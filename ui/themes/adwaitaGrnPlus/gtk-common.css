@@ -1,0 +1,59 @@
+/* common color definitions to the light and dark variations */
+@define-color alt_base_color mix(@theme_bg_color, @theme_base_color, 0.5);
+@define-color alt_subdued_color mix(@theme_bg_color, @subdued_color, 0.5);
+
+@define-color alt_border_color mix(@theme_tooltip_bg_color, @border_color, 0.5);
+@define-color colored_border_color mix(@alt_border_color, shade(@theme_selected_bg_color, 0.5), 0.2);
+@define-color focused_border_color mix(@internal_element_color, @theme_selected_bg_color, 0.8);
+@define-color suggested_action_border_color mix(@alt_border_color, shade(@theme_selected_bg_color, 0.2), 0.2);
+@define-color destructive_action_border_color mix(@alt_border_color, shade(@error_color, 0.2), 0.2);
+@define-color insensitive_border_color alpha(@alt_border_color, 0.5);
+
+/* 
+@define-color insensitive_fg_color alpha(@theme_fg_color, 0.5);
+@define-color insensitive_internal_element_color alpha(@internal_element_color, 0.5);
+@define-color selected_internal_element_color alpha(@theme_selected_fg_color, 0.6);
+ */
+@define-color insensitive_fg_color mix(@theme_fg_color, @theme_bg_color, 0.5);
+@define-color insensitive_internal_element_color mix(@internal_element_color, @theme_bg_color, 0.5);
+@define-color selected_internal_element_color mix(@theme_selected_fg_color, @theme_selected_bg_color, 0.4);
+
+@define-color button_top_color mix(@theme_bg_color, @theme_base_color, 0.5);
+@define-color button_bottom_color mix(@theme_bg_color, @theme_tooltip_bg_color, 0.5);
+@define-color button_top_hover_color @theme_base_color;
+@define-color button_bottom_hover_color mix(@theme_bg_color, @subdued_color, 0.5);
+@define-color button_top_active_color mix(@theme_tooltip_bg_color, @subdued_color, 0.5);
+@define-color button_bottom_active_color mix(@theme_tooltip_bg_color, @theme_bg_color, 0.5);
+@define-color button_top_active_hover_color mix(@theme_tooltip_bg_color, @theme_bg_color, 0.5);
+@define-color button_bottom_active_hover_color mix(@theme_tooltip_bg_color, @theme_base_color, 0.5);
+
+@define-color colored_button_top_color mix(@button_top_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_bottom_color mix(@button_bottom_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_top_hover_color mix(@button_top_hover_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_bottom_hover_color mix(@button_bottom_hover_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_top_active_color mix(@button_top_active_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_bottom_active_color mix(@button_bottom_active_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_top_active_hover_color mix(@button_top_active_hover_color, @theme_selected_bg_color, 0.2);
+@define-color colored_button_bottom_active_hover_color mix(@button_bottom_active_hover_color, @theme_selected_bg_color, 0.2);
+
+@define-color suggested_action_button_top_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 1.1), 0.8);
+@define-color suggested_action_button_bottom_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 0.9), 0.8);
+@define-color suggested_action_button_top_hover_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 1.2), 0.8);
+@define-color suggested_action_button_bottom_hover_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 1.0), 0.8);
+@define-color suggested_action_button_top_active_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 0.9), 0.8);
+@define-color suggested_action_button_bottom_active_color mix(@theme_bg_color, shade(@theme_selected_bg_color, 1.0), 0.8);
+
+@define-color destructive_action_button_top_color mix(@theme_bg_color, shade(@error_color, 1.1), 0.8);
+@define-color destructive_action_button_bottom_color mix(@theme_bg_color, shade(@error_color, 0.9), 0.8);
+@define-color destructive_action_button_top_hover_color mix(@theme_bg_color, shade(@error_color, 1.2), 0.8);
+@define-color destructive_action_button_bottom_hover_color mix(@theme_bg_color, shade(@error_color, 1.0), 0.8);
+@define-color destructive_action_button_top_active_color mix(@theme_bg_color, shade(@error_color, 0.9), 0.8);
+@define-color destructive_action_button_bottom_active_color mix(@theme_bg_color, shade(@error_color, 1.0), 0.8);
+
+/*****************
+ * Fallback Mode *
+ *****************/
+@define-color os_chrome_bg_color black;
+@define-color os_chrome_fg_color #ccc;
+@define-color os_chrome_selected_bg_color #333;
+@define-color os_chrome_selected_fg_color white;

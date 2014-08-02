@@ -1,0 +1,339 @@
+/****************
+ * Content view *
+ ****************/
+.content-view.view {
+    background-image: url("assets/noise-texture.png");
+}
+
+/***************
+ * Resize grip *
+ ***************/
+.grip {
+    background-image: url("assets/resize-grip.svg");
+}
+
+.grip:hover {
+    background-image: url("assets/resize-grip-hover.svg");
+}
+
+.grip:active {
+    background-image: url("assets/resize-grip-active.svg");
+}
+
+/*******************
+ * Pane separators *
+ *******************/
+.pane-separator {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-image: url("assets/pane-separator-grip.svg");
+}
+
+.pane-separator:hover {
+    background-image: url("assets/pane-separator-grip-hover.svg");
+}
+
+.pane-separator:active {
+    background-image: url("assets/pane-separator-grip-active.svg");
+}
+
+.pane-separator.vertical {
+    background-image: url("assets/pane-separator-grip-vertical.svg");
+}
+
+.pane-separator.vertical:hover {
+    background-image: url("assets/pane-separator-grip-vertical-hover.svg");
+}
+
+.pane-separator.vertical:active {
+    background-image: url("assets/pane-separator-grip-vertical-active.svg");
+}
+
+/*************************
+ * Check and Radio items *
+ *************************/
+.check:active,
+.check row:active,
+.view.cell.check:active {
+    background-image: url("assets/check-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      @suggested_action_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.check:active:hover,
+.check row:active:hover,
+.view.cell.check:active:hover {
+    background-image: url("assets/check-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_hover_color,
+                                      @suggested_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.check:active:insensitive,
+.check row:active:insensitive,
+.view.cell.check:active:insensitive {
+    background-image: url("assets/check-insensitive.svg");
+    background-color: @theme_bg_color;
+}
+
+.radio:active,
+.radio row:active,
+.view.cell.radio:active {
+    background-image: url("assets/radio-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      @suggested_action_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.radio:active:hover,
+.radio row:active:hover,
+.view.cell.radio:active:hover {
+    background-image: url("assets/radio-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_hover_color,
+                                      @suggested_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.radio:active:insensitive,
+.radio row:active:insensitive,
+.view.cell.radio:active:insensitive {
+    background-image: url("assets/radio-insensitive.svg");
+    background-color: @theme_bg_color;
+}
+
+.check:inconsistent,
+.check row:inconsistent,
+.view.cell.check:inconsistent,
+.radio:inconsistent,
+.radio row:inconsistent,
+.view.cell.radio:inconsistent {
+    background-image: url("assets/mix.svg"),
+                      linear-gradient(to bottom,
+                                      @colored_button_top_color,
+                                      @colored_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.check:inconsistent:hover,
+.check row:inconsistent:hover,
+.view.cell.check:inconsistent:hover,
+.radio:inconsistent:hover,
+.radio row:inconsistent:hover,
+.view.cell.radio:inconsistent:hover {
+    background-image: url("assets/mix.svg"),
+                      linear-gradient(to bottom,
+                                      @colored_button_top_hover_color,
+                                      @colored_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.check:inconsistent:insensitive,
+.check row:inconsistent:insensitive,
+.view.cell.check:inconsistent:insensitive,
+.radio:inconsistent:insensitive,
+.radio row:inconsistent:insensitive,
+.view.cell.radio:inconsistent:insensitive {
+    background-image: url("assets/mix-insensitive.svg");
+    background-color: @theme_bg_color;
+}
+
+.menuitem.check:active {
+    background-image: url("assets/check.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:active:hover {
+    background-image: url("assets/check-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:active:insensitive {
+    background-image: url("assets/check-insensitive.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active {
+    background-image: url("assets/radio.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active:hover {
+    background-image: url("assets/radio-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active:insensitive {
+    background-image: url("assets/radio-insensitive.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent,
+.menuitem.radio:inconsistent {
+    background-image: url("assets/mix.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent:hover,
+.menuitem.radio:inconsistent:hover {
+    background-image: url("assets/mix-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent:insensitive,
+.menuitem.radio:inconsistent:insensitive {
+    background-image: url("assets/mix-insensitive.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:hover,
+.sidebar .view.radio:focus {
+    background-image: url("assets/radio-hover.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:active,
+.sidebar .view.radio:active:hover,
+.sidebar .view.radio:active:focus {
+    background-image: url("assets/radio.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:selected:hover,
+.sidebar .view.radio:selected:focus {
+    background-image: url("assets/radio-selected-hover.svg");
+    background-color: transparent; 
+}
+
+.sidebar .view.radio:selected:active,
+.sidebar .view.radio:selected:active:hover,
+.sidebar .view.radio:selected:active:focus {
+    background-image: url("assets/radio-selected.svg");
+    background-color: transparent;
+}
+
+/*********************
+ * GtkScale's slider *
+ *********************/
+.scale.scale-has-marks-above.slider.horizontal {
+    background-image: url("assets/scale-slider-up.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:hover {
+    background-image: url("assets/scale-slider-up-hover.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:active {
+    background-image: url("assets/scale-slider-up-active.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.fine-tune.horizontal:active {
+    background-image: url("assets/scale-slider-up-fine-tune.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:insensitive {
+    background-image: url("assets/scale-slider-up-insensitive.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical {
+    background-image: url("assets/scale-slider-left.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:hover {
+    background-image: url("assets/scale-slider-left-hover.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:active {
+    background-image: url("assets/scale-slider-left-active.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.fine-tune.vertical:active {
+    background-image: url("assets/scale-slider-left-fine-tune.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:insensitive {
+    background-image: url("assets/scale-slider-left-insensitive.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal {
+    background-image: url("assets/scale-slider-down.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:hover {
+    background-image: url("assets/scale-slider-down-hover.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:active {
+    background-image: url("assets/scale-slider-down-active.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.fine-tune.horizontal:active {
+    background-image: url("assets/scale-slider-down-fine-tune.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:insensitive {
+    background-image: url("assets/scale-slider-down-insensitive.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical {
+    background-image: url("assets/scale-slider-right.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:hover {
+    background-image: url("assets/scale-slider-right-hover.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:active {
+    background-image: url("assets/scale-slider-right-active.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.fine-tune.vertical:active {
+    background-image: url("assets/scale-slider-right-fine-tune.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:insensitive {
+    background-image: url("assets/scale-slider-right-insensitive.svg");
+    background-color: transparent;
+}
+
+/********************************
+ * Touch text selection handles *
+ ********************************/
+.cursor-handle.bottom {
+    background-image: url("assets/scale-slider-up.svg");
+    background-color: transparent;
+}
+
+.cursor-handle.top {
+    background-image: url("assets/scale-slider-down.svg");
+    background-color: transparent;
+}

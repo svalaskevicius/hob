@@ -1,0 +1,486 @@
+/* Button and slider background and text */
+.button,
+.toolbar .button.raised,
+.toolbar .raised .button,
+.primary-toolbar .button:focus,
+.primary-toolbar .spinbutton .button,
+.primary-toolbar GtkComboBox .button,
+.primary-toolbar GtkComboBox.combobox-entry .button,
+column-header.button,
+column-header .button,
+.scale.slider,
+GtkSwitch.slider,
+.scrollbar.slider,
+.check,
+.check row,
+.view.cell.check,
+.radio,
+.radio row,
+.view.cell.radio,
+.notebook tab {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_color,
+                                      @button_bottom_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+.scrollbar.slider.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_color,
+                                      alpha(@button_top_color, 0) 8px
+                                      ),
+                      linear-gradient(to top,
+                                      @button_bottom_color,
+                                      alpha(@button_bottom_color, 0) 8px
+                                      );
+    background-color: mix(@button_top_color, @button_bottom_color, 0.5);
+}
+
+/* Prelit button and slider background and text */
+.button:hover,
+.toolbar .button.raised:hover,
+.toolbar .raised .button:hover,
+.primary-toolbar .button:hover,
+.primary-toolbar .spinbutton .button:hover,
+.primary-toolbar GtkComboBox .button:hover,
+.primary-toolbar GtkComboBox.combobox-entry .button:hover,
+column-header.button:hover,
+column-header .button:hover,
+.scale.slider:hover,
+GtkSwitch.slider:hover,
+.scrollbar.slider:hover,
+.check:hover,
+.check row:hover,
+.view.cell.check:hover,
+.radio:hover,
+.radio row:hover,
+.view.cell.radio:hover,
+.notebook tab:hover {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_hover_color,
+                                      @button_bottom_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+.scrollbar.slider.vertical:hover {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_hover_color,
+                                      alpha(@button_top_hover_color, 0) 8px
+                                      ),
+                      linear-gradient(to top,
+                                      @button_bottom_hover_color,
+                                      alpha(@button_bottom_hover_color, 0) 8px
+                                      );
+    background-color: mix(@button_top_hover_color, @button_bottom_hover_color, 0.5);
+}
+
+/* Pushed button and through background and text */
+.button:active,
+.toolbar .button.raised:active,
+.toolbar .raised .button:active,
+.primary-toolbar .button:active,
+.primary-toolbar .spinbutton .button:active,
+.primary-toolbar GtkComboBox .button:active,
+.primary-toolbar GtkComboBox.combobox-entry .button:active,
+column-header.button:active,
+column-header .button:active,
+column-header .button.dnd,
+.trough,
+.trough row,
+.scale.trough,
+GtkSwitch.trough,
+.scrollbar.trough {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_active_color,
+                                      @button_bottom_active_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+.scrollbar.trough.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_active_color,
+                                      alpha(@button_top_active_color, 0) 8px
+                                      ),
+                      linear-gradient(to top,
+                                      @button_bottom_active_color,
+                                      alpha(@button_bottom_active_color, 0) 8px
+                                      );
+    background-color: mix(@button_top_active_color, @button_bottom_active_color, 0.5);
+}
+
+.trough.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_active_color,
+                                      alpha(@button_top_active_color, 0) 9px
+                                      ),
+                      linear-gradient(to top,
+                                      @button_bottom_active_color,
+                                      alpha(@button_bottom_active_color, 0) 9px
+                                      );
+    background-color: mix(@button_top_active_color, @button_bottom_active_color, 0.5);
+}
+
+.scale.trough.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_active_color,
+                                      alpha(@button_top_active_color, 0) 3px
+                                      ),
+                      linear-gradient(to top,
+                                      @button_bottom_active_color,
+                                      alpha(@button_bottom_active_color, 0) 3px
+                                      );
+    background-color: mix(@button_top_active_color, @button_bottom_active_color, 0.5);
+}
+
+/* Prelit pushed button background and text */
+.button:active:hover,
+.toolbar .button.raised:active:hover,
+.toolbar .raised .button:active:hover,
+.primary-toolbar .button:active:hover,
+.primary-toolbar .spinbutton .button:active:hover,
+.primary-toolbar GtkComboBox .button:active:hover,
+.primary-toolbar GtkComboBox.combobox-entry .button:active:hover,
+column-header.button:active:hover,
+column-header .button:active:hover {
+    background-image: linear-gradient(to bottom,
+                                      @button_top_active_hover_color,
+                                      @button_bottom_active_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+/* Colored button background and text */
+.button.default,
+.toolbar .button.raised.default,
+.toolbar .raised .button.default,
+.primary-toolbar .button.default:focus {
+    background-image: linear-gradient(to bottom,
+                                      @colored_button_top_color,
+                                      @colored_button_bottom_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+/* Prelit colored button background and text */
+.button.default:hover,
+.toolbar .button.raised.default:hover,
+.toolbar .raised .button.default:hover,
+.primary-toolbar .button.default:hover,
+.scale.slider.fine-tune:active,
+.scrollbar.slider.fine-tune:active {
+    background-image: linear-gradient(to bottom, 
+                                      @colored_button_top_hover_color, 
+                                      @colored_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+.scrollbar.slider.fine-tune.vertical:active {
+    background-image: linear-gradient(to bottom,
+                                      @colored_button_top_hover_color,
+                                      alpha(@colored_button_top_hover_color, 0) 8px
+                                      ),
+                      linear-gradient(to top,
+                                      @colored_button_bottom_hover_color,
+                                      alpha(@colored_button_bottom_hover_color, 0) 8px
+                                      );
+    background-color: mix(@colored_button_top_hover_color, @colored_button_bottom_hover_color, 0.5);
+}
+
+/* Pushed colored button background and text */
+.button.default:active,
+.toolbar .button.raised.default:active,
+.toolbar .raised .button.default:active,
+.primary-toolbar .button.default:active {
+    background-image: linear-gradient(to bottom, 
+                                      @colored_button_top_active_color, 
+                                      @colored_button_bottom_active_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+/* Prelit pushed colored button background and text */
+.button.default:active:hover,
+.toolbar .button.raised.default:active:hover,
+.toolbar .raised .button.default:active:hover,
+.primary-toolbar .button.default:active:hover {
+    background-image: linear-gradient(to bottom, 
+                                      @colored_button_top_active_hover_color, 
+                                      @colored_button_bottom_active_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_fg_color;
+}
+
+/* Suggested action button and progressbar background and text */
+.suggested-action.button,
+.primary-toolbar .suggested-action.button,
+.selection-mode.toolbar GtkToolButton.suggested-action .button,
+.progressbar,
+.progressbar row,
+.scale.progressbar {
+    background-image: linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      @suggested_action_button_bottom_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+.progressbar.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      alpha(@suggested_action_button_top_color, 0) 9px
+                                      ),
+                      linear-gradient(to top,
+                                      @suggested_action_button_bottom_color,
+                                      alpha(@suggested_action_button_bottom_color, 0) 9px
+                                      );
+    background-color: mix(@suggested_action_button_top_color, @suggested_action_button_bottom_color, 0.5);
+}
+
+.scale.progressbar.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      alpha(@suggested_action_button_top_color, 0) 3px
+                                      ),
+                      linear-gradient(to top,
+                                      @suggested_action_button_bottom_color,
+                                      alpha(@suggested_action_button_bottom_color, 0) 3px
+                                      );
+    background-color: mix(@suggested_action_button_top_color, @suggested_action_button_bottom_color, 0.5);
+}
+
+/* Prelit suggested action button background and text */
+.suggested-action.button:hover,
+.primary-toolbar .suggested-action.button:hover,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:hover {
+    background-image: linear-gradient(to bottom, 
+                                      @suggested_action_button_top_hover_color, 
+                                      @suggested_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+/* Pushed suggested action button and highlit through background and text */
+.suggested-action.button:active,
+.primary-toolbar .suggested-action.button:active,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:active,
+.scale.trough.highlight,
+GtkSwitch.trough:active {
+    background-image: linear-gradient(to bottom, 
+                                      @suggested_action_button_top_active_color, 
+                                      @suggested_action_button_bottom_active_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+.scale.trough.highlight.vertical {
+    background-image: linear-gradient(to bottom,
+                                      @suggested_action_button_top_active_color,
+                                      alpha(@suggested_action_button_top_active_color, 0) 3px
+                                      ),
+                      linear-gradient(to top,
+                                      @suggested_action_button_bottom_active_color,
+                                      alpha(@suggested_action_button_bottom_active_color, 0) 3px
+                                      );
+    background-color: mix(@suggested_action_button_top_active_color, @suggested_action_button_bottom_active_color, 0.5);
+}
+
+/* Destructive action button background and text */
+.destructive-action.button,
+.primary-toolbar .destructive-action.button {
+    background-image: linear-gradient(to bottom,
+                                      @destructive_action_button_top_color,
+                                      @destructive_action_button_bottom_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+/* Prelit destructive action button background and text */
+.destructive-action.button:hover,
+.primary-toolbar .destructive-action.button:hover {
+    background-image: linear-gradient(to bottom, 
+                                      @destructive_action_button_top_hover_color, 
+                                      @destructive_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+/* Pushed destructive action button background and text */
+.destructive-action.button:active,
+.primary-toolbar .destructive-action.button:active {
+    background-image: linear-gradient(to bottom, 
+                                      @destructive_action_button_top_active_color, 
+                                      @destructive_action_button_bottom_active_color
+                                      );
+    background-color: transparent;
+    color: @theme_selected_fg_color;
+}
+
+/* Insensitive button and slider background and text */
+.button:insensitive,
+.toolbar .button.raised:insensitive,
+.toolbar .raised .button:insensitive,
+.primary-toolbar .spinbutton .button:insensitive,
+.primary-toolbar GtkComboBox .button:insensitive,
+.primary-toolbar GtkComboBox.combobox-entry .button:insensitive,
+column-header.button:insensitive,
+column-header .button:insensitive,
+.scale.slider:insensitive,
+GtkSwitch.slider:insensitive,
+.scrollbar.slider:insensitive,
+.check:insensitive,
+.check row:insensitive,
+.view.cell.check:insensitive,
+.radio:insensitive,
+.radio row:insensitive,
+.view.cell.radio:insensitive,
+.notebook tab:insensitive,
+.button.default:insensitive,
+.toolbar .button.raised.default:insensitive,
+.toolbar .raised .button.default:insensitive,
+.suggested-action.button:insensitive,
+.primary-toolbar .suggested-action.button:insensitive,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:insensitive,
+.progressbar:insensitive,
+.progressbar row:insensitive,
+.scale.progressbar:insensitive,
+.destructive-action.button:insensitive,
+.primary-toolbar .destructive-action.button:insensitive {
+    background-image: none;
+    background-color: mix(@theme_bg_color, mix(@button_top_color, @button_bottom_color, 0.5), 0.5);
+    color: @insensitive_fg_color;
+}
+
+/* Insensitive Pushed button and through background and text */
+.button:active:insensitive,
+.toolbar .button.raised:active:insensitive,
+.toolbar .raised .button:active:insensitive,
+.primary-toolbar .button:active:insensitive,
+.primary-toolbar .spinbutton .button:active:insensitive,
+.primary-toolbar GtkComboBox .button:active:insensitive,
+.primary-toolbar GtkComboBox.combobox-entry .button:active:insensitive,
+column-header.button:active:insensitive,
+column-header .button:active:insensitive,
+.trough:insensitive,
+.trough row:insensitive,
+.scale.trough:insensitive,
+GtkSwitch.trough:insensitive,
+.scrollbar.trough:insensitive,
+.button.default:active:insensitive,
+.toolbar .button.raised.default:active:insensitive,
+.toolbar .raised .button.default:active:insensitive,
+.primary-toolbar .button.default:active:insensitive,
+.suggested-action.button:active:insensitive,
+.primary-toolbar .suggested-action.button:active:insensitive,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:active:insensitive,
+.scale.trough.highlight:insensitive,
+GtkSwitch.trough:active:insensitive,
+.destructive-action.button:active:insensitive,
+.primary-toolbar .destructive-action.button:active:insensitive {
+    background-image: none;
+    background-color: mix(@theme_bg_color, mix(@button_top_active_color, @button_bottom_active_color, 0.5), 0.5);
+    color: @insensitive_fg_color;
+}
+
+/* Active menu button and tab background and text */
+.menubar .menuitem:hover,
+.button.menuitem.menubar:active,
+GtkMenuButton.button:active,
+.toolbar GtkMenuButton.button.raised:active,
+.toolbar .raised GtkMenuButton.button:active,
+.primary-toolbar GtkMenuButton.button:active,
+.selection-mode.toolbar .selection-menu.button:active,
+.selection-mode.header-bar .selection-menu.button:active,
+GtkComboBox .button:active,
+GtkComboBox.combobox-entry .button:active,
+.notebook tab:active {
+    background-image: none;
+    background-color: @theme_base_color;
+    color: @theme_text_color;
+}
+
+/* Entry background and text */
+.entry {
+    background-image: linear-gradient(to bottom,
+                                      alpha(@theme_tooltip_bg_color, 0.2),
+                                      alpha(@theme_tooltip_bg_color, 0) 4px
+                                      );
+    background-color: @theme_base_color;
+    color: @theme_text_color;
+}
+
+/* Insensitive entry background and text */
+.entry:insensitive {
+    background-image: none;
+    background-color: @alt_base_color;
+    color: @insensitive_fg_color;
+}
+
+/* Toolbar and header bar background */
+.toolbar,
+.header-bar {
+    background-image: none;
+    background-color: @theme_bg_color;
+}
+
+/* Unfocused window toolbar and header bar background */
+.toolbar:backdrop,
+.header-bar:backdrop {
+    background-image: none;
+    background-color: @theme_bg_color;
+}
+
+/* Selection mode toolbar and header bar background */
+.selection-mode.header-bar {
+    background-image: linear-gradient(to bottom,
+                                      mix(@info_color, @button_top_color, 0.8),
+                                      mix(@info_color, @theme_bg_color, 0.8)
+                                      );
+    background-color: transparent;
+}
+
+/* Unfocused window selection mode toolbar and header bar background */
+.selection-mode.toolbar,
+.selection-mode.toolbar:backdrop,
+.selection-mode.header-bar:backdrop {
+    background-image: none;
+    background-color: mix(@info_color, @theme_bg_color, 0.8);
+}
+
+/* Primary and inline toolbars background */
+.primary-toolbar .toolbar,
+.primary-toolbar.toolbar,
+.inline-toolbar.toolbar {
+    background-image: linear-gradient(to bottom,
+                                      mix(@subdued_color, @theme_tooltip_bg_color, 0.2),
+                                      mix(@subdued_color, @theme_bg_color, 0.2)
+                                      );
+    background-color: transparent;
+}
+
+/* Unfocused window primary toolbar and insensitive inline toolbar background */
+.primary-toolbar .toolbar:backdrop,
+.primary-toolbar.toolbar:backdrop,
+.inline-toolbar.toolbar:insensitive,
+.primary-toolbar .toolbar.vertical,
+.primary-toolbar.toolbar.vertical,
+.inline-toolbar.toolbar.vertical {
+    background-image: none;
+    background-color: @subdued_color;
+}

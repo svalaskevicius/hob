@@ -1,0 +1,339 @@
+/****************
+ * Content view *
+ ****************/
+.content-view.view {
+    background-image: url("assets/noise-texture-dark.png");
+}
+
+/***************
+ * Resize grip *
+ ***************/
+.grip {
+    background-image: url("assets/resize-grip-dark.svg");
+}
+
+.grip:hover {
+    background-image: url("assets/resize-grip-hover-dark.svg");
+}
+
+.grip:active {
+    background-image: url("assets/resize-grip-active.svg");
+}
+
+/*******************
+ * Pane separators *
+ *******************/
+.pane-separator {
+    background-position: center;
+    background-repeat: no-repeat;
+    background-image: url("assets/pane-separator-grip-dark.svg");
+}
+
+.pane-separator:hover {
+    background-image: url("assets/pane-separator-grip-hover-dark.svg");
+}
+
+.pane-separator:active {
+    background-image: url("assets/pane-separator-grip-active.svg");
+}
+
+.pane-separator.vertical {
+    background-image: url("assets/pane-separator-grip-vertical-dark.svg");
+}
+
+.pane-separator.vertical:hover {
+    background-image: url("assets/pane-separator-grip-vertical-hover-dark.svg");
+}
+
+.pane-separator.vertical:active {
+    background-image: url("assets/pane-separator-grip-vertical-active.svg");
+}
+
+/*************************
+ * Check and Radio items *
+ *************************/
+.check:active,
+.check row:active,
+.view.cell.check:active {
+    background-image: url("assets/check-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      @suggested_action_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.check:active:hover,
+.check row:active:hover,
+.view.cell.check:active:hover {
+    background-image: url("assets/check-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_hover_color,
+                                      @suggested_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.check:active:insensitive,
+.check row:active:insensitive,
+.view.cell.check:active:insensitive {
+    background-image: url("assets/check-insensitive-dark.svg");
+    background-color: @theme_bg_color;
+}
+
+.radio:active,
+.radio row:active,
+.view.cell.radio:active {
+    background-image: url("assets/radio-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_color,
+                                      @suggested_action_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.radio:active:hover,
+.radio row:active:hover,
+.view.cell.radio:active:hover {
+    background-image: url("assets/radio-selected.svg"),
+                      linear-gradient(to bottom,
+                                      @suggested_action_button_top_hover_color,
+                                      @suggested_action_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.radio:active:insensitive,
+.radio row:active:insensitive,
+.view.cell.radio:active:insensitive {
+    background-image: url("assets/radio-insensitive-dark.svg");
+    background-color: @theme_bg_color;
+}
+
+.check:inconsistent,
+.check row:inconsistent,
+.view.cell.check:inconsistent,
+.radio:inconsistent,
+.radio row:inconsistent,
+.view.cell.radio:inconsistent {
+    background-image: url("assets/mix-dark.svg"),
+                      linear-gradient(to bottom,
+                                      @colored_button_top_color,
+                                      @colored_button_bottom_color
+                                      );
+    background-color: transparent;
+}
+
+.check:inconsistent:hover,
+.check row:inconsistent:hover,
+.view.cell.check:inconsistent:hover,
+.radio:inconsistent:hover,
+.radio row:inconsistent:hover,
+.view.cell.radio:inconsistent:hover {
+    background-image: url("assets/mix-dark.svg"),
+                      linear-gradient(to bottom,
+                                      @colored_button_top_hover_color,
+                                      @colored_button_bottom_hover_color
+                                      );
+    background-color: transparent;
+}
+
+.check:inconsistent:insensitive,
+.check row:inconsistent:insensitive,
+.view.cell.check:inconsistent:insensitive,
+.radio:inconsistent:insensitive,
+.radio row:inconsistent:insensitive,
+.view.cell.radio:inconsistent:insensitive {
+    background-image: url("assets/mix-insensitive-dark.svg");
+    background-color: @theme_bg_color;
+}
+
+.menuitem.check:active {
+    background-image: url("assets/check-dark.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:active:hover {
+    background-image: url("assets/check-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:active:insensitive {
+    background-image: url("assets/check-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active {
+    background-image: url("assets/radio-dark.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active:hover {
+    background-image: url("assets/radio-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.radio:active:insensitive {
+    background-image: url("assets/radio-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent,
+.menuitem.radio:inconsistent {
+    background-image: url("assets/mix-dark.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent:hover,
+.menuitem.radio:inconsistent:hover {
+    background-image: url("assets/mix-selected.svg");
+    background-color: transparent;
+}
+
+.menuitem.check:inconsistent:insensitive,
+.menuitem.radio:inconsistent:insensitive {
+    background-image: url("assets/mix-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:hover,
+.sidebar .view.radio:focus {
+    background-image: url("assets/radio-hover-dark.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:active,
+.sidebar .view.radio:active:hover,
+.sidebar .view.radio:active:focus {
+    background-image: url("assets/radio-dark.svg");
+    background-color: transparent;
+}
+
+.sidebar .view.radio:selected:hover,
+.sidebar .view.radio:selected:focus {
+    background-image: url("assets/radio-selected-hover.svg");
+    background-color: transparent; 
+}
+
+.sidebar .view.radio:selected:active,
+.sidebar .view.radio:selected:active:hover,
+.sidebar .view.radio:selected:active:focus {
+    background-image: url("assets/radio-selected.svg");
+    background-color: transparent;
+}
+
+/*********************
+ * GtkScale's slider *
+ *********************/
+.scale.scale-has-marks-above.slider.horizontal {
+    background-image: url("assets/scale-slider-up-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:hover {
+    background-image: url("assets/scale-slider-up-hover-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:active {
+    background-image: url("assets/scale-slider-up-active-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.fine-tune.horizontal:active {
+    background-image: url("assets/scale-slider-up-fine-tune-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.horizontal:insensitive {
+    background-image: url("assets/scale-slider-up-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical {
+    background-image: url("assets/scale-slider-left-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:hover {
+    background-image: url("assets/scale-slider-left-hover-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:active {
+    background-image: url("assets/scale-slider-left-active-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.fine-tune.vertical:active {
+    background-image: url("assets/scale-slider-left-fine-tune-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-above.slider.vertical:insensitive {
+    background-image: url("assets/scale-slider-left-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal {
+    background-image: url("assets/scale-slider-down-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:hover {
+    background-image: url("assets/scale-slider-down-hover-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:active {
+    background-image: url("assets/scale-slider-down-active-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.fine-tune.horizontal:active {
+    background-image: url("assets/scale-slider-down-fine-tune-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.horizontal:insensitive {
+    background-image: url("assets/scale-slider-down-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical {
+    background-image: url("assets/scale-slider-right-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:hover {
+    background-image: url("assets/scale-slider-right-hover-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:active {
+    background-image: url("assets/scale-slider-right-active-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.fine-tune.vertical:active {
+    background-image: url("assets/scale-slider-right-fine-tune-dark.svg");
+    background-color: transparent;
+}
+
+.scale.scale-has-marks-below.slider.vertical:insensitive {
+    background-image: url("assets/scale-slider-right-insensitive-dark.svg");
+    background-color: transparent;
+}
+
+/********************************
+ * Touch text selection handles *
+ ********************************/
+.cursor-handle.bottom {
+    background-image: url("assets/scale-slider-up-dark.svg");
+    background-color: transparent;
+}
+
+.cursor-handle.top {
+    background-image: url("assets/scale-slider-down-dark.svg");
+    background-color: transparent;
+}

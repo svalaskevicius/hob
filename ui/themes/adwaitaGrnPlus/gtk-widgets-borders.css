@@ -1,0 +1,215 @@
+/* Generic element borders */
+.entry,
+.button,
+.toolbar .button.raised,
+.toolbar .raised .button,
+.primary-toolbar .button:hover,
+.primary-toolbar .button:active,
+.primary-toolbar .spinbutton .button,
+.primary-toolbar GtkComboBox .button,
+.primary-toolbar GtkComboBox.combobox-entry .button,
+column-header.button,
+column-header .button,
+.scale.slider,
+GtkSwitch.slider,
+.trough,
+.trough row,
+.scale.trough,
+GtkSwitch.trough,
+.notebook tab {
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: @alt_border_color;
+}
+
+.scrollbar.slider,
+.scrollbar.trough,
+.check,
+.check row,
+.view.cell.check,
+.radio,
+.radio row,
+.view.cell.radio {
+    box-shadow: inset 0 0 0 1px @alt_border_color;
+}
+
+/* Colored element borders */
+.button.default,
+.toolbar .button.raised.default,
+.toolbar .raised .button.default,
+.primary-toolbar .button.default:hover,
+.primary-toolbar .button.default:active {
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: @colored_border_color;
+}
+
+.check:inconsistent,
+.check row:inconsistent,
+.view.cell.check:inconsistent,
+.radio:inconsistent,
+.radio row:inconsistent,
+.view.cell.radio:inconsistent {
+    box-shadow: inset 0 0 0 1px @colored_border_color;
+}
+
+/* Suggested action buttons borders */
+.suggested-action.button,
+.primary-toolbar .suggested-action.button,
+.selection-mode.toolbar GtkToolButton.suggested-action .button,
+.progressbar,
+.progressbar row,
+.scale.progressbar,
+.scale.trough.highlight,
+GtkSwitch.trough:active {
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: @suggested_action_border_color;
+}
+
+.check:active,
+.check row:active,
+.view.cell.check:active,
+.radio:active,
+.radio row:active,
+.view.cell.radio:active {
+    box-shadow: inset 0 0 0 1px @suggested_action_border_color;
+}
+
+/* Destructive action buttons borders */
+.destructive-action.button,
+.primary-toolbar .destructive-action.button {
+    border-radius: 4px;
+    border-width: 1px;
+    border-style: solid;
+    border-color: @destructive_action_border_color;
+}
+
+/* Focused element borders */
+.entry:focus,
+.button:focus,
+.toolbar .button.raised:focus,
+.toolbar .raised .button:focus,
+.primary-toolbar .button:focus,
+.primary-toolbar .spinbutton .button:focus,
+.primary-toolbar GtkComboBox .button:focus,
+.primary-toolbar GtkComboBox.combobox-entry .button:focus,
+column-header.button:focus,
+column-header .button:focus,
+.scale.slider:active,
+/* GtkSwitch.slider:active, */
+.scale.trough:focus,
+GtkSwitch.trough:focus,
+.notebook tab:active:focus {
+    border-color: @focused_border_color;
+    box-shadow: inset 0 0 0 1px alpha(@focused_border_color, 0.2);
+}
+
+.scrollbar.slider:active,
+.check:focus,
+.check row:focus,
+.view.cell.check:focus,
+.radio:focus,
+.radio row:focus,
+.view.cell.radio:focus {
+    box-shadow: inset 0 0 0 2px alpha(@focused_border_color, 0.2),
+                inset 0 0 0 1px @focused_border_color;
+}
+
+/* Focused colored element borders */
+.button.default:focus,
+.toolbar .button.raised.default:focus,
+.toolbar .raised .button.default:focus,
+.primary-toolbar .button.default:focus,
+.scale.slider.fine-tune:active {
+    border-color: @focused_border_color;
+    box-shadow: inset 0 0 0 1px alpha(@focused_border_color, 0.2);
+}
+
+.scrollbar.slider.fine-tune:active,
+.check:inconsistent:focus,
+.check row:inconsistent:focus,
+.view.cell.check:inconsistent:focus,
+.radio:inconsistent:focus,
+.radio row:inconsistent:focus,
+.view.cell.radio:inconsistent:focus {
+    box-shadow: inset 0 0 0 2px alpha(@focused_border_color, 0.2),
+                inset 0 0 0 1px @focused_border_color;
+}
+
+/* Focused suggested action buttons borders */
+.suggested-action.button:focus,
+.primary-toolbar .suggested-action.button:focus,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:focus,
+.scale.progressbar:focus,
+.scale.trough.highlight:focus,
+GtkSwitch.trough:active:focus {
+    border-color: @suggested_action_border_color;
+    box-shadow: inset 0 0 0 1px alpha(@theme_selected_fg_color, 0.6);
+}
+
+.check:active:focus,
+.check row:active:focus,
+.view.cell.check:active:focus,
+.radio:active:focus,
+.radio row:active:focus,
+.view.cell.radio:active:focus {
+    box-shadow: inset 0 0 0 2px alpha(@theme_selected_fg_color, 0.6),
+                inset 0 0 0 1px @suggested_action_border_color;
+}
+
+/* Focused destructive action buttons borders */
+.destructive-action.button:focus,
+.primary-toolbar .destructive-action.button:focus {
+    border-color: @destructive_action_border_color;
+    box-shadow: inset 0 0 0 1px alpha(@theme_selected_fg_color, 0.6);
+}
+
+/* Insensitive element borders */
+.entry:insensitive,
+.button:insensitive,
+.toolbar .button.raised:insensitive,
+.toolbar .raised .button:insensitive,
+.primary-toolbar .button:active:insensitive,
+.primary-toolbar .spinbutton .button:insensitive,
+.primary-toolbar GtkComboBox .button:insensitive,
+.primary-toolbar GtkComboBox.combobox-entry .button:insensitive,
+column-header.button:insensitive,
+column-header .button:insensitive,
+.scale.slider:insensitive,
+GtkSwitch.slider:insensitive,
+.trough:insensitive,
+.trough row:insensitive,
+.scale.trough:insensitive,
+GtkSwitch.trough:insensitive,
+.notebook tab:insensitive,
+.button.default:insensitive,
+.toolbar .button.raised.default:insensitive,
+.toolbar .raised .button.default:insensitive,
+.primary-toolbar .button.default:active:insensitive,
+.suggested-action.button:insensitive,
+.primary-toolbar .suggested-action.button:insensitive,
+.selection-mode.toolbar GtkToolButton.suggested-action .button:insensitive,
+.progressbar:insensitive,
+.progressbar row:insensitive,
+.scale.progressbar:insensitive,
+.scale.trough.highlight:insensitive,
+GtkSwitch.trough:active:insensitive,
+.destructive-action.button:insensitive,
+.primary-toolbar .destructive-action.button:insensitive {
+    border-color: @insensitive_border_color;
+}
+
+.scrollbar.slider:insensitive,
+.scrollbar.trough:insensitive,
+.check:insensitive,
+.check row:insensitive,
+.view.cell.check:insensitive,
+.radio:insensitive,
+.radio row:insensitive,
+.view.cell.radio:insensitive {
+    box-shadow: inset 0 0 0 1px @insensitive_border_color;
+}
