@@ -49,7 +49,7 @@ initSideBarFileTree treeView = do
 
     treeViewSetSearchColumn treeView $ makeColumnIdString 0
 
-    on treeView rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
+    treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
 
 
 main = do
