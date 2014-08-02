@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <interface>
   <!-- interface-requires gtk+ 3.0 -->
-  <object class="GtkWindow" id="window1">
+  <object class="GtkWindow" id="mainWindow">
     <property name="can_focus">False</property>
     <child>
-      <object class="GtkPaned" id="paned1">
+      <object class="GtkPaned" id="sidebarPaned">
         <property name="visible">True</property>
         <property name="can_focus">False</property>
         <child>
-          <object class="GtkScrolledWindow" id="scrolledwindow1">
+          <object class="GtkScrolledWindow" id="sidebarScroller">
             <property name="width_request">170</property>
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <child>
-              <object class="GtkTreeView" id="treeview1">
+              <object class="GtkTreeView" id="directoryListing">
                 <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <style>
@@ -28,11 +28,27 @@
           </packing>
         </child>
         <child>
-          <object class="GtkTextView" id="textview1">
+          <object class="GtkLayout" id="welcomeLayout">
             <property name="visible">True</property>
-            <property name="can_focus">True</property>
-            <property name="has_focus">True</property>
-            <property name="hexpand">True</property>
+            <property name="can_focus">False</property>
+            <child>
+              <object class="GtkLabel" id="welcomeText">
+                <property name="width_request">142</property>
+                <property name="height_request">41</property>
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Welcome</property>
+                <attributes>
+                  <attribute name="font-desc" value="Verdana Italic 20"/>
+                  <attribute name="style" value="oblique"/>
+                  <attribute name="weight" value="ultralight"/>
+                </attributes>
+              </object>
+              <packing>
+                <property name="x">70</property>
+                <property name="y">70</property>
+              </packing>
+            </child>
           </object>
           <packing>
             <property name="resize">True</property>

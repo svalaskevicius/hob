@@ -58,11 +58,11 @@ main = do
     builder <- builderNew
     builderAddFromFile builder "ui/ui.glade"
 
-    initSideBarFileTree =<< builderGetObject builder castToTreeView "treeview1"
+    initSideBarFileTree =<< builderGetObject builder castToTreeView "directoryListing"
 
     setGtkStyle
 
-    mainWindow <- builderGetObject builder castToWindow "window1"
+    mainWindow <- builderGetObject builder castToWindow "mainWindow"
     mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow
     mainGUI
