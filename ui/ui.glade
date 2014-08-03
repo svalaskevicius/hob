@@ -28,9 +28,11 @@
           </packing>
         </child>
         <child>
-          <object class="GtkLayout" id="welcomeLayout">
+          <object class="GtkNotebook" id="tabbedEditArea">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
+            <property name="show_tabs">False</property>
+            <property name="show_border">False</property>
             <child>
               <object class="GtkLabel" id="welcomeText">
                 <property name="width_request">142</property>
@@ -44,9 +46,15 @@
                   <attribute name="weight" value="ultralight"/>
                 </attributes>
               </object>
+            </child>
+            <child type="tab">
+              <object class="GtkLabel" id="welcomeTab">
+                <property name="visible">True</property>
+                <property name="can_focus">False</property>
+                <property name="label" translatable="yes">Welcome</property>
+              </object>
               <packing>
-                <property name="x">70</property>
-                <property name="y">70</property>
+                <property name="tab_fill">False</property>
               </packing>
             </child>
           </object>
