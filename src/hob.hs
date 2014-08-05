@@ -2,8 +2,8 @@ module Main where
 
 import Control.Monad                        (forM)
 import Control.Monad.Trans                  (liftIO)
+import Data.Text                            (unpack)
 import Data.Tree
-import Data.Text (unpack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
@@ -31,34 +31,42 @@ type NewFileEditorLauncher = FilePath -> IO()
 
 main :: IO ()
 main = do
-    _ <- initGUI
+        _ <- initGUI
 
-    builder <- builderNew
-    builderAddFromFile builder "ui/ui.glade"
+        builder <- loadUiBuilder
+        initSidebar builder
+        initMainWindow builder
 
-    sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
-    mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-    initSideBarFileTree sidebarTree $ launchNewFileEditor mainEditNotebook
-
-    setGtkStyle
-
-    mainWindow <- builderGetObject builder castToWindow "mainWindow"
-    _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
-    widgetShowAll mainWindow
-
-    mainGUI
+        setGtkStyle
+        mainGUI
+    where
+        loadUiBuilder = do
+            builder <- builderNew
+            builderAddFromFile builder "ui/ui.glade"
+            return builder
+        initSidebar builder = do
+            sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
+            mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
+            initSideBarFileTree sidebarTree $ launchNewFileEditor mainEditNotebook
+        initMainWindow builder = do
+            mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
+            widgetShowAll mainWindow
 
 
 fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
 fileTreeFromDirectory path = do
-    contents <- getDirectoryContents path
-    forM (removeDotDirectories contents) $ \ child -> do
+    directoryContents <- getFilteredDirectoryContents
+    forM directoryContents $ \ child -> do
         let childPath = path </> child
         isDir <- doesDirectoryExist childPath
         childrenForest <- if isDir then fileTreeFromDirectory childPath else return []
         return $ Node (DirectoryTreeElement child childPath) childrenForest
     where
         removeDotDirectories = filter (\child -> not ((child == ".") || (child == "..")))
+        getFilteredDirectoryContents = do
+            contents <- getDirectoryContents path
+            return (removeDotDirectories contents)
 
 setGtkStyle :: IO ()
 setGtkStyle = do
