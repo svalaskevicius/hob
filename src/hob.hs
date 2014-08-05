@@ -1,17 +1,14 @@
 module Main where
 
+import Control.Monad                        (forM)
+import Control.Monad.Trans                  (liftIO)
+import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
-import Graphics.UI.Gtk.Builder
-import Control.Monad.Trans(liftIO)
-import Control.Monad (liftM, forM, filterM)
-import Data.Tree
-import Graphics.UI.Gtk.ModelView as Mv
 import Graphics.UI.Gtk.General.StyleContext
+import Graphics.UI.Gtk.ModelView            as Mv
 import System.Directory
 import System.FilePath
-import System.IO (hPutStrLn, stderr)
-import Data.Maybe (fromJust)
 
 
 data DirectoryTreeElement = DirectoryTreeElement String FilePath
@@ -25,9 +22,9 @@ directoryTreeElementPath (DirectoryTreeElement _ path) = path
 type NewFileEditorLauncher = FilePath -> IO()
 
 
-
+main :: IO ()
 main = do
-    initGUI
+    _ <- initGUI
 
     builder <- builderNew
     builderAddFromFile builder "ui/ui.glade"
@@ -39,7 +36,7 @@ main = do
     setGtkStyle
 
     mainWindow <- builderGetObject builder castToWindow "mainWindow"
-    mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
+    _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow
 
     mainGUI
@@ -56,6 +53,7 @@ fileTreeFromDirectory path = do
     where
         removeDotDirectories = filter (\child -> not ((child == ".") || (child == "..")))
 
+setGtkStyle :: IO ()
 setGtkStyle = do
     cssProvider <- cssProviderNew
     cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "adwaitaGrnPlus" </> "gtk-dark.css")
@@ -73,24 +71,29 @@ initSideBarFileTree treeView launchFile = do
     Mv.cellLayoutPackStart col rend True
     Mv.cellLayoutSetAttributes col rend treeModel (\v -> [Mv.cellText := directoryTreeElementLabel v])
 
-    treeViewAppendColumn treeView col
+    _ <- treeViewAppendColumn treeView col
 
     treeViewSetHeadersVisible treeView False
     treeViewSetModel treeView treeModel
 
-    treeViewSetSearchColumn treeView $ makeColumnIdString 0
+    treeViewSetSearchColumn treeView searchCol
 
-    treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
-    treeView `on` rowActivated $ \ path _ -> (launchFile . directoryTreeElementPath) =<< treeStoreGetValue treeModel path
+
+    _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
+    _ <- treeView `on` rowActivated $ \ path _ -> (launchFile . directoryTreeElementPath) =<< treeStoreGetValue treeModel path
 
     return ()
 
+    where
+        searchCol :: ColumnId row String
+        searchCol = makeColumnIdString 0
+
 
 launchNewFileEditor :: Notebook -> NewFileEditorLauncher
-launchNewFileEditor targetNotebook filepath = do
+launchNewFileEditor targetNotebook _ = do
     editor <- textViewNew
     widgetShowAll editor
-    notebookAppendPage targetNotebook editor "t"
+    _ <- notebookAppendPage targetNotebook editor "t"
     notebookSetShowTabs targetNotebook True
     return()
 
