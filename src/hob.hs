@@ -3,6 +3,7 @@ module Main where
 import Control.Monad                        (forM)
 import Control.Monad.Trans                  (liftIO)
 import Data.Tree
+import Data.Text (unpack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
@@ -61,6 +62,7 @@ fileTreeFromDirectory path = do
 
 setGtkStyle :: IO ()
 setGtkStyle = do
+    -- should we also listen for `screenChanged`?
     cssProvider <- cssProviderNew
     cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "adwaitaGrnPlus" </> "gtk-dark.css")
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
@@ -118,8 +120,23 @@ launchNewFileEditor targetNotebook filePath = do
     scrolledWindow <- scrolledWindowNew Nothing Nothing
     scrolledWindow `containerAdd` editor
 
+    font <- fontDescriptionFromString "monospace 12"
+    widgetModifyFont editor (Just font)
+
+    _ <- editor `on` keyPressEvent $ do
+        modifier <- eventModifier
+        key <- eventKeyName
+        case (modifier, unpack key) of
+            ([Control], "s") -> liftIO $ saveFile buffer filePath
+            _ -> return False
+
     widgetShowAll scrolledWindow
     _ <- notebookAppendPage targetNotebook scrolledWindow "t"
     notebookSetShowTabs targetNotebook True
     return()
 
+
+saveFile :: TextBufferClass a => a -> FilePath -> IO Bool
+saveFile buffer filePath = do
+    writeFile filePath =<< buffer `get` textBufferText
+    return True
