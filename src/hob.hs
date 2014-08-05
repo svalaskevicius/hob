@@ -7,9 +7,15 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
+import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
+                                             sourceBufferSetHighlightSyntax,
+                                             sourceLanguageManagerGetLanguage,
+                                             sourceLanguageManagerGetSearchPath,
+                                             sourceLanguageManagerNew,
+                                             sourceViewNewWithBuffer,
+                                             sourceViewSetShowLineNumbers)
 import System.Directory
 import System.FilePath
-
 
 data DirectoryTreeElement = DirectoryTreeElement String FilePath
 
@@ -90,10 +96,30 @@ initSideBarFileTree treeView launchFile = do
 
 
 launchNewFileEditor :: Notebook -> NewFileEditorLauncher
-launchNewFileEditor targetNotebook _ = do
-    editor <- textViewNew
-    widgetShowAll editor
-    _ <- notebookAppendPage targetNotebook editor "t"
+launchNewFileEditor targetNotebook filePath = do
+    lm <- sourceLanguageManagerNew
+    langM <- sourceLanguageManagerGetLanguage lm "haskell"
+    lang <- case langM of
+        (Just lang) -> return lang
+        Nothing -> do
+            langDirs <- sourceLanguageManagerGetSearchPath lm
+            error ("please copy haskell.lang to one of the following directories:\n"
+                ++unlines langDirs)
+
+    buffer <- sourceBufferNewWithLanguage lang
+    fileContents <- readFile filePath
+    textBufferSetText buffer fileContents
+    textBufferSetModified buffer False
+    sourceBufferSetHighlightSyntax buffer True
+
+    editor <- sourceViewNewWithBuffer buffer
+    sourceViewSetShowLineNumbers editor True
+
+    scrolledWindow <- scrolledWindowNew Nothing Nothing
+    scrolledWindow `containerAdd` editor
+
+    widgetShowAll scrolledWindow
+    _ <- notebookAppendPage targetNotebook scrolledWindow "t"
     notebookSetShowTabs targetNotebook True
     return()
 
