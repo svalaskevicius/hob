@@ -10,9 +10,12 @@ import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
 import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
                                              sourceBufferSetHighlightSyntax,
+                                             sourceBufferSetStyleScheme,
                                              sourceLanguageManagerGetLanguage,
                                              sourceLanguageManagerGetSearchPath,
                                              sourceLanguageManagerNew,
+                                             sourceStyleSchemeManagerGetDefault,
+                                             sourceStyleSchemeManagerGetScheme,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
 import System.Directory
@@ -116,11 +119,15 @@ launchNewFileEditor targetNotebook filePath = do
             error ("please copy haskell.lang to one of the following directories:\n"
                 ++unlines langDirs)
 
+    styleManager <- sourceStyleSchemeManagerGetDefault
+    style <- sourceStyleSchemeManagerGetScheme styleManager "oblivion"
+
     buffer <- sourceBufferNewWithLanguage lang
     fileContents <- readFile filePath
     textBufferSetText buffer fileContents
     textBufferSetModified buffer False
     sourceBufferSetHighlightSyntax buffer True
+    sourceBufferSetStyleScheme buffer (Just style)
 
     editor <- sourceViewNewWithBuffer buffer
     sourceViewSetShowLineNumbers editor True

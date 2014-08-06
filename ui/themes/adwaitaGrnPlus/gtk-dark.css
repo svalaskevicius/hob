@@ -1,5 +1,5 @@
 /* Dark color scheme */
-@define-color theme_base_color #383838;
+@define-color theme_base_color #252520;
 @define-color theme_text_color #d0d0d0;
 @define-color border_color #000000;
 @define-color internal_element_color #babdb6;
@@ -15,7 +15,7 @@
 @define-color other_color #c17d11;
 
 
-@define-color subdued_color shade(@theme_base_color, 0.7);
+@define-color subdued_color shade(@theme_base_color, 0.8);
 @define-color theme_bg_color mix(@theme_base_color, @subdued_color, 0.7);
 @define-color theme_fg_color @theme_text_color;
 @define-color theme_tooltip_bg_color mix(@subdued_color, #000000, 0.5);
