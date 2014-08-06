@@ -15,7 +15,7 @@ import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
                                              sourceLanguageManagerGetSearchPath,
                                              sourceLanguageManagerNew,
                                              sourceStyleSchemeManagerGetDefault,
-                                             sourceStyleSchemeManagerGetScheme,
+                                             sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
 import System.Directory
@@ -75,7 +75,7 @@ setGtkStyle :: IO ()
 setGtkStyle = do
     -- should we also listen for `screenChanged`?
     cssProvider <- cssProviderNew
-    cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "adwaitaGrnPlus" </> "gtk-dark.css")
+    cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css")
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
@@ -120,7 +120,8 @@ launchNewFileEditor targetNotebook filePath = do
                 ++unlines langDirs)
 
     styleManager <- sourceStyleSchemeManagerGetDefault
-    style <- sourceStyleSchemeManagerGetScheme styleManager "oblivion"
+    sourceStyleSchemeManagerSetSearchPath styleManager (Just [("ui" </> "themes" </> "gtksourceview")])
+    style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
     buffer <- sourceBufferNewWithLanguage lang
     fileContents <- readFile filePath
