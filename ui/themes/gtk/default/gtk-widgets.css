@@ -43,6 +43,8 @@
     -GtkWidget-focus-padding: 0;
     -GtkWidget-focus-line-width: 0;
 
+    -GtkWidget-cursor-color: @theme_selected_bg_color;
+
     /* We use the outline properties to signal the focus properties
      * to the adwaita engine: using real CSS properties is faster,
      * and we don't use any outlines for now.
