@@ -30,9 +30,9 @@ directoryTreeElementPath (DirectoryTreeElement _ path) = path
 type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO()
 
-type FileLoader = FilePath -> IO(String)
+type FileLoader = FilePath -> IO String
 
-loadGui :: FileTreeLoader -> FileLoader -> IO (Window)
+loadGui :: FileTreeLoader -> FileLoader -> IO Window
 loadGui fileTreeLoader fileLoader = do
         _ <- initGUI
 
@@ -104,7 +104,7 @@ launchNewFileEditor loadFile targetNotebook filePath = do
                 ++unlines langDirs)
 
     styleManager <- sourceStyleSchemeManagerGetDefault
-    sourceStyleSchemeManagerSetSearchPath styleManager (Just [("ui" </> "themes" </> "gtksourceview")])
+    sourceStyleSchemeManagerSetSearchPath styleManager (Just ["ui" </> "themes" </> "gtksourceview"])
     style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
     buffer <- sourceBufferNewWithLanguage lang
