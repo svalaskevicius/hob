@@ -47,10 +47,13 @@ loadGui = do
             return builder
         initSidebar builder = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
+            widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             initSideBarFileTree sidebarTree $ launchNewFileEditor mainEditNotebook
         initMainWindow builder = do
-            builderGetObject builder castToWindow "mainWindow"
+            mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            widgetSetName mainWindow "mainWindow"
+            return mainWindow
 
 
 fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
