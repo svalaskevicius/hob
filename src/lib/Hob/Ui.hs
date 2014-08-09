@@ -1,6 +1,5 @@
 module Hob.Ui where
 
-import Control.Monad                        (forM)
 import Control.Monad.Trans                  (liftIO)
 import Data.Text                            (unpack)
 import Data.Tree
@@ -18,7 +17,6 @@ import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
                                              sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
-import System.Directory
 import System.FilePath
 
 data DirectoryTreeElement = DirectoryTreeElement String FilePath
@@ -29,11 +27,13 @@ directoryTreeElementLabel (DirectoryTreeElement label _) = label
 directoryTreeElementPath :: DirectoryTreeElement -> FilePath
 directoryTreeElementPath (DirectoryTreeElement _ path) = path
 
+type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO()
 
+type FileLoader = FilePath -> IO(String)
 
-loadGui :: IO (Window)
-loadGui = do
+loadGui :: FileTreeLoader -> FileLoader -> IO (Window)
+loadGui fileTreeLoader fileLoader = do
         _ <- initGUI
 
         builder <- loadUiBuilder
@@ -49,38 +49,23 @@ loadGui = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree sidebarTree $ launchNewFileEditor mainEditNotebook
+            initSideBarFileTree sidebarTree fileTreeLoader $ launchNewFileEditor fileLoader mainEditNotebook
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
             return mainWindow
 
 
-fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
-fileTreeFromDirectory path = do
-    directoryContents <- getFilteredDirectoryContents
-    forM directoryContents $ \ child -> do
-        let childPath = path </> child
-        isDir <- doesDirectoryExist childPath
-        childrenForest <- if isDir then fileTreeFromDirectory childPath else return []
-        return $ Node (DirectoryTreeElement child childPath) childrenForest
-    where
-        removeDotDirectories = filter (\child -> not ((child == ".") || (child == "..")))
-        getFilteredDirectoryContents = do
-            contents <- getDirectoryContents path
-            return (removeDotDirectories contents)
-
 setGtkStyle :: IO ()
 setGtkStyle = do
-    -- should we also listen for `screenChanged`?
     cssProvider <- cssProviderNew
     cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css")
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
-initSideBarFileTree :: TreeView -> NewFileEditorLauncher -> IO ()
-initSideBarFileTree treeView launchFile = do
-    treeModel <- treeStoreNew =<< fileTreeFromDirectory =<< getCurrentDirectory
+initSideBarFileTree :: TreeView -> FileTreeLoader -> NewFileEditorLauncher -> IO ()
+initSideBarFileTree treeView fileTreeLoader launchFile = do
+    treeModel <- treeStoreNew =<< fileTreeLoader
     customStoreSetColumn treeModel (makeColumnIdString 0) directoryTreeElementLabel
 
     col <- treeViewColumnNew
@@ -107,8 +92,8 @@ initSideBarFileTree treeView launchFile = do
         searchCol = makeColumnIdString 0
 
 
-launchNewFileEditor :: Notebook -> NewFileEditorLauncher
-launchNewFileEditor targetNotebook filePath = do
+launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher
+launchNewFileEditor loadFile targetNotebook filePath = do
     lm <- sourceLanguageManagerNew
     langM <- sourceLanguageManagerGetLanguage lm "haskell"
     lang <- case langM of
@@ -123,7 +108,7 @@ launchNewFileEditor targetNotebook filePath = do
     style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
     buffer <- sourceBufferNewWithLanguage lang
-    fileContents <- readFile filePath
+    fileContents <- loadFile filePath
     textBufferSetText buffer fileContents
     textBufferSetModified buffer False
     sourceBufferSetHighlightSyntax buffer True
@@ -146,7 +131,8 @@ launchNewFileEditor targetNotebook filePath = do
             _ -> return False
 
     widgetShowAll scrolledWindow
-    _ <- notebookAppendPage targetNotebook scrolledWindow "t"
+    tabNr <- notebookAppendPage targetNotebook scrolledWindow "t"
+    notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
     return()
 
