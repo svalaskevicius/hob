@@ -2,13 +2,14 @@ module Hob.Ui where
 
 import Control.Monad                        (unless)
 import Control.Monad.Trans                  (liftIO)
-import Data.Text                            (unpack)
+import Data.Text                            (Text (..), pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
-import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
+import Graphics.UI.Gtk.SourceView           (SourceView (..),
+                                             sourceBufferNewWithLanguage,
                                              sourceBufferSetHighlightSyntax,
                                              sourceBufferSetStyleScheme,
                                              sourceLanguageManagerGetLanguage,
@@ -24,7 +25,7 @@ import System.FilePath
 type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO()
 
-type FileLoader = FilePath -> IO String
+type FileLoader = FilePath -> IO (Maybe Text)
 
 loadGui :: FileTreeLoader -> FileLoader -> IO Window
 loadGui fileTreeLoader fileLoader = do
@@ -93,6 +94,21 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
 
 launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher
 launchNewFileEditor loadFile targetNotebook filePath = do
+    fileContents <- loadFile filePath
+    maybe (return ()) launchEditor fileContents
+    where launchEditor text = do
+              editor <- launchNewEditorForText targetNotebook text
+              _ <- editor `on` keyPressEvent $ do
+                modifier <- eventModifier
+                key <- eventKeyName
+                case (modifier, unpack key) of
+                    ([Control], "s") -> liftIO $ saveFile filePath =<< textViewGetBuffer editor
+                    _ -> return False
+              return ()
+
+
+launchNewEditorForText :: Notebook -> Text -> IO SourceView
+launchNewEditorForText targetNotebook text = do
     lm <- sourceLanguageManagerNew
     langM <- sourceLanguageManagerGetLanguage lm "haskell"
     lang <- case langM of
@@ -107,8 +123,7 @@ launchNewFileEditor loadFile targetNotebook filePath = do
     style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
     buffer <- sourceBufferNewWithLanguage lang
-    fileContents <- loadFile filePath
-    textBufferSetText buffer fileContents
+    textBufferSetText buffer text
     textBufferSetModified buffer False
     sourceBufferSetHighlightSyntax buffer True
     sourceBufferSetStyleScheme buffer (Just style)
@@ -122,21 +137,14 @@ launchNewFileEditor loadFile targetNotebook filePath = do
     font <- fontDescriptionFromString "monospace 12"
     widgetModifyFont editor (Just font)
 
-    _ <- editor `on` keyPressEvent $ do
-        modifier <- eventModifier
-        key <- eventKeyName
-        case (modifier, unpack key) of
-            ([Control], "s") -> liftIO $ saveFile buffer filePath
-            _ -> return False
-
     widgetShowAll scrolledWindow
     tabNr <- notebookAppendPage targetNotebook scrolledWindow "t"
     notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
-    return()
+    return editor
 
 
-saveFile :: TextBufferClass a => a -> FilePath -> IO Bool
-saveFile buffer filePath = do
+saveFile :: TextBufferClass a => FilePath -> a -> IO Bool
+saveFile filePath buffer = do
     writeFile filePath =<< buffer `get` textBufferText
     return True

@@ -2,6 +2,7 @@ module Hob.UiSpec where
 
 import Control.Monad.Error
 import Data.Maybe
+import Data.Text           (pack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Hob.DirectoryTree
@@ -33,6 +34,11 @@ spec = do
     it "does not open a file editor for directory" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader
       activateDirectoryPath mainWindow [0]
+      isWelcome <- isShowingWelcome mainWindow
+      isWelcome `shouldBe` True
+    it "does not open a file editor for files it cannot read" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      activateDirectoryPath mainWindow [2]
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
 
@@ -86,13 +92,15 @@ fileTreeStub =
         return [
                 Node (DirectoryTreeElement "a" "/xxx/a" (IsDirectory True)) [
                         Node (DirectoryTreeElement "b" "/xxx/a/b" (IsDirectory False)) []],
-                Node (DirectoryTreeElement "c" "/xxx/c" (IsDirectory False)) []]
+                Node (DirectoryTreeElement "c" "/xxx/c" (IsDirectory False)) [],
+                Node (DirectoryTreeElement "-" "/xxx/cannotRead" (IsDirectory False)) []]
 
 failingFileLoader :: FileLoader
 failingFileLoader _ = throwError $ userError "cannot open files stub"
 
 stubbedFileLoader :: FileLoader
-stubbedFileLoader "/xxx/c" = return "file contents for /xxx/c"
+stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
+stubbedFileLoader "/xxx/cannotRead" = return Nothing
 stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
 
 
