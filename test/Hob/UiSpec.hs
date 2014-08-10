@@ -2,9 +2,10 @@ module Hob.UiSpec where
 
 import Control.Monad.Error
 import Data.Maybe
-import Data.Text           (pack)
+import Data.Text                  (pack)
 import Data.Tree
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
 import Hob.DirectoryTree
 import Hob.Ui
 import Test.Hspec
@@ -31,17 +32,28 @@ spec = do
       activateDirectoryPath mainWindow [1]
       editorText <- getActiveEditorText mainWindow
       editorText `shouldBe` "file contents for /xxx/c"
+
     it "does not open a file editor for directory" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader
       activateDirectoryPath mainWindow [0]
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
+
     it "does not open a file editor for files it cannot read" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader
       activateDirectoryPath mainWindow [2]
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
 
+  describe "edit area" $
+    it "does not allow to undo the intial loaded source" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      tabbed <- getActiveEditorNotebook mainWindow
+      editor <- launchNewEditorForText tabbed $ pack "initial text"
+      buffer <- textViewGetBuffer editor
+      sourceBufferUndo $ castToSourceBuffer buffer
+      editorText <- getEditorText editor
+      editorText `shouldBe` "initial text"
 
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
@@ -59,11 +71,12 @@ getDirectoryListingSidebar mainWindow = do
         return (castToTreeView $ fromJust sidebar)
 
 getActiveEditorText :: Window -> IO String
-getActiveEditorText mainWindow = do
-      textEdit <- getActiveEditor mainWindow
+getActiveEditorText mainWindow = getEditorText =<< getActiveEditor mainWindow
+
+getEditorText :: TextViewClass a => a -> IO String
+getEditorText textEdit = do
       textBuf <- textViewGetBuffer textEdit
       get textBuf textBufferText
-
 
 getActiveEditor :: Window -> IO TextView
 getActiveEditor mainWindow = do
@@ -79,13 +92,16 @@ isShowingWelcome mainWindow = do
 
 getActiveEditorTab :: Window -> IO Widget
 getActiveEditorTab mainWindow = do
-      paned <- binGetChild mainWindow
-      tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
-      let tabbed = castToNotebook $ fromJust tabbed'
+      tabbed <- getActiveEditorNotebook mainWindow
       pageNum <- notebookGetCurrentPage tabbed
       tabs <- containerGetChildren tabbed
       return (tabs!!pageNum)
 
+getActiveEditorNotebook :: Window -> IO Notebook
+getActiveEditorNotebook mainWindow = do
+      paned <- binGetChild mainWindow
+      tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
+      return $ castToNotebook $ fromJust tabbed'
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
 fileTreeStub =

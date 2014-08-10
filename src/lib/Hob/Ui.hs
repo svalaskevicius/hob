@@ -9,6 +9,8 @@ import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
 import Graphics.UI.Gtk.SourceView           (SourceView (..),
+                                             sourceBufferBeginNotUndoableAction,
+                                             sourceBufferEndNotUndoableAction,
                                              sourceBufferNewWithLanguage,
                                              sourceBufferSetHighlightSyntax,
                                              sourceBufferSetStyleScheme,
@@ -123,8 +125,11 @@ launchNewEditorForText targetNotebook text = do
     style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
     buffer <- sourceBufferNewWithLanguage lang
+    sourceBufferBeginNotUndoableAction buffer
     textBufferSetText buffer text
     textBufferSetModified buffer False
+    sourceBufferEndNotUndoableAction buffer
+
     sourceBufferSetHighlightSyntax buffer True
     sourceBufferSetStyleScheme buffer (Just style)
 
