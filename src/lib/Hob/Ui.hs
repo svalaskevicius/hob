@@ -1,5 +1,6 @@
 module Hob.Ui where
 
+import Control.Monad                        (unless)
 import Control.Monad.Trans                  (liftIO)
 import Data.Text                            (unpack)
 import Data.Tree
@@ -17,15 +18,8 @@ import Graphics.UI.Gtk.SourceView           (sourceBufferNewWithLanguage,
                                              sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
+import Hob.DirectoryTree
 import System.FilePath
-
-data DirectoryTreeElement = DirectoryTreeElement String FilePath
-
-directoryTreeElementLabel :: DirectoryTreeElement -> String
-directoryTreeElementLabel (DirectoryTreeElement label _) = label
-
-directoryTreeElementPath :: DirectoryTreeElement -> FilePath
-directoryTreeElementPath (DirectoryTreeElement _ path) = path
 
 type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO()
@@ -53,6 +47,8 @@ loadGui fileTreeLoader fileLoader = do
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
+            welcomeTab <- builderGetObject builder castToLabel "welcomeText"
+            widgetSetName welcomeTab "welcomeText"
             return mainWindow
 
 
@@ -83,13 +79,16 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
 
 
     _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
-    _ <- treeView `on` rowActivated $ \ path _ -> (launchFile . directoryTreeElementPath) =<< treeStoreGetValue treeModel path
+    _ <- treeView `on` rowActivated $ \ path _ -> activateRow =<< treeStoreGetValue treeModel path
 
     return ()
 
     where
         searchCol :: ColumnId row String
         searchCol = makeColumnIdString 0
+
+        activateRow :: DirectoryTreeElement -> IO ()
+        activateRow el = unless (directoryTreeElementIsDirectory el) $ (launchFile . directoryTreeElementPath) el
 
 
 launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher
