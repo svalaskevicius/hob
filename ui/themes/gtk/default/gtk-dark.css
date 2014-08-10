@@ -1,10 +1,10 @@
 /* Dark color scheme */
-@define-color theme_base_color #252520;
-@define-color theme_text_color #d0d0d0;
-@define-color border_color #000000;
-@define-color internal_element_color #babdb6;
+@define-color theme_base_color #2a2f25;
+@define-color theme_text_color #d0d5d0;
+@define-color border_color #304020;
+@define-color internal_element_color #cacdc6;
 
-@define-color theme_selected_bg_color #4e9a06;
+@define-color theme_selected_bg_color #608a36;
 @define-color theme_selected_fg_color #ffffff;
 
 @define-color link_color #729fcf;
@@ -15,8 +15,8 @@
 @define-color other_color #c17d11;
 
 
-@define-color subdued_color shade(@theme_base_color, 0.8);
-@define-color theme_bg_color mix(@theme_base_color, @subdued_color, 0.7);
+@define-color subdued_color shade(@theme_base_color, 0.3);
+@define-color theme_bg_color shade(@theme_base_color, 1.7);
 @define-color theme_fg_color @theme_text_color;
 @define-color theme_tooltip_bg_color mix(@subdued_color, #000000, 0.5);
 @define-color theme_tooltip_fg_color @theme_text_color;
@@ -28,3 +28,5 @@
 @import url("gtk-widgets-backgrounds-and-texts.css");
 @import url("gtk-widgets-borders.css");
 @import url("gtk-widgets.css");
+@import url("app-specific.css");
+

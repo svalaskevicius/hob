@@ -1,6 +1,4 @@
 * {
-    engine: adwaita;
-
     padding: 0;
     background-clip: border-box;
 
@@ -45,11 +43,8 @@
 
     -GtkWidget-cursor-color: @theme_selected_bg_color;
 
-    /* We use the outline properties to signal the focus properties
-     * to the adwaita engine: using real CSS properties is faster,
-     * and we don't use any outlines for now.
-     */
-    outline-offset: 2px;
+    outline-offset: -3px;
+    /* outline-radius: 4px; unsupported by older gtk */
     outline-style: dashed;
     outline-color: @internal_element_color;
 }
@@ -759,8 +754,8 @@ GtkLevelBar.vertical {
 .scrollbar {
     -GtkScrollbar-has-backward-stepper: false;
     -GtkScrollbar-has-forward-stepper: false;
-    -GtkRange-slider-width: 20;
-    -GtkScrollbar-min-slider-length: 20;
+    -GtkRange-slider-width: 12px;
+    -GtkScrollbar-min-slider-length: 12px;
     -GtkRange-trough-border: 0;
     -GtkRange-stepper-spacing: 0;
     -GtkRange-trough-under-steppers: 1;
@@ -1670,7 +1665,7 @@ GtkTreeView.cell:hover {
     border-width: 0;
     border-radius: 3px;
     color: @theme_selected_fg_color;
-    box-shadow: 0px 0px 1px 1px mix(@theme_base_color, @theme_selected_bg_color, 0.6);
+    box-shadow: inset 0px 0px 3px mix(@theme_base_color, @theme_selected_bg_color, 0.4);
 }
 
 .cell:insensitive:selected {
