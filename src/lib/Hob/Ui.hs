@@ -4,6 +4,8 @@ import Control.Monad                        (unless)
 import Control.Monad.Trans                  (liftIO)
 import Data.Text                            (Text (..), pack, unpack)
 import Data.Tree
+import Filesystem.Path.CurrentOS            (decodeString, encodeString,
+                                             filename)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
@@ -99,7 +101,7 @@ launchNewFileEditor loadFile targetNotebook filePath = do
     fileContents <- loadFile filePath
     maybe (return ()) launchEditor fileContents
     where launchEditor text = do
-              editor <- launchNewEditorForText targetNotebook text
+              editor <- launchNewEditorForText targetNotebook tabTitle text
               _ <- editor `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
@@ -107,10 +109,12 @@ launchNewFileEditor loadFile targetNotebook filePath = do
                     ([Control], "s") -> liftIO $ saveFile filePath =<< textViewGetBuffer editor
                     _ -> return False
               return ()
+          tabTitle = filename' filePath
+          filename' = encodeString . filename . decodeString
 
 
-launchNewEditorForText :: Notebook -> Text -> IO SourceView
-launchNewEditorForText targetNotebook text = do
+launchNewEditorForText :: Notebook -> String -> Text -> IO SourceView
+launchNewEditorForText targetNotebook title text = do
     lm <- sourceLanguageManagerNew
     langM <- sourceLanguageManagerGetLanguage lm "haskell"
     lang <- case langM of
@@ -143,7 +147,7 @@ launchNewEditorForText targetNotebook text = do
     widgetModifyFont editor (Just font)
 
     widgetShowAll scrolledWindow
-    tabNr <- notebookAppendPage targetNotebook scrolledWindow "t"
+    tabNr <- notebookAppendPage targetNotebook scrolledWindow title
     notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
     return editor

@@ -45,15 +45,23 @@ spec = do
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
 
-  describe "edit area" $
+  describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader
       tabbed <- getActiveEditorNotebook mainWindow
-      editor <- launchNewEditorForText tabbed $ pack "initial text"
+      editor <- launchNewEditorForText tabbed "testfile" $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
       editorText <- getEditorText editor
       editorText `shouldBe` "initial text"
+
+    it "sets the tab title when opening a file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      tabbed <- getActiveEditorNotebook mainWindow
+      launchNewFileEditor stubbedFileLoader tabbed "/xxx/testName.hs"
+      tabText <- getActiveEditorTabText mainWindow
+      tabText `shouldBe` "testName.hs"
+
 
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
@@ -84,6 +92,13 @@ getActiveEditor mainWindow = do
       let textEditScroller = castToScrolledWindow currentlyActiveEditor
       textEdit' <- binGetChild textEditScroller
       return (castToTextView $ fromJust textEdit')
+
+getActiveEditorTabText :: Window -> IO String
+getActiveEditorTabText mainWindow = do
+      tabbed <- getActiveEditorNotebook mainWindow
+      currentlyActiveEditor <- getActiveEditorTab mainWindow
+      text <- notebookGetTabLabelText tabbed currentlyActiveEditor
+      return $ fromJust text
 
 isShowingWelcome :: Window -> IO Bool
 isShowingWelcome mainWindow = do
@@ -117,6 +132,7 @@ failingFileLoader _ = throwError $ userError "cannot open files stub"
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
 stubbedFileLoader "/xxx/cannotRead" = return Nothing
+stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
 stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
 
 
