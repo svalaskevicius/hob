@@ -57,12 +57,23 @@ spec = do
 
     it "sets the tab title when opening a file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader
-      tabbed <- getActiveEditorNotebook mainWindow
-      launchNewFileEditor stubbedFileLoader tabbed "/xxx/testName.hs"
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs"
 
+  describe "editor commands" $ do
+    it "closes the currently active editor tab" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      closeCurrentEditorTab mainWindow
+      tabText <- getActiveEditorTabText mainWindow
+      tabText `shouldBe` "Welcome"
 
+
+launchStubbedEditorTab :: Window -> String -> IO ()
+launchStubbedEditorTab mainWindow file = do
+      tabbed <- getActiveEditorNotebook mainWindow
+      launchNewFileEditor stubbedFileLoader tabbed file
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
 activateDirectoryPath mainWindow path = do
@@ -111,12 +122,6 @@ getActiveEditorTab mainWindow = do
       pageNum <- notebookGetCurrentPage tabbed
       tabs <- containerGetChildren tabbed
       return (tabs!!pageNum)
-
-getActiveEditorNotebook :: Window -> IO Notebook
-getActiveEditorNotebook mainWindow = do
-      paned <- binGetChild mainWindow
-      tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
-      return $ castToNotebook $ fromJust tabbed'
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
 fileTreeStub =

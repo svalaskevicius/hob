@@ -2,6 +2,7 @@ module Hob.Ui where
 
 import Control.Monad                        (unless)
 import Control.Monad.Trans                  (liftIO)
+import Data.Maybe                           (fromJust)
 import Data.Text                            (Text (..), pack, unpack)
 import Data.Tree
 import Filesystem.Path.CurrentOS            (decodeString, encodeString,
@@ -54,6 +55,13 @@ loadGui fileTreeLoader fileLoader = do
             widgetSetName mainWindow "mainWindow"
             welcomeTab <- builderGetObject builder castToLabel "welcomeText"
             widgetSetName welcomeTab "welcomeText"
+            _ <- mainWindow `on` keyPressEvent $ do
+                modifier <- eventModifier
+                key <- eventKeyName
+                case (modifier, unpack key) of
+                    ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
+                    _ -> return False
+
             return mainWindow
 
 
@@ -152,6 +160,24 @@ launchNewEditorForText targetNotebook title text = do
     notebookSetShowTabs targetNotebook True
     return editor
 
+
+closeCurrentEditorTab :: Window -> IO ()
+closeCurrentEditorTab mainWindow = do
+    tabbed <- getActiveEditorNotebook mainWindow
+    currentPage <- notebookGetCurrentPage tabbed
+    nthPage <- notebookGetNthPage tabbed currentPage
+    case nthPage of
+        Just pageContents -> do
+            notebookRemovePage tabbed currentPage
+            widgetDestroy pageContents
+        Nothing -> return ()
+
+
+getActiveEditorNotebook :: Window -> IO Notebook
+getActiveEditorNotebook mainWindow = do
+      paned <- binGetChild mainWindow
+      tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
+      return $ castToNotebook $ fromJust tabbed'
 
 saveFile :: TextBufferClass a => FilePath -> a -> IO Bool
 saveFile filePath buffer = do
