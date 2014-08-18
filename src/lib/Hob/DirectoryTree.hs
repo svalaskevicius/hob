@@ -4,24 +4,15 @@ import Control.Monad   (forM)
 import Data.Tree
 import System.FilePath
 
-newtype IsDirectory = IsDirectory Bool
+type IsDirectory = Bool
 
-data DirectoryTreeElement = DirectoryTreeElement String FilePath IsDirectory
-
-directoryTreeElementLabel :: DirectoryTreeElement -> String
-directoryTreeElementLabel (DirectoryTreeElement label _ _) = label
-
-directoryTreeElementPath :: DirectoryTreeElement -> FilePath
-directoryTreeElementPath (DirectoryTreeElement _ path _) = path
-
-directoryTreeElementIsDirectory :: DirectoryTreeElement -> Bool
-directoryTreeElementIsDirectory (DirectoryTreeElement _ _ (IsDirectory isDir)) = isDir
+data DirectoryTreeElement = DirectoryTreeElement { elementLabel :: String, elementPath :: FilePath, isDirectory :: IsDirectory }
 
 instance Show (DirectoryTreeElement) where
-  show (DirectoryTreeElement label path (IsDirectory isDir)) = show label ++" ["++ show path ++"] "++(if isDir then "(directory)" else "(file)")
+  show (DirectoryTreeElement label path isDir) = show label ++" ["++ show path ++"] "++(if isDir then "(directory)" else "(file)")
 
 instance  Eq (DirectoryTreeElement)  where
-    (DirectoryTreeElement label path (IsDirectory isDir)) == (DirectoryTreeElement label' path' (IsDirectory isDir')) = (label == label') && (path == path') && (isDir == isDir')
+    (DirectoryTreeElement label path isDir) == (DirectoryTreeElement label' path' isDir') = (label == label') && (path == path') && (isDir == isDir')
 
 type DirectoryTreeLoader = FilePath -> IO (Forest DirectoryTreeElement)
 type DirectoryReader = FilePath -> IO [FilePath]
@@ -34,7 +25,7 @@ fileTreeGenerator getDirectoryContents doesDirectoryExist root = do
         let childPath = root </> child
         isDir <- doesDirectoryExist childPath
         childrenForest <- if isDir then callSelf childPath else return []
-        return $ Node (DirectoryTreeElement child childPath (IsDirectory isDir)) childrenForest
+        return $ Node (DirectoryTreeElement child childPath isDir) childrenForest
     where
         callSelf = fileTreeGenerator getDirectoryContents doesDirectoryExist
         removeDotDirectories = filter (\child -> not ((child == ".") || (child == "..")))

@@ -75,13 +75,13 @@ setGtkStyle = do
 initSideBarFileTree :: TreeView -> FileTreeLoader -> NewFileEditorLauncher -> IO ()
 initSideBarFileTree treeView fileTreeLoader launchFile = do
     treeModel <- treeStoreNew =<< fileTreeLoader
-    customStoreSetColumn treeModel (makeColumnIdString 0) directoryTreeElementLabel
+    customStoreSetColumn treeModel (makeColumnIdString 0) elementLabel
 
     col <- treeViewColumnNew
 
     rend <- Mv.cellRendererTextNew
     Mv.cellLayoutPackStart col rend True
-    Mv.cellLayoutSetAttributes col rend treeModel (\v -> [Mv.cellText := directoryTreeElementLabel v])
+    Mv.cellLayoutSetAttributes col rend treeModel (\v -> [Mv.cellText := elementLabel v])
 
     _ <- treeViewAppendColumn treeView col
 
@@ -101,7 +101,7 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
         searchCol = makeColumnIdString 0
 
         activateRow :: DirectoryTreeElement -> IO ()
-        activateRow el = unless (directoryTreeElementIsDirectory el) $ (launchFile . directoryTreeElementPath) el
+        activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
 
 
 launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher

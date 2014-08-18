@@ -126,10 +126,10 @@ getActiveEditorTab mainWindow = do
 fileTreeStub :: IO (Forest DirectoryTreeElement)
 fileTreeStub =
         return [
-                Node (DirectoryTreeElement "a" "/xxx/a" (IsDirectory True)) [
-                        Node (DirectoryTreeElement "b" "/xxx/a/b" (IsDirectory False)) []],
-                Node (DirectoryTreeElement "c" "/xxx/c" (IsDirectory False)) [],
-                Node (DirectoryTreeElement "-" "/xxx/cannotRead" (IsDirectory False)) []]
+                Node (DirectoryTreeElement "a" "/xxx/a" True) [
+                        Node (DirectoryTreeElement "b" "/xxx/a/b" False) []],
+                Node (DirectoryTreeElement "c" "/xxx/c" False) [],
+                Node (DirectoryTreeElement "-" "/xxx/cannotRead" False) []]
 
 failingFileLoader :: FileLoader
 failingFileLoader _ = throwError $ userError "cannot open files stub"
