@@ -1,6 +1,6 @@
 module Hob.Ui where
 
-import Control.Monad                        (unless)
+import Control.Monad                        (unless, (<=<))
 import Control.Monad.Trans                  (liftIO)
 import Data.Maybe                           (fromJust)
 import Data.Text                            (Text (..), pack, unpack)
@@ -26,14 +26,16 @@ import Graphics.UI.Gtk.SourceView           (SourceView (..),
                                              sourceViewSetShowLineNumbers)
 import Hob.DirectoryTree
 import System.FilePath
+import System.Glib.GObject
 
 type FileTreeLoader = IO (Forest DirectoryTreeElement)
-type NewFileEditorLauncher = FilePath -> IO()
+type NewFileEditorLauncher = FilePath -> IO ()
 
 type FileLoader = FilePath -> IO (Maybe Text)
+type FileWriter = FilePath -> Text -> IO ()
 
-loadGui :: FileTreeLoader -> FileLoader -> IO Window
-loadGui fileTreeLoader fileLoader = do
+loadGui :: FileTreeLoader -> FileLoader -> FileWriter -> IO Window
+loadGui fileTreeLoader fileLoader fileWriter = do
         _ <- initGUI
 
         builder <- loadUiBuilder
@@ -60,6 +62,7 @@ loadGui fileTreeLoader fileLoader = do
                 key <- eventKeyName
                 case (modifier, unpack key) of
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
+                    ([Control], "s") -> liftIO $ saveCurrentEditorTab fileWriter mainWindow >> return True
                     _ -> return False
 
             return mainWindow
@@ -110,12 +113,8 @@ launchNewFileEditor loadFile targetNotebook filePath = do
     maybe (return ()) launchEditor fileContents
     where launchEditor text = do
               editor <- launchNewEditorForText targetNotebook tabTitle text
-              _ <- editor `on` keyPressEvent $ do
-                modifier <- eventModifier
-                key <- eventKeyName
-                case (modifier, unpack key) of
-                    ([Control], "s") -> liftIO $ saveFile filePath =<< textViewGetBuffer editor
-                    _ -> return False
+              quark <- fileNameQuark
+              objectSetAttribute quark editor $ Just filePath
               return ()
           tabTitle = filename' filePath
           filename' = encodeString . filename . decodeString
@@ -172,14 +171,51 @@ closeCurrentEditorTab mainWindow = do
             widgetDestroy pageContents
         Nothing -> return ()
 
+saveCurrentEditorTab :: FileWriter -> Window -> IO ()
+saveCurrentEditorTab fileWriter mainWindow = do
+    editor <- getActiveEditor mainWindow
+    maybe (return ()) saveEditor editor
+    where saveEditor editor = do
+              quark <- fileNameQuark
+              path <- objectGetAttributeUnsafe quark editor
+              case path of
+                  Just filePath -> do
+                      text <- getEditorText editor
+                      fileWriter filePath text
+                      return ()
+                  Nothing -> return ()
+
+fileNameQuark :: IO Quark
+fileNameQuark = quarkFromString "fileName"
+
+getActiveEditorText :: Window -> IO (Maybe Text)
+getActiveEditorText mainWindow = do
+    editor <- getActiveEditor mainWindow
+    maybe (return Nothing) ((return . Just) <=< getEditorText) editor
+
+getEditorText :: TextViewClass a => a -> IO Text
+getEditorText textEdit = do
+      textBuf <- textViewGetBuffer textEdit
+      get textBuf textBufferText
+
+getActiveEditor :: Window -> IO (Maybe TextView)
+getActiveEditor mainWindow = do
+      currentlyActiveEditor <- getActiveEditorTab mainWindow
+      if currentlyActiveEditor `isA` gTypeScrolledWindow then do
+          let textEditScroller = castToScrolledWindow currentlyActiveEditor
+          textEdit' <- binGetChild textEditScroller
+          return $ fmap castToTextView textEdit'
+      else return Nothing
+
+getActiveEditorTab :: Window -> IO Widget
+getActiveEditorTab mainWindow = do
+      tabbed <- getActiveEditorNotebook mainWindow
+      pageNum <- notebookGetCurrentPage tabbed
+      tabs <- containerGetChildren tabbed
+      return (tabs!!pageNum)
 
 getActiveEditorNotebook :: Window -> IO Notebook
 getActiveEditorNotebook mainWindow = do
       paned <- binGetChild mainWindow
       tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
       return $ castToNotebook $ fromJust tabbed'
-
-saveFile :: TextBufferClass a => FilePath -> a -> IO Bool
-saveFile filePath buffer = do
-    writeFile filePath =<< buffer `get` textBufferText
-    return True

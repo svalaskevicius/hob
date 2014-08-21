@@ -1,8 +1,9 @@
 module Hob.UiSpec where
 
 import Control.Monad.Error
+import Data.IORef
 import Data.Maybe
-import Data.Text                  (pack)
+import Data.Text                  (pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
@@ -17,58 +18,71 @@ spec :: Spec
 spec = do
   describe "mainWindow" $ do
     it "mainWindow is named" $ do
-      mainWindow <- loadGui fileTreeStub failingFileLoader
+      mainWindow <- loadGui fileTreeStub failingFileLoader failingFileWriter
       name <- widgetGetName mainWindow
       name `shouldBe` "mainWindow"
 
     it "contains named sidebar" $ do
-      mainWindow <- loadGui fileTreeStub failingFileLoader
+      mainWindow <- loadGui fileTreeStub failingFileLoader failingFileWriter
       name <- widgetGetName =<< getDirectoryListingSidebar mainWindow
       name `shouldBe` "directoryListing"
 
   describe "sidebar" $ do
     it "opens a file editor" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [1]
       editorText <- getActiveEditorText mainWindow
-      editorText `shouldBe` "file contents for /xxx/c"
+      (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 
     it "does not open a file editor for directory" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [0]
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
 
     it "does not open a file editor for files it cannot read" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [2]
       isWelcome <- isShowingWelcome mainWindow
       isWelcome `shouldBe` True
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       tabbed <- getActiveEditorNotebook mainWindow
       editor <- launchNewEditorForText tabbed "testfile" $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
       editorText <- getEditorText editor
-      editorText `shouldBe` "initial text"
+      unpack editorText `shouldBe` "initial text"
 
     it "sets the tab title when opening a file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs"
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       closeCurrentEditorTab mainWindow
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "Welcome"
 
+    it "saves the currently active file" $ do
+      recorder <- newIORef ("", pack "")
+      let stubbedFileWriter = curry $ writeIORef recorder
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      saveCurrentEditorTab stubbedFileWriter mainWindow
+
+      savedFile <- readIORef recorder
+      savedFile `shouldBe` ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
+
+    it "skips save when there is no active file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      saveCurrentEditorTab failingFileWriter mainWindow
 
 launchStubbedEditorTab :: Window -> String -> IO ()
 launchStubbedEditorTab mainWindow file = do
@@ -89,20 +103,6 @@ getDirectoryListingSidebar mainWindow = do
         sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
         return (castToTreeView $ fromJust sidebar)
 
-getActiveEditorText :: Window -> IO String
-getActiveEditorText mainWindow = getEditorText =<< getActiveEditor mainWindow
-
-getEditorText :: TextViewClass a => a -> IO String
-getEditorText textEdit = do
-      textBuf <- textViewGetBuffer textEdit
-      get textBuf textBufferText
-
-getActiveEditor :: Window -> IO TextView
-getActiveEditor mainWindow = do
-      currentlyActiveEditor <- getActiveEditorTab mainWindow
-      let textEditScroller = castToScrolledWindow currentlyActiveEditor
-      textEdit' <- binGetChild textEditScroller
-      return (castToTextView $ fromJust textEdit')
 
 getActiveEditorTabText :: Window -> IO String
 getActiveEditorTabText mainWindow = do
@@ -116,12 +116,6 @@ isShowingWelcome mainWindow = do
       name <- widgetGetName =<< getActiveEditorTab mainWindow
       return (name == "welcomeText")
 
-getActiveEditorTab :: Window -> IO Widget
-getActiveEditorTab mainWindow = do
-      tabbed <- getActiveEditorNotebook mainWindow
-      pageNum <- notebookGetCurrentPage tabbed
-      tabs <- containerGetChildren tabbed
-      return (tabs!!pageNum)
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
 fileTreeStub =
@@ -133,6 +127,9 @@ fileTreeStub =
 
 failingFileLoader :: FileLoader
 failingFileLoader _ = throwError $ userError "cannot open files stub"
+
+failingFileWriter :: FileWriter
+failingFileWriter _ _ = throwError $ userError "cannot write files stub"
 
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"

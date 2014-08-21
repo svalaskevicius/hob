@@ -17,7 +17,7 @@ import System.IO (hPutStr, stderr)
 main :: IO ()
 main = do
         projectRoot <- getCurrentDirectory
-        mainWindow <- loadGui (fileTreeFromDirectory projectRoot) loadFile
+        mainWindow <- loadGui (fileTreeFromDirectory projectRoot) loadFile storeFile
         _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
         widgetShowAll mainWindow
         mainGUI
@@ -33,3 +33,6 @@ loadFile path = do
         where checkError (Left e) = do hPutStr stderr (show e)
                                        return Nothing
               checkError (Right t) = return $ Just t
+
+storeFile :: FileWriter
+storeFile path = BS.writeFile path . E.encodeUtf8
