@@ -67,6 +67,19 @@ spec = do
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs*"
 
+    it "focuses the tab with the open file if requested to open an already loaded file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      notebook <- getActiveEditorNotebook mainWindow
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
+      launchStubbedEditorTab mainWindow "/xxx/c"
+      pagesBeforeOpeningExistingFile <- notebookGetNPages notebook
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      currentPageAfterLoadingTheFirstLoadedFile <- notebookGetCurrentPage notebook
+      pagesAfterOpeningExistingFile <- notebookGetNPages notebook
+      pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
+      currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
+
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter

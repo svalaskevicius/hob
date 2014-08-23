@@ -1,8 +1,8 @@
 module Hob.Ui where
 
-import Control.Monad                        (unless, (<=<))
+import Control.Monad                        (filterM, unless, (<=<))
 import Control.Monad.Trans                  (liftIO)
-import Data.Maybe                           (fromJust)
+import Data.Maybe                           (fromJust, mapMaybe)
 import Data.Text                            (Text (..), pack, unpack)
 import Data.Tree
 import Filesystem.Path.CurrentOS            (decodeString, encodeString,
@@ -109,8 +109,12 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
 
 launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher
 launchNewFileEditor loadFile targetNotebook filePath = do
-    fileContents <- loadFile filePath
-    maybe (return ()) launchEditor fileContents
+    editors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
+    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
+    case alreadyLoadedPage editorsForFile of
+        Just nr -> notebookSetCurrentPage targetNotebook nr
+        Nothing -> maybe (return ()) launchEditor <=< loadFile $ filePath
+
     where launchEditor text = do
               editor <- launchNewEditorForText targetNotebook tabTitle text
               quark <- fileNameQuark
@@ -118,7 +122,12 @@ launchNewFileEditor loadFile targetNotebook filePath = do
               return ()
           tabTitle = filename' filePath
           filename' = encodeString . filename . decodeString
-
+          isEditorFileMatching editor = do
+              quark <- fileNameQuark
+              Just f <- objectGetAttributeUnsafe quark editor
+              return $ f == filePath
+          alreadyLoadedPage [(nr, _)] = Just nr
+          alreadyLoadedPage _ = Nothing
 
 launchNewEditorForText :: Notebook -> String -> Text -> IO SourceView
 launchNewEditorForText targetNotebook title text = do
@@ -208,12 +217,14 @@ getEditorText textEdit = do
       get textBuf textBufferText
 
 getActiveEditor :: Window -> IO (Maybe TextView)
-getActiveEditor mainWindow = do
-      currentlyActiveEditor <- getActiveEditorTab mainWindow
+getActiveEditor = getEditorFromNotebookTab <=< getActiveEditorTab
+
+getEditorFromNotebookTab :: Widget -> IO (Maybe TextView)
+getEditorFromNotebookTab currentlyActiveEditor =
       if currentlyActiveEditor `isA` gTypeScrolledWindow then do
           let textEditScroller = castToScrolledWindow currentlyActiveEditor
-          textEdit' <- binGetChild textEditScroller
-          return $ fmap castToTextView textEdit'
+          textEdit <- binGetChild textEditScroller
+          return $ fmap castToTextView textEdit
       else return Nothing
 
 getActiveEditorTab :: Window -> IO Widget
@@ -228,3 +239,10 @@ getActiveEditorNotebook mainWindow = do
       paned <- binGetChild mainWindow
       tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
       return $ castToNotebook $ fromJust tabbed'
+
+liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
+liftTupledMaybe (x, Just y) = Just (x, y)
+liftTupledMaybe (x, Nothing) = Nothing
+
+numberedJusts :: [Maybe a] -> [(Int, a)]
+numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
