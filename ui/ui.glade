@@ -31,32 +31,8 @@
           <object class="GtkNotebook" id="tabbedEditArea">
             <property name="visible">True</property>
             <property name="can_focus">False</property>
-            <property name="show_tabs">False</property>
+            <property name="show_tabs">True</property>
             <property name="show_border">False</property>
-            <child>
-              <object class="GtkLabel" id="welcomeText">
-                <property name="width_request">142</property>
-                <property name="height_request">41</property>
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="label" translatable="yes">Welcome</property>
-                <attributes>
-                  <attribute name="font-desc" value="Verdana Italic 20"/>
-                  <attribute name="style" value="oblique"/>
-                  <attribute name="weight" value="ultralight"/>
-                </attributes>
-              </object>
-            </child>
-            <child type="tab">
-              <object class="GtkLabel" id="welcomeTab">
-                <property name="visible">True</property>
-                <property name="can_focus">False</property>
-                <property name="label" translatable="yes">Welcome</property>
-              </object>
-              <packing>
-                <property name="tab_fill">False</property>
-              </packing>
-            </child>
           </object>
           <packing>
             <property name="resize">True</property>

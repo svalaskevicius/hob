@@ -55,8 +55,6 @@ loadGui fileTreeLoader fileLoader fileWriter = do
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
-            welcomeTab <- builderGetObject builder castToLabel "welcomeText"
-            widgetSetName welcomeTab "welcomeText"
             _ <- mainWindow `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
@@ -217,7 +215,7 @@ getEditorText textEdit = do
       get textBuf textBufferText
 
 getActiveEditor :: Window -> IO (Maybe TextView)
-getActiveEditor = getEditorFromNotebookTab <=< getActiveEditorTab
+getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
 getEditorFromNotebookTab :: Widget -> IO (Maybe TextView)
 getEditorFromNotebookTab currentlyActiveEditor =
@@ -227,12 +225,15 @@ getEditorFromNotebookTab currentlyActiveEditor =
           return $ fmap castToTextView textEdit
       else return Nothing
 
-getActiveEditorTab :: Window -> IO Widget
+getActiveEditorTab :: Window -> IO (Maybe Widget)
 getActiveEditorTab mainWindow = do
       tabbed <- getActiveEditorNotebook mainWindow
       pageNum <- notebookGetCurrentPage tabbed
-      tabs <- containerGetChildren tabbed
-      return (tabs!!pageNum)
+      if pageNum < 0 then
+          return Nothing
+      else do
+          tabs <- containerGetChildren tabbed
+          return $ Just $ tabs!!pageNum
 
 getActiveEditorNotebook :: Window -> IO Notebook
 getActiveEditorNotebook mainWindow = do

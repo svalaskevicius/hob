@@ -37,14 +37,14 @@ spec = do
     it "does not open a file editor for directory" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [0]
-      isWelcome <- isShowingWelcome mainWindow
-      isWelcome `shouldBe` True
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      pagesAfterActivatingDirectory `shouldBe` 0
 
     it "does not open a file editor for files it cannot read" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [2]
-      isWelcome <- isShowingWelcome mainWindow
-      isWelcome `shouldBe` True
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      pagesAfterActivatingDirectory `shouldBe` 0
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
@@ -85,8 +85,8 @@ spec = do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       closeCurrentEditorTab mainWindow
-      tabText <- getActiveEditorTabText mainWindow
-      tabText `shouldBe` "Welcome"
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      pagesAfterActivatingDirectory `shouldBe` 0
 
     it "saves the currently active file" $ do
       recorder <- newIORef ("", pack "")
@@ -141,13 +141,11 @@ getActiveEditorTabText :: Window -> IO String
 getActiveEditorTabText mainWindow = do
       tabbed <- getActiveEditorNotebook mainWindow
       currentlyActiveEditor <- getActiveEditorTab mainWindow
-      text <- notebookGetTabLabelText tabbed currentlyActiveEditor
+      text <- notebookGetTabLabelText tabbed $ fromJust currentlyActiveEditor
       return $ fromJust text
 
-isShowingWelcome :: Window -> IO Bool
-isShowingWelcome mainWindow = do
-      name <- widgetGetName =<< getActiveEditorTab mainWindow
-      return (name == "welcomeText")
+getNumberOfEditorPages :: Window -> IO Int
+getNumberOfEditorPages = notebookGetNPages <=< getActiveEditorNotebook
 
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
