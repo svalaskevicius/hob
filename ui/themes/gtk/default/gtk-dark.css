@@ -16,7 +16,7 @@
 
 
 @define-color subdued_color shade(@theme_base_color, 0.3);
-@define-color theme_bg_color shade(@theme_base_color, 1.7);
+@define-color theme_bg_color #222320;
 @define-color theme_fg_color @theme_text_color;
 @define-color theme_tooltip_bg_color mix(@subdued_color, #000000, 0.5);
 @define-color theme_tooltip_fg_color @theme_text_color;

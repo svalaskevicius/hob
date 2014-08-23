@@ -1,6 +1,6 @@
 /* common color definitions to the light and dark variations */
-@define-color alt_base_color mix(@theme_bg_color, @theme_base_color, 0.7);
-@define-color alt_subdued_color mix(@theme_bg_color, @subdued_color, 0.7);
+@define-color alt_base_color mix(@theme_bg_color, @theme_base_color, 0.5);
+@define-color alt_subdued_color mix(@theme_bg_color, @subdued_color, 0.5);
 
 @define-color alt_border_color mix(@theme_tooltip_bg_color, @border_color, 0.5);
 @define-color colored_border_color mix(@alt_border_color, shade(@theme_selected_bg_color, 0.5), 0.2);
