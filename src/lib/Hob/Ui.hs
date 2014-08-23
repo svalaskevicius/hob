@@ -185,11 +185,14 @@ saveCurrentEditorTab fileWriter mainWindow = do
               quark <- fileNameQuark
               path <- objectGetAttributeUnsafe quark editor
               case path of
-                  Just filePath -> do
-                      text <- getEditorText editor
-                      fileWriter filePath text
-                      return ()
+                  Just filePath -> saveEditorContents editor filePath
                   Nothing -> return ()
+          saveEditorContents editor filePath = do
+              textBuf <- textViewGetBuffer editor
+              text <- get textBuf textBufferText
+              fileWriter filePath text
+              textBuf `set` [textBufferModified := False]
+              return ()
 
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"

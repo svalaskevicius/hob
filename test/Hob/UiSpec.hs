@@ -63,10 +63,7 @@ spec = do
       tabText `shouldBe` "testName.hs"
 
     it "updates the tab title to reflect if buffer is modified" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
-      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
-      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
-      textBufferSetModified buffer True
+      (mainWindow, _) <- launchNewFileAndSetModified
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs*"
 
@@ -92,6 +89,20 @@ spec = do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       saveCurrentEditorTab failingFileWriter mainWindow
 
+    it "marks buffer as unmodified on save" $ do
+      (mainWindow, buffer) <- launchNewFileAndSetModified
+      saveCurrentEditorTab blackholeFileWriter mainWindow
+      stateAfterSave <- textBufferGetModified buffer
+      stateAfterSave `shouldBe` False
+
+
+launchNewFileAndSetModified :: IO (Window, TextBuffer)
+launchNewFileAndSetModified = do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      textBufferSetModified buffer True
+      return (mainWindow, buffer)
 
 launchStubbedEditorTab :: Window -> String -> IO ()
 launchStubbedEditorTab mainWindow file = do
@@ -139,6 +150,9 @@ failingFileLoader _ = throwError $ userError "cannot open files stub"
 
 failingFileWriter :: FileWriter
 failingFileWriter _ _ = throwError $ userError "cannot write files stub"
+
+blackholeFileWriter :: FileWriter
+blackholeFileWriter _ _ = return ()
 
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
