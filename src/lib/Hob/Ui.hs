@@ -157,6 +157,12 @@ launchNewEditorForText targetNotebook title text = do
     tabNr <- notebookAppendPage targetNotebook scrolledWindow title
     notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
+
+    buffer `on` modifiedChanged $ do
+                                      modified <- buffer `get` textBufferModified
+                                      notebookSetTabLabelText targetNotebook scrolledWindow $ if modified then title ++ "*" else title
+                                      return ()
+
     return editor
 
 

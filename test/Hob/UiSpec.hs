@@ -62,6 +62,14 @@ spec = do
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs"
 
+    it "updates the tab title to reflect if buffer is modified" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      launchStubbedEditorTab mainWindow "/xxx/testName.hs"
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      textBufferSetModified buffer True
+      tabText <- getActiveEditorTabText mainWindow
+      tabText `shouldBe` "testName.hs*"
+
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
@@ -83,6 +91,7 @@ spec = do
     it "skips save when there is no active file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       saveCurrentEditorTab failingFileWriter mainWindow
+
 
 launchStubbedEditorTab :: Window -> String -> IO ()
 launchStubbedEditorTab mainWindow file = do
