@@ -107,6 +107,12 @@ spec = do
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
+    it "creates a new unnamed file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      editNewFile mainWindow
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      pagesAfterActivatingDirectory `shouldBe` 1
+
     it "requests filename for a new file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       editNewFile mainWindow
@@ -117,12 +123,14 @@ spec = do
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "fileResponded.hs"
 
-    it "creates a new unnamed file" $ do
+    it "updates the tab title from the newly got filepath" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       editNewFile mainWindow
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
-      pagesAfterActivatingDirectory `shouldBe` 1
-
+      saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") blackholeFileWriter mainWindow
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      textBufferSetModified buffer True
+      tabText <- getActiveEditorTabText mainWindow
+      tabText `shouldBe` "fileResponded.hs*"
 
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do
@@ -183,7 +191,7 @@ blackholeFileWriter _ _ = return ()
 mockedFileWriter :: IO (FileWriter, IO (Maybe (String, Text)))
 mockedFileWriter = do
       recorder <- newIORef Nothing
-      return (curry $ (writeIORef recorder) . Just, readIORef recorder)
+      return (curry $ writeIORef recorder . Just, readIORef recorder)
 
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
@@ -195,4 +203,4 @@ stubbedFileChooser :: Maybe FilePath -> NewFileNameChooser
 stubbedFileChooser = return
 
 emptyFileChooser :: NewFileNameChooser
-emptyFileChooser = stubbedFileChooser Nothing 
+emptyFileChooser = stubbedFileChooser Nothing

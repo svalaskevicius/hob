@@ -24,7 +24,7 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
-import Graphics.UI.Gtk.SourceView           (SourceView (..),
+import Graphics.UI.Gtk.SourceView           (SourceView (..), castToSourceView,
                                              sourceBufferBeginNotUndoableAction,
                                              sourceBufferEndNotUndoableAction,
                                              sourceBufferNewWithLanguage,
@@ -178,13 +178,9 @@ launchNewEditorForText targetNotebook filePath text = do
     notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
 
-    buffer `on` modifiedChanged $ do
-                                      modified <- buffer `get` textBufferModified
-                                      notebookSetTabLabelText targetNotebook scrolledWindow $ if modified then title ++ "*" else title
-                                      return ()
+    buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
 
-    quark <- fileNameQuark
-    objectSetAttribute quark editor filePath
+    setEditorFilePath editor filePath
 
     return editor
     where title = tabTitle filePath
@@ -220,10 +216,9 @@ saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
           askForFile onSuccess = newFileNameChooser >>= maybe (return()) onSuccess
           saveAsNewFile editor filePath = do
               saveEditorContents editor filePath
-              Just scrolledW <- widgetGetParent editor
-              Just notebookW <- widgetGetParent scrolledW
-              let notebook = castToNotebook notebookW
-              notebookSetTabLabelText notebook scrolledW $ tabTitle $ Just filePath
+              setEditorFilePath editor $ Just filePath
+              updateEditorTitle editor
+
           saveEditorContents editor filePath = do
               textBuf <- textViewGetBuffer editor
               text <- get textBuf textBufferText
@@ -244,15 +239,15 @@ getEditorText textEdit = do
       textBuf <- textViewGetBuffer textEdit
       get textBuf textBufferText
 
-getActiveEditor :: Window -> IO (Maybe TextView)
+getActiveEditor :: Window -> IO (Maybe SourceView)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
-getEditorFromNotebookTab :: Widget -> IO (Maybe TextView)
+getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
 getEditorFromNotebookTab currentlyActiveEditor =
       if currentlyActiveEditor `isA` gTypeScrolledWindow then do
           let textEditScroller = castToScrolledWindow currentlyActiveEditor
           textEdit <- binGetChild textEditScroller
-          return $ fmap castToTextView textEdit
+          return $ fmap castToSourceView textEdit
       else return Nothing
 
 getActiveEditorTab :: Window -> IO (Maybe Widget)
@@ -275,6 +270,26 @@ tabTitle :: Maybe FilePath -> String
 tabTitle (Just filePath) = filename' filePath
     where filename' = encodeString . filename . decodeString
 tabTitle Nothing = "(new file)"
+
+tabTitleForEditor :: SourceView -> IO String
+tabTitleForEditor editor = do
+    quark <- fileNameQuark
+    filePath <- objectGetAttributeUnsafe quark editor
+    buffer <- textViewGetBuffer editor
+    modified <- buffer `get` textBufferModified
+    return $ if modified then tabTitle filePath ++ "*" else tabTitle filePath
+
+updateEditorTitle :: SourceView -> IO ()
+updateEditorTitle editor = do
+    Just scrolledW <- widgetGetParent editor
+    Just notebookW <- widgetGetParent scrolledW
+    let notebook = castToNotebook notebookW
+    notebookSetTabLabelText notebook scrolledW =<< tabTitleForEditor editor
+
+setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
+setEditorFilePath editor filePath = do
+    quark <- fileNameQuark
+    objectSetAttribute quark editor filePath
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)
