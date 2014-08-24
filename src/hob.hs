@@ -1,4 +1,4 @@
-module Main where
+module Main (main) where
 
 import           Control.Monad       (forM)
 import           Control.Monad.Trans (liftIO)

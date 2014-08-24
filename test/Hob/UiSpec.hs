@@ -1,4 +1,4 @@
-module Hob.UiSpec where
+module Hob.UiSpec (main, spec) where
 
 import Control.Monad.Error
 import Data.IORef

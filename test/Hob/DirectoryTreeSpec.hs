@@ -1,4 +1,4 @@
-module Hob.DirectoryTreeSpec where
+module Hob.DirectoryTreeSpec (main, spec) where
 
 import Control.Monad.Error
 import Data.Tree

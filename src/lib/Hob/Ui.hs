@@ -1,4 +1,15 @@
-module Hob.Ui where
+module Hob.Ui (loadGui,
+               FileLoader,
+               FileWriter,
+               getActiveEditorText,
+               getActiveEditorTab,
+               getActiveEditorNotebook,
+               launchNewEditorForText,
+               launchNewFileEditor,
+               getEditorText,
+               closeCurrentEditorTab,
+               saveCurrentEditorTab,
+               getActiveEditor) where
 
 import Control.Monad                        (filterM, unless, (<=<))
 import Control.Monad.Trans                  (liftIO)
