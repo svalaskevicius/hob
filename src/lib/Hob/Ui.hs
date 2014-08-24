@@ -81,7 +81,10 @@ loadGui fileTreeLoader fileLoader fileWriter = do
             return mainWindow
         fileChooser mainWindow = do
             dialog <- fileChooserDialogNew Nothing (Just mainWindow) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
-            fileChooserGetFilename dialog
+            response <- dialogRun dialog
+            file <- if response == ResponseOk then fileChooserGetFilename dialog else return Nothing
+            widgetDestroy dialog
+            return file
 
 setGtkStyle :: IO ()
 setGtkStyle = do
