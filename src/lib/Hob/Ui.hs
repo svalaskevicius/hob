@@ -1,6 +1,7 @@
 module Hob.Ui (loadGui,
                FileLoader,
                FileWriter,
+               NewFileNameChooser,
                getActiveEditorText,
                getActiveEditorTab,
                getActiveEditorNotebook,
@@ -42,6 +43,7 @@ import System.Glib.GObject
 
 type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO ()
+type NewFileNameChooser = IO (Maybe FilePath)
 
 type FileLoader = FilePath -> IO (Maybe Text)
 type FileWriter = FilePath -> Text -> IO ()
@@ -72,12 +74,14 @@ loadGui fileTreeLoader fileLoader fileWriter = do
                 key <- eventKeyName
                 case (modifier, unpack key) of
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
-                    ([Control], "s") -> liftIO $ saveCurrentEditorTab fileWriter mainWindow >> return True
+                    ([Control], "s") -> liftIO $ saveCurrentEditorTab (fileChooser mainWindow) fileWriter mainWindow >> return True
                     ([Control], "n") -> liftIO $ editNewFile mainWindow >> return True
                     _ -> return False
 
             return mainWindow
-
+        fileChooser mainWindow = do
+            dialog <- fileChooserDialogNew Nothing (Just mainWindow) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
+            fileChooserGetFilename dialog
 
 setGtkStyle :: IO ()
 setGtkStyle = do
@@ -205,8 +209,8 @@ editNewFile mainWindow = do
     objectSetAttribute quark editor Nothing
 
 
-saveCurrentEditorTab :: FileWriter -> Window -> IO ()
-saveCurrentEditorTab fileWriter mainWindow = do
+saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
+saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
     editor <- getActiveEditor mainWindow
     maybe (return ()) saveEditor editor
     where saveEditor editor = do
@@ -214,7 +218,8 @@ saveCurrentEditorTab fileWriter mainWindow = do
               path <- objectGetAttributeUnsafe quark editor
               case path of
                   Just filePath -> saveEditorContents editor filePath
-                  Nothing -> return ()
+                  Nothing -> saveAsNewFile editor
+          saveAsNewFile editor = newFileNameChooser >>= maybe (return()) (saveEditorContents editor)
           saveEditorContents editor filePath = do
               textBuf <- textViewGetBuffer editor
               text <- get textBuf textBufferText

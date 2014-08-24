@@ -3,7 +3,7 @@ module Hob.UiSpec (main, spec) where
 import Control.Monad.Error
 import Data.IORef
 import Data.Maybe
-import Data.Text                  (pack, unpack)
+import Data.Text                  (Text, pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
@@ -89,24 +89,31 @@ spec = do
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "saves the currently active file" $ do
-      recorder <- newIORef ("", pack "")
-      let stubbedFileWriter = curry $ writeIORef recorder
+      (mockedWriter, mockReader) <- mockedFileWriter
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
-      saveCurrentEditorTab stubbedFileWriter mainWindow
+      saveCurrentEditorTab emptyFileChooser mockedWriter mainWindow
 
-      savedFile <- readIORef recorder
-      savedFile `shouldBe` ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
+      savedFile <- mockReader
+      savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
     it "skips save when there is no active file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
-      saveCurrentEditorTab failingFileWriter mainWindow
+      saveCurrentEditorTab emptyFileChooser failingFileWriter mainWindow
 
     it "marks buffer as unmodified on save" $ do
       (mainWindow, buffer) <- launchNewFileAndSetModified
-      saveCurrentEditorTab blackholeFileWriter mainWindow
+      saveCurrentEditorTab emptyFileChooser blackholeFileWriter mainWindow
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
+
+    it "requests filename for a new file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      editNewFile mainWindow
+      (mockedWriter, mockReader) <- mockedFileWriter
+      saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") mockedWriter mainWindow
+      savedFile <- mockReader
+      savedFile `shouldBe` Just ("/xxx/fileResponded.hs", pack "")
 
     it "creates a new unnamed file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
@@ -171,10 +178,19 @@ failingFileWriter _ _ = throwError $ userError "cannot write files stub"
 blackholeFileWriter :: FileWriter
 blackholeFileWriter _ _ = return ()
 
+mockedFileWriter :: IO (FileWriter, IO (Maybe (String, Text)))
+mockedFileWriter = do
+      recorder <- newIORef Nothing
+      return (curry $ (writeIORef recorder) . Just, readIORef recorder)
+
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
 stubbedFileLoader "/xxx/cannotRead" = return Nothing
 stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
 stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
 
+stubbedFileChooser :: Maybe FilePath -> NewFileNameChooser
+stubbedFileChooser = return
 
+emptyFileChooser :: NewFileNameChooser
+emptyFileChooser = stubbedFileChooser Nothing 
