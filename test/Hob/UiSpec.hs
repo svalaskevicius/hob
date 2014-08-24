@@ -50,7 +50,7 @@ spec = do
     it "does not allow to undo the intial loaded source" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
       tabbed <- getActiveEditorNotebook mainWindow
-      editor <- launchNewEditorForText tabbed "testfile" $ pack "initial text"
+      editor <- launchNewEditorForText tabbed Nothing $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
       editorText <- getEditorText editor
@@ -114,6 +114,8 @@ spec = do
       saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") mockedWriter mainWindow
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/fileResponded.hs", pack "")
+      tabText <- getActiveEditorTabText mainWindow
+      tabText `shouldBe` "fileResponded.hs"
 
     it "creates a new unnamed file" $ do
       mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter

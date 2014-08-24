@@ -131,12 +131,8 @@ launchNewFileEditor loadFile targetNotebook filePath = do
         Nothing -> maybe (return ()) launchEditor <=< loadFile $ filePath
 
     where launchEditor text = do
-              editor <- launchNewEditorForText targetNotebook tabTitle text
-              quark <- fileNameQuark
-              objectSetAttribute quark editor $ Just filePath
+              editor <- launchNewEditorForText targetNotebook (Just filePath) text
               return ()
-          tabTitle = filename' filePath
-          filename' = encodeString . filename . decodeString
           isEditorFileMatching editor = do
               quark <- fileNameQuark
               f <- objectGetAttributeUnsafe quark editor
@@ -144,8 +140,8 @@ launchNewFileEditor loadFile targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-launchNewEditorForText :: Notebook -> String -> Text -> IO SourceView
-launchNewEditorForText targetNotebook title text = do
+launchNewEditorForText :: Notebook -> Maybe FilePath -> Text -> IO SourceView
+launchNewEditorForText targetNotebook filePath text = do
     lm <- sourceLanguageManagerNew
     langM <- sourceLanguageManagerGetLanguage lm "haskell"
     lang <- case langM of
@@ -187,7 +183,11 @@ launchNewEditorForText targetNotebook title text = do
                                       notebookSetTabLabelText targetNotebook scrolledWindow $ if modified then title ++ "*" else title
                                       return ()
 
+    quark <- fileNameQuark
+    objectSetAttribute quark editor filePath
+
     return editor
+    where title = tabTitle filePath
 
 
 closeCurrentEditorTab :: Window -> IO ()
@@ -204,10 +204,8 @@ closeCurrentEditorTab mainWindow = do
 editNewFile :: Window -> IO ()
 editNewFile mainWindow = do
     tabbed <- getActiveEditorNotebook mainWindow
-    editor <- launchNewEditorForText tabbed "(new file)" $ pack ""
-    quark <- fileNameQuark
-    objectSetAttribute quark editor Nothing
-
+    _ <- launchNewEditorForText tabbed Nothing $ pack ""
+    return ()
 
 saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
 saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
@@ -218,8 +216,14 @@ saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
               path <- objectGetAttributeUnsafe quark editor
               case path of
                   Just filePath -> saveEditorContents editor filePath
-                  Nothing -> saveAsNewFile editor
-          saveAsNewFile editor = newFileNameChooser >>= maybe (return()) (saveEditorContents editor)
+                  Nothing -> askForFile $ saveAsNewFile editor
+          askForFile onSuccess = newFileNameChooser >>= maybe (return()) onSuccess
+          saveAsNewFile editor filePath = do
+              saveEditorContents editor filePath
+              Just scrolledW <- widgetGetParent editor
+              Just notebookW <- widgetGetParent scrolledW
+              let notebook = castToNotebook notebookW
+              notebookSetTabLabelText notebook scrolledW $ tabTitle $ Just filePath
           saveEditorContents editor filePath = do
               textBuf <- textViewGetBuffer editor
               text <- get textBuf textBufferText
@@ -264,8 +268,13 @@ getActiveEditorTab mainWindow = do
 getActiveEditorNotebook :: Window -> IO Notebook
 getActiveEditorNotebook mainWindow = do
       paned <- binGetChild mainWindow
-      tabbed' <- panedGetChild2 $ castToPaned $ fromJust paned
-      return $ castToNotebook $ fromJust tabbed'
+      notebook <- panedGetChild2 $ castToPaned $ fromJust paned
+      return $ castToNotebook $ fromJust notebook
+
+tabTitle :: Maybe FilePath -> String
+tabTitle (Just filePath) = filename' filePath
+    where filename' = encodeString . filename . decodeString
+tabTitle Nothing = "(new file)"
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)
