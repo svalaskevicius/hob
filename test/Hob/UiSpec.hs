@@ -108,6 +108,12 @@ spec = do
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
+    it "creates a new unnamed file" $ do
+      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      editNewFile mainWindow
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      pagesAfterActivatingDirectory `shouldBe` 1
+
 
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do

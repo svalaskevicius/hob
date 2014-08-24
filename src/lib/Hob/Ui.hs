@@ -8,6 +8,7 @@ module Hob.Ui (loadGui,
                launchNewFileEditor,
                getEditorText,
                closeCurrentEditorTab,
+               editNewFile,
                saveCurrentEditorTab,
                getActiveEditor) where
 
@@ -72,6 +73,7 @@ loadGui fileTreeLoader fileLoader fileWriter = do
                 case (modifier, unpack key) of
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
                     ([Control], "s") -> liftIO $ saveCurrentEditorTab fileWriter mainWindow >> return True
+                    ([Control], "n") -> liftIO $ editNewFile mainWindow >> return True
                     _ -> return False
 
             return mainWindow
@@ -133,8 +135,8 @@ launchNewFileEditor loadFile targetNotebook filePath = do
           filename' = encodeString . filename . decodeString
           isEditorFileMatching editor = do
               quark <- fileNameQuark
-              Just f <- objectGetAttributeUnsafe quark editor
-              return $ f == filePath
+              f <- objectGetAttributeUnsafe quark editor
+              return $ maybe False (filePath ==) f
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
@@ -194,6 +196,14 @@ closeCurrentEditorTab mainWindow = do
             notebookRemovePage tabbed currentPage
             widgetDestroy pageContents
         Nothing -> return ()
+
+editNewFile :: Window -> IO ()
+editNewFile mainWindow = do
+    tabbed <- getActiveEditorNotebook mainWindow
+    editor <- launchNewEditorForText tabbed "(new file)" $ pack ""
+    quark <- fileNameQuark
+    objectSetAttribute quark editor Nothing
+
 
 saveCurrentEditorTab :: FileWriter -> Window -> IO ()
 saveCurrentEditorTab fileWriter mainWindow = do
