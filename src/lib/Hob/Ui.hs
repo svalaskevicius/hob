@@ -37,8 +37,8 @@ import Graphics.UI.Gtk.SourceView           (SourceView (..), castToSourceView,
                                              sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
-import Hob.DirectoryTree
 import Hob.Context
+import Hob.DirectoryTree
 import System.FilePath
 import System.Glib.GObject
 
@@ -54,7 +54,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
         _ <- initGUI
 
         builder <- loadUiBuilder
-        setGtkStyle
+        setGtkStyle ctx
         initSidebar builder
         initMainWindow builder
     where
@@ -87,10 +87,10 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
             widgetDestroy dialog
             return file
 
-setGtkStyle :: IO ()
-setGtkStyle = do
+setGtkStyle :: Context -> IO ()
+setGtkStyle ctx = do
     cssProvider <- cssProviderNew
-    cssProviderLoadFromPath cssProvider ("ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css")
+    cssProviderLoadFromPath cssProvider $ uiTheme ctx
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 

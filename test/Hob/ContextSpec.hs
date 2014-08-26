@@ -7,8 +7,12 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec =
-  describe "uiFile" $ do
-    it "returns absolute path" $ do
-      let ctx = Context "/tmp/xxx"
-      (uiFile ctx) `shouldBe` "/tmp/xxx/ui/ui.glade"
+spec = do
+  describe "uiFile" $
+    it "returns prefixed path" $
+      uiFile (Context "/tmp/xxx") `shouldBe` "/tmp/xxx/ui/ui.glade"
+
+  describe "uiTheme" $
+    it "returns prefixed path" $
+      uiTheme (Context "/tmp/xxx") `shouldBe` "/tmp/xxx/ui/themes/gtk/default/gtk-dark.css"
+

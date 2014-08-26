@@ -7,9 +7,9 @@ import Data.Text                  (Text, pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
+import Hob.Context
 import Hob.DirectoryTree
 import Hob.Ui
-import Hob.Context
 import Test.Hspec
 
 main :: IO ()

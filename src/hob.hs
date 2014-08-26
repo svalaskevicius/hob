@@ -7,9 +7,9 @@ import           Data.Text           (Text (..))
 import qualified Data.Text.Encoding  as E
 import           Data.Tree
 import           Graphics.UI.Gtk
+import           Hob.Context
 import           Hob.DirectoryTree
 import           Hob.Ui
-import           Hob.Context
 import           System.Directory
 import           System.FilePath
 
