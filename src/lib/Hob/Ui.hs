@@ -38,6 +38,7 @@ import Graphics.UI.Gtk.SourceView           (SourceView (..), castToSourceView,
                                              sourceViewNewWithBuffer,
                                              sourceViewSetShowLineNumbers)
 import Hob.DirectoryTree
+import Hob.Context
 import System.FilePath
 import System.Glib.GObject
 
@@ -48,8 +49,8 @@ type NewFileNameChooser = IO (Maybe FilePath)
 type FileLoader = FilePath -> IO (Maybe Text)
 type FileWriter = FilePath -> Text -> IO ()
 
-loadGui :: FileTreeLoader -> FileLoader -> FileWriter -> IO Window
-loadGui fileTreeLoader fileLoader fileWriter = do
+loadGui :: Context -> FileTreeLoader -> FileLoader -> FileWriter -> IO Window
+loadGui ctx fileTreeLoader fileLoader fileWriter = do
         _ <- initGUI
 
         builder <- loadUiBuilder
@@ -59,7 +60,7 @@ loadGui fileTreeLoader fileLoader fileWriter = do
     where
         loadUiBuilder = do
             builder <- builderNew
-            builderAddFromFile builder "ui/ui.glade"
+            builderAddFromFile builder $ uiFile ctx
             return builder
         initSidebar builder = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"

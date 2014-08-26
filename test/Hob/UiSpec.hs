@@ -9,6 +9,7 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
 import Hob.DirectoryTree
 import Hob.Ui
+import Hob.Context
 import Test.Hspec
 
 main :: IO ()
@@ -18,37 +19,37 @@ spec :: Spec
 spec = do
   describe "mainWindow" $ do
     it "mainWindow is named" $ do
-      mainWindow <- loadGui fileTreeStub failingFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub failingFileLoader failingFileWriter
       name <- widgetGetName mainWindow
       name `shouldBe` "mainWindow"
 
     it "contains named sidebar" $ do
-      mainWindow <- loadGui fileTreeStub failingFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub failingFileLoader failingFileWriter
       name <- widgetGetName =<< getDirectoryListingSidebar mainWindow
       name `shouldBe` "directoryListing"
 
   describe "sidebar" $ do
     it "opens a file editor" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [1]
       editorText <- getActiveEditorText mainWindow
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 
     it "does not open a file editor for directory" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [0]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "does not open a file editor for files it cannot read" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       activateDirectoryPath mainWindow [2]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       tabbed <- getActiveEditorNotebook mainWindow
       editor <- launchNewEditorForText tabbed Nothing $ pack "initial text"
       buffer <- textViewGetBuffer editor
@@ -57,7 +58,7 @@ spec = do
       unpack editorText `shouldBe` "initial text"
 
     it "sets the tab title when opening a file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs"
@@ -68,7 +69,7 @@ spec = do
       tabText `shouldBe` "testName.hs*"
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       notebook <- getActiveEditorNotebook mainWindow
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
@@ -82,7 +83,7 @@ spec = do
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       closeCurrentEditorTab mainWindow
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
@@ -90,7 +91,7 @@ spec = do
 
     it "saves the currently active file" $ do
       (mockedWriter, mockReader) <- mockedFileWriter
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       saveCurrentEditorTab emptyFileChooser mockedWriter mainWindow
 
@@ -98,7 +99,7 @@ spec = do
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
     it "skips save when there is no active file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       saveCurrentEditorTab emptyFileChooser failingFileWriter mainWindow
 
     it "marks buffer as unmodified on save" $ do
@@ -108,13 +109,13 @@ spec = do
       stateAfterSave `shouldBe` False
 
     it "creates a new unnamed file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       editNewFile mainWindow
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 1
 
     it "requests filename for a new file" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       editNewFile mainWindow
       (mockedWriter, mockReader) <- mockedFileWriter
       saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") mockedWriter mainWindow
@@ -124,7 +125,7 @@ spec = do
       tabText `shouldBe` "fileResponded.hs"
 
     it "updates the tab title from the newly got filepath" $ do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       editNewFile mainWindow
       saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") blackholeFileWriter mainWindow
       buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
@@ -134,7 +135,7 @@ spec = do
 
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do
-      mainWindow <- loadGui fileTreeStub stubbedFileLoader failingFileWriter
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       launchStubbedEditorTab mainWindow "/xxx/testName.hs"
       buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
       textBufferSetModified buffer True
@@ -204,3 +205,6 @@ stubbedFileChooser = return
 
 emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
+
+stubbedCtx :: Context
+stubbedCtx = Context "."

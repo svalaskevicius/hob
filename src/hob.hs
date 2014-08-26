@@ -9,6 +9,7 @@ import           Data.Tree
 import           Graphics.UI.Gtk
 import           Hob.DirectoryTree
 import           Hob.Ui
+import           Hob.Context
 import           System.Directory
 import           System.FilePath
 
@@ -16,11 +17,12 @@ import System.IO (hPutStr, stderr)
 
 main :: IO ()
 main = do
-        projectRoot <- getCurrentDirectory
-        mainWindow <- loadGui (fileTreeFromDirectory projectRoot) loadFile storeFile
-        _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
-        widgetShowAll mainWindow
-        mainGUI
+    projectRoot <- getCurrentDirectory
+    let ctx = Context projectRoot
+    mainWindow <- loadGui ctx (fileTreeFromDirectory projectRoot) loadFile storeFile
+    _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
+    widgetShowAll mainWindow
+    mainGUI
 
 
 fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
