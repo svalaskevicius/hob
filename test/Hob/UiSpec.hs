@@ -6,7 +6,8 @@ import Data.Maybe
 import Data.Text                  (Text, pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
+import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo,
+                                   sourceLanguageManagerNew)
 import Hob.Context
 import Hob.DirectoryTree
 import Hob.Ui
@@ -51,7 +52,8 @@ spec = do
     it "does not allow to undo the intial loaded source" $ do
       mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
       tabbed <- getActiveEditorNotebook mainWindow
-      editor <- launchNewEditorForText tabbed Nothing $ pack "initial text"
+      languageManager <- sourceLanguageManagerNew
+      editor <- launchNewEditorForText tabbed languageManager Nothing $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
       editorText <- getEditorText editor
@@ -109,14 +111,12 @@ spec = do
       stateAfterSave `shouldBe` False
 
     it "creates a new unnamed file" $ do
-      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
-      editNewFile mainWindow
+      mainWindow <- launchNewFile
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 1
 
     it "requests filename for a new file" $ do
-      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
-      editNewFile mainWindow
+      mainWindow <- launchNewFile
       (mockedWriter, mockReader) <- mockedFileWriter
       saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") mockedWriter mainWindow
       savedFile <- mockReader
@@ -125,13 +125,19 @@ spec = do
       tabText `shouldBe` "fileResponded.hs"
 
     it "updates the tab title from the newly got filepath" $ do
-      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
-      editNewFile mainWindow
+      mainWindow <- launchNewFile
       saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") blackholeFileWriter mainWindow
       buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
       textBufferSetModified buffer True
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "fileResponded.hs*"
+
+launchNewFile :: IO Window
+launchNewFile = do
+      mainWindow <- loadGui stubbedCtx fileTreeStub stubbedFileLoader failingFileWriter
+      languageManager <- sourceLanguageManagerNew
+      editNewFile mainWindow languageManager
+      return mainWindow
 
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do
@@ -144,7 +150,8 @@ launchNewFileAndSetModified = do
 launchStubbedEditorTab :: Window -> String -> IO ()
 launchStubbedEditorTab mainWindow file = do
       tabbed <- getActiveEditorNotebook mainWindow
-      launchNewFileEditor stubbedFileLoader tabbed file
+      languageManager <- sourceLanguageManagerNew
+      launchNewFileEditor stubbedFileLoader tabbed languageManager file
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
 activateDirectoryPath mainWindow path = do

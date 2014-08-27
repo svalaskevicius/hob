@@ -1,4 +1,8 @@
-module Hob.Context (Context(..), uiFile, uiTheme) where
+module Hob.Context (
+    Context(..),
+    uiFile,
+    uiTheme
+) where
 
 import System.FilePath (FilePath (..), (</>))
 

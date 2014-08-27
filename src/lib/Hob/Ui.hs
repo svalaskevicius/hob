@@ -24,14 +24,17 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
-import Graphics.UI.Gtk.SourceView           (SourceView (..), castToSourceView,
+import Graphics.UI.Gtk.SourceView           (SourceLanguageManager, SourceView,
+                                             castToSourceView,
                                              sourceBufferBeginNotUndoableAction,
                                              sourceBufferEndNotUndoableAction,
-                                             sourceBufferNewWithLanguage,
+                                             sourceBufferNew,
                                              sourceBufferSetHighlightSyntax,
+                                             sourceBufferSetLanguage,
                                              sourceBufferSetStyleScheme,
                                              sourceLanguageManagerGetLanguage,
                                              sourceLanguageManagerGetSearchPath,
+                                             sourceLanguageManagerGuessLanguage,
                                              sourceLanguageManagerNew,
                                              sourceStyleSchemeManagerGetDefault,
                                              sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
@@ -55,19 +58,21 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
 
         builder <- loadUiBuilder
         setGtkStyle ctx
-        initSidebar builder
-        initMainWindow builder
+
+        languageManager <- sourceLanguageManagerNew
+        initSidebar builder languageManager
+        initMainWindow builder languageManager
     where
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile ctx
             return builder
-        initSidebar builder = do
+        initSidebar builder languageManager = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree sidebarTree fileTreeLoader $ launchNewFileEditor fileLoader mainEditNotebook
-        initMainWindow builder = do
+            initSideBarFileTree sidebarTree fileTreeLoader $ launchNewFileEditor fileLoader mainEditNotebook languageManager
+        initMainWindow builder languageManager = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
             _ <- mainWindow `on` keyPressEvent $ do
@@ -76,7 +81,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                 case (modifier, unpack key) of
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
                     ([Control], "s") -> liftIO $ saveCurrentEditorTab (fileChooser mainWindow) fileWriter mainWindow >> return True
-                    ([Control], "n") -> liftIO $ editNewFile mainWindow >> return True
+                    ([Control], "n") -> liftIO $ editNewFile mainWindow languageManager >> return True
                     _ -> return False
 
             return mainWindow
@@ -126,8 +131,8 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
 
 
-launchNewFileEditor :: FileLoader -> Notebook -> NewFileEditorLauncher
-launchNewFileEditor loadFile targetNotebook filePath = do
+launchNewFileEditor :: FileLoader -> Notebook -> SourceLanguageManager -> NewFileEditorLauncher
+launchNewFileEditor loadFile targetNotebook languageManager filePath = do
     editors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
     editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
     case alreadyLoadedPage editorsForFile of
@@ -135,7 +140,7 @@ launchNewFileEditor loadFile targetNotebook filePath = do
         Nothing -> maybe (return ()) launchEditor <=< loadFile $ filePath
 
     where launchEditor text = do
-              editor <- launchNewEditorForText targetNotebook (Just filePath) text
+              editor <- launchNewEditorForText targetNotebook languageManager (Just filePath) text
               return ()
           isEditorFileMatching editor = do
               quark <- fileNameQuark
@@ -144,28 +149,21 @@ launchNewFileEditor loadFile targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-launchNewEditorForText :: Notebook -> Maybe FilePath -> Text -> IO SourceView
-launchNewEditorForText targetNotebook filePath text = do
-    lm <- sourceLanguageManagerNew
-    langM <- sourceLanguageManagerGetLanguage lm "haskell"
-    lang <- case langM of
-        (Just lang) -> return lang
-        Nothing -> do
-            langDirs <- sourceLanguageManagerGetSearchPath lm
-            error ("please copy haskell.lang to one of the following directories:\n"
-                ++unlines langDirs)
-
+launchNewEditorForText :: Notebook -> SourceLanguageManager -> Maybe FilePath -> Text -> IO SourceView
+launchNewEditorForText targetNotebook languageManager filePath text = do
     styleManager <- sourceStyleSchemeManagerGetDefault
     sourceStyleSchemeManagerSetSearchPath styleManager (Just ["ui" </> "themes" </> "gtksourceview"])
     style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
 
-    buffer <- sourceBufferNewWithLanguage lang
+    buffer <- sourceBufferNew Nothing
+    setBufferLanguage buffer =<< guessLanguage languageManager filePath
+
+
     sourceBufferBeginNotUndoableAction buffer
     textBufferSetText buffer text
     textBufferSetModified buffer False
     sourceBufferEndNotUndoableAction buffer
 
-    sourceBufferSetHighlightSyntax buffer True
     sourceBufferSetStyleScheme buffer (Just style)
 
     editor <- sourceViewNewWithBuffer buffer
@@ -187,7 +185,12 @@ launchNewEditorForText targetNotebook filePath text = do
     setEditorFilePath editor filePath
 
     return editor
-    where title = tabTitle filePath
+    where
+        title = tabTitle filePath
+        setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
+        setBufferLanguage buffer Nothing = return()
+        guessLanguage languageManager (Just filePath) = sourceLanguageManagerGuessLanguage languageManager (Just filePath) (Nothing::Maybe String)
+        guessLanguage languageManager Nothing = return Nothing
 
 
 closeCurrentEditorTab :: Window -> IO ()
@@ -201,10 +204,10 @@ closeCurrentEditorTab mainWindow = do
             widgetDestroy pageContents
         Nothing -> return ()
 
-editNewFile :: Window -> IO ()
-editNewFile mainWindow = do
+editNewFile :: Window -> SourceLanguageManager -> IO ()
+editNewFile mainWindow languageManager = do
     tabbed <- getActiveEditorNotebook mainWindow
-    _ <- launchNewEditorForText tabbed Nothing $ pack ""
+    _ <- launchNewEditorForText tabbed languageManager Nothing $ pack ""
     return ()
 
 saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
