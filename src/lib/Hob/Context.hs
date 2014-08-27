@@ -1,17 +1,24 @@
 module Hob.Context (
     Context(..),
     uiFile,
-    uiTheme
+    uiTheme,
+    sourceLanguage
 ) where
 
-import System.FilePath (FilePath (..), (</>))
+import Graphics.UI.Gtk.SourceView (SourceLanguage, SourceLanguageManager,
+                                   sourceLanguageManagerGuessLanguage)
+import System.FilePath            (FilePath (..), (</>))
 
 data Context = Context {
-    basePath :: FilePath
+    contextBasePath        :: FilePath,
+    contextLanguageManager :: SourceLanguageManager
 }
 
 uiFile :: Context -> FilePath
-uiFile ctx = basePath ctx </> "ui" </> "ui.glade"
+uiFile ctx = contextBasePath ctx </> "ui" </> "ui.glade"
 
 uiTheme :: Context -> FilePath
-uiTheme ctx = basePath ctx </> "ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css"
+uiTheme ctx = contextBasePath ctx </> "ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css"
+
+sourceLanguage :: Context -> FilePath -> IO (Maybe SourceLanguage)
+sourceLanguage ctx filePath = sourceLanguageManagerGuessLanguage (contextLanguageManager ctx) (Just filePath) (Nothing::Maybe String)

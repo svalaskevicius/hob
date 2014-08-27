@@ -1,12 +1,13 @@
 module Main (main) where
 
-import           Control.Monad       (forM)
-import           Control.Monad.Trans (liftIO)
-import qualified Data.ByteString     as BS
-import           Data.Text           (Text (..))
-import qualified Data.Text.Encoding  as E
+import           Control.Monad              (forM)
+import           Control.Monad.Trans        (liftIO)
+import qualified Data.ByteString            as BS
+import           Data.Text                  (Text (..))
+import qualified Data.Text.Encoding         as E
 import           Data.Tree
 import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (sourceLanguageManagerNew)
 import           Hob.Context
 import           Hob.DirectoryTree
 import           Hob.Ui
@@ -18,7 +19,8 @@ import System.IO (hPutStr, stderr)
 main :: IO ()
 main = do
     projectRoot <- getCurrentDirectory
-    let ctx = Context projectRoot
+    languageManager <- sourceLanguageManagerNew
+    let ctx = Context projectRoot languageManager
     mainWindow <- loadGui ctx (fileTreeFromDirectory projectRoot) loadFile storeFile
     _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow
