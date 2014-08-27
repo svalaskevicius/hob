@@ -1,7 +1,8 @@
 module Hob.ContextSpec (main, spec) where
 
 import Graphics.UI.Gtk.SourceView (sourceLanguageGetName,
-                                   sourceLanguageManagerNew)
+                                   sourceLanguageManagerNew,
+                                   sourceStyleSchemeGetName)
 import Hob.Context
 import Test.Hspec
 
@@ -27,6 +28,12 @@ spec = do
       name <- sourceLanguageGetName lang
       name `shouldBe` "Haskell"
 
+  describe "sourceStyleScheme" $
+    it "returns source style to use" $ do
+      ctx <- stubbedCtx
+      Just style <- sourceStyleScheme ctx $ Just "/tmp/yyy/test.hs"
+      name <- sourceStyleSchemeGetName style
+      name `shouldBe` "Molokai"
 
 stubbedCtx :: IO Context
 stubbedCtx = do

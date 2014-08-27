@@ -150,20 +150,15 @@ launchNewFileEditor ctx loadFile targetNotebook filePath = do
 
 launchNewEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
 launchNewEditorForText ctx targetNotebook filePath text = do
-    styleManager <- sourceStyleSchemeManagerGetDefault
-    sourceStyleSchemeManagerSetSearchPath styleManager (Just ["ui" </> "themes" </> "gtksourceview"])
-    style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
-
     buffer <- sourceBufferNew Nothing
     maybe (return()) (setBufferLanguage buffer <=< sourceLanguage ctx) filePath
-
 
     sourceBufferBeginNotUndoableAction buffer
     textBufferSetText buffer text
     textBufferSetModified buffer False
     sourceBufferEndNotUndoableAction buffer
 
-    sourceBufferSetStyleScheme buffer (Just style)
+    sourceBufferSetStyleScheme buffer =<< sourceStyleScheme ctx filePath
 
     editor <- sourceViewNewWithBuffer buffer
     sourceViewSetShowLineNumbers editor True
@@ -171,8 +166,7 @@ launchNewEditorForText ctx targetNotebook filePath text = do
     scrolledWindow <- scrolledWindowNew Nothing Nothing
     scrolledWindow `containerAdd` editor
 
-    font <- fontDescriptionFromString "monospace 12"
-    widgetModifyFont editor (Just font)
+    widgetModifyFont editor =<< sourceStyleFont ctx filePath
 
     widgetShowAll scrolledWindow
     tabNr <- notebookAppendPage targetNotebook scrolledWindow title
