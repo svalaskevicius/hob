@@ -8,7 +8,7 @@ copyright: (c) Sarunas Valaskevicius
 maintainer: Sarunas Valaskevicius <rakatan@gmail.com>
 synopsis: A source code editor aiming for the convenience of use
 stability: alpha
-bug-reports: mailto:rakatan@gmail.com
+bug-reports: github.com/svalaskevicius/hob/issues
 description:
 category: IDE
 author: Sarunas Valaskevicius
