@@ -12,7 +12,12 @@ bug-reports: mailto:rakatan@gmail.com
 description:
 category: IDE
 author: Sarunas Valaskevicius
-data-dir: ""
+data-dir: app-data
+data-files: ui.glade,
+            themes/gtksourceview/*.xml,
+            themes/gtk/default/*.css,
+            themes/gtk/default/assets/*.png,
+            themes/gtk/default/assets/*.svg
 
 source-repository head
     type: git
