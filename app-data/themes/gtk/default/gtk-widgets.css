@@ -1628,8 +1628,6 @@ GtkAssistant .sidebar .highlight {
  ***********************/
 GtkTreeView {
     -GtkTreeView-vertical-separator: 0;
-    -GtkWidget-focus-padding: 1;
-    -GtkWidget-focus-line-width: 1;
 }
 
 GtkIconView.cell:selected {
