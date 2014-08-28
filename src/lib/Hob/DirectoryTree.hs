@@ -28,7 +28,8 @@ fileTreeGenerator getDirectoryContents doesDirectoryExist root = do
         return $ Node (DirectoryTreeElement child childPath isDir) childrenForest
     where
         callSelf = fileTreeGenerator getDirectoryContents doesDirectoryExist
-        removeDotDirectories = filter (\child -> not ((child == ".") || (child == "..")))
+        removeBannedDirectories = filter (`notElem` bannedDirectories)
         getFilteredDirectoryContents = do
             contents <- getDirectoryContents root
-            return (removeDotDirectories contents)
+            return (removeBannedDirectories contents)
+        bannedDirectories = [".", "..", ".git"]

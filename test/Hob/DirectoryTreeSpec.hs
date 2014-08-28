@@ -30,7 +30,7 @@ spec =
         items `shouldBe` [Node (DirectoryTreeElement "d1" "/xxx/d1" True) [
                           Node (DirectoryTreeElement "nd2" "/xxx/d1/nd2" False) []]]
 
-    it "returns hides dot (. | ..) directory contents" $ do
+    it "hides dot (. | ..) directory contents" $ do
         let dirContentsStub p = case p of
                                         "/xxx" -> return ["d1", ".", ".."]
                                         "/xxx/d1" -> return ["nd2", ".", ".."]
@@ -42,3 +42,13 @@ spec =
                           Node (DirectoryTreeElement "nd2" "/xxx/d1/nd2" False) []]]
 
 
+    it "hides .git directories" $ do
+        let dirContentsStub p = case p of
+                                        "/xxx" -> return ["d1", ".git"]
+                                        "/xxx/d1" -> return ["nd2"]
+                                        _ -> throwError $ userError "unexpected directory listing"
+            isDirStub d = return $ "/xxx/d1" == d
+            fileTreeGenerator' = fileTreeGenerator dirContentsStub isDirStub
+        items <- fileTreeGenerator' "/xxx"
+        items `shouldBe` [Node (DirectoryTreeElement "d1" "/xxx/d1" True) [
+                          Node (DirectoryTreeElement "nd2" "/xxx/d1/nd2" False) []]]
