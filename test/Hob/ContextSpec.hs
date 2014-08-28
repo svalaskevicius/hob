@@ -1,7 +1,6 @@
 module Hob.ContextSpec (main, spec) where
 
 import Graphics.UI.Gtk.SourceView (sourceLanguageGetName,
-                                   sourceLanguageManagerNew,
                                    sourceStyleSchemeGetName)
 import Hob.Context
 import Test.Hspec
@@ -14,12 +13,12 @@ spec = do
   describe "uiFile" $
     it "returns prefixed path" $ do
       ctx <- stubbedCtx
-      uiFile ctx `shouldBe` "/tmp/xxx/ui/ui.glade"
+      uiFile ctx `shouldBe` "app-data/ui.glade"
 
   describe "uiTheme" $
     it "returns prefixed path" $ do
       ctx <- stubbedCtx
-      uiTheme ctx `shouldBe` "/tmp/xxx/ui/themes/gtk/default/gtk-dark.css"
+      uiTheme ctx `shouldBe` "app-data/themes/gtk/default/gtk-dark.css"
 
   describe "sourceLanguage" $
     it "guesses language based on the file ending" $ do
@@ -36,6 +35,4 @@ spec = do
       name `shouldBe` "Molokai"
 
 stubbedCtx :: IO Context
-stubbedCtx = do
-    languageManager <- sourceLanguageManagerNew
-    return $ Context "/tmp/xxx" languageManager
+stubbedCtx = defaultContext "app-data"

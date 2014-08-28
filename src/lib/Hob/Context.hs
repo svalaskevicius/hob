@@ -1,5 +1,6 @@
 module Hob.Context (
-    Context(..),
+    Context,
+    defaultContext,
     uiFile,
     uiTheme,
     sourceLanguage,
@@ -12,31 +13,39 @@ import Graphics.Rendering.Pango.Font (FontDescription,
                                       fontDescriptionFromString)
 import Graphics.UI.Gtk.SourceView    (SourceLanguage, SourceLanguageManager,
                                       SourceStyleScheme,
+                                      SourceStyleSchemeManager,
                                       sourceLanguageManagerGuessLanguage,
+                                      sourceLanguageManagerNew,
                                       sourceStyleSchemeManagerGetDefault,
                                       sourceStyleSchemeManagerGetScheme,
                                       sourceStyleSchemeManagerSetSearchPath)
 import System.FilePath               (FilePath (..), (</>))
 
 data Context = Context {
-    contextBasePath        :: FilePath,
-    contextLanguageManager :: SourceLanguageManager
+    contextDataPath        :: FilePath,
+    contextLanguageManager :: SourceLanguageManager,
+    contextStyleManager    :: SourceStyleSchemeManager
 }
 
+defaultContext :: FilePath -> IO Context
+defaultContext dataDir = do
+    languageManager <- sourceLanguageManagerNew
+    styleManager <- sourceStyleSchemeManagerGetDefault
+    sourceStyleSchemeManagerSetSearchPath styleManager (Just [dataDir </> "themes" </> "gtksourceview"])
+    return $ Context dataDir languageManager styleManager
+
 uiFile :: Context -> FilePath
-uiFile ctx = contextBasePath ctx </> "ui" </> "ui.glade"
+uiFile ctx = contextDataPath ctx </> "ui.glade"
 
 uiTheme :: Context -> FilePath
-uiTheme ctx = contextBasePath ctx </> "ui" </> "themes" </> "gtk" </> "default" </> "gtk-dark.css"
+uiTheme ctx = contextDataPath ctx </> "themes" </> "gtk" </> "default" </> "gtk-dark.css"
 
 sourceLanguage :: Context -> FilePath -> IO (Maybe SourceLanguage)
 sourceLanguage ctx filePath = sourceLanguageManagerGuessLanguage (contextLanguageManager ctx) (Just filePath) (Nothing::Maybe String)
 
 sourceStyleScheme :: Context -> Maybe FilePath -> IO (Maybe SourceStyleScheme)
 sourceStyleScheme ctx _ = do
-    styleManager <- sourceStyleSchemeManagerGetDefault
-    sourceStyleSchemeManagerSetSearchPath styleManager (Just ["ui" </> "themes" </> "gtksourceview"])
-    style <- sourceStyleSchemeManagerGetScheme styleManager "molokai"
+    style <- sourceStyleSchemeManagerGetScheme (contextStyleManager ctx) "molokai"
     return $ Just style
 
 sourceStyleFont :: Context -> Maybe FilePath -> IO (Maybe FontDescription)

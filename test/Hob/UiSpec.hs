@@ -6,8 +6,7 @@ import Data.Maybe
 import Data.Text                  (Text, pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo,
-                                   sourceLanguageManagerNew)
+import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
 import Hob.Context
 import Hob.DirectoryTree
 import Hob.Ui
@@ -208,9 +207,7 @@ emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
 
 stubbedCtx :: IO Context
-stubbedCtx = do
-    languageManager <- sourceLanguageManagerNew
-    return $ Context "." languageManager
+stubbedCtx = defaultContext "app-data"
 
 loadDefaultGui :: IO (Window, Context)
 loadDefaultGui = do
