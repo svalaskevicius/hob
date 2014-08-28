@@ -136,7 +136,7 @@ launchNewFileEditor ctx loadFile targetNotebook filePath = do
     editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
     case alreadyLoadedPage editorsForFile of
         Just nr -> notebookSetCurrentPage targetNotebook nr
-        Nothing -> maybe (return ()) launchEditor <=< loadFile $ filePath
+        Nothing -> maybeDo launchEditor =<< loadFile filePath
 
     where launchEditor text = do
               editor <- launchNewEditorForText ctx targetNotebook (Just filePath) text
@@ -151,7 +151,7 @@ launchNewFileEditor ctx loadFile targetNotebook filePath = do
 launchNewEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
 launchNewEditorForText ctx targetNotebook filePath text = do
     buffer <- sourceBufferNew Nothing
-    maybe (return()) (setBufferLanguage buffer <=< sourceLanguage ctx) filePath
+    maybeDo (setBufferLanguage buffer <=< sourceLanguage ctx) filePath
 
     sourceBufferBeginNotUndoableAction buffer
     textBufferSetText buffer text
@@ -204,7 +204,7 @@ editNewFile ctx mainWindow = do
 saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
 saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
     editor <- getActiveEditor mainWindow
-    maybe (return ()) saveEditor editor
+    maybeDo saveEditor editor
     where saveEditor editor = do
               quark <- fileNameQuark
               path <- objectGetAttributeUnsafe quark editor
@@ -295,3 +295,6 @@ liftTupledMaybe (x, Nothing) = Nothing
 
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
+
+maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
+maybeDo = maybe (return())
