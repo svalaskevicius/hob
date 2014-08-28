@@ -8,6 +8,7 @@ import qualified Data.Text.Encoding  as E
 import           Data.Tree
 import           Graphics.UI.Gtk
 import           System.Directory
+import           System.Environment  (getArgs)
 import           System.FilePath
 import           System.IO           (hPutStr, stderr)
 
@@ -19,12 +20,19 @@ import Paths_hob
 
 main :: IO ()
 main = do
-    projectRoot <- getCurrentDirectory
+    projectRoot <- getProjectDirectory
     ctx <- defaultContext =<< getDataDir
     mainWindow <- loadGui ctx (fileTreeFromDirectory projectRoot) loadFile storeFile
     _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow
     mainGUI
+    where
+         getProjectDirectory = do
+             args <- getArgs
+             case args of
+                 [] -> getCurrentDirectory
+                 [path] -> canonicalizePath path
+                 _ -> error "unsupported command options"
 
 
 fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
