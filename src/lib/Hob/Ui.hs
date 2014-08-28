@@ -24,7 +24,8 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
 import Graphics.UI.Gtk.General.StyleContext
 import Graphics.UI.Gtk.ModelView            as Mv
-import Graphics.UI.Gtk.SourceView           (SourceLanguageManager, SourceView,
+import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
+                                             SourceLanguageManager, SourceView,
                                              castToSourceView,
                                              sourceBufferBeginNotUndoableAction,
                                              sourceBufferEndNotUndoableAction,
@@ -39,7 +40,13 @@ import Graphics.UI.Gtk.SourceView           (SourceLanguageManager, SourceView,
                                              sourceStyleSchemeManagerGetDefault,
                                              sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
                                              sourceViewNewWithBuffer,
-                                             sourceViewSetShowLineNumbers)
+                                             sourceViewSetAutoIndent,
+                                             sourceViewSetDrawSpaces,
+                                             sourceViewSetHighlightCurrentLine,
+                                             sourceViewSetIndentOnTab,
+                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
+                                             sourceViewSetShowLineNumbers,
+                                             sourceViewSetTabWidth)
 import Hob.Context
 import Hob.DirectoryTree
 import System.FilePath
@@ -162,6 +169,13 @@ launchNewEditorForText ctx targetNotebook filePath text = do
 
     editor <- sourceViewNewWithBuffer buffer
     sourceViewSetShowLineNumbers editor True
+    sourceViewSetAutoIndent editor True
+    sourceViewSetIndentOnTab editor True
+    sourceViewSetIndentWidth editor 4
+    sourceViewSetTabWidth editor 4
+    sourceViewSetInsertSpacesInsteadOfTabs editor True
+    sourceViewSetHighlightCurrentLine editor True
+    sourceViewSetDrawSpaces editor SourceDrawSpacesTrailing
 
     scrolledWindow <- scrolledWindowNew Nothing Nothing
     scrolledWindow `containerAdd` editor
