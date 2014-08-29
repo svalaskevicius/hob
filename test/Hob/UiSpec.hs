@@ -17,18 +17,18 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "mainWindow" $ do
-    it "mainWindow is named" $ do
+  describe "mainWindow" $
+    it "is named" $ do
       (mainWindow, _) <- loadDefaultGui
       name <- widgetGetName mainWindow
       name `shouldBe` "mainWindow"
 
-    it "contains named sidebar" $ do
+  describe "sidebar" $ do
+    it "is named" $ do
       (mainWindow, _) <- loadDefaultGui
       name <- widgetGetName =<< getDirectoryListingSidebar mainWindow
       name `shouldBe` "directoryListing"
 
-  describe "sidebar" $ do
     it "opens a file editor" $ do
       (mainWindow, _) <- loadDefaultGui
       activateDirectoryPath mainWindow [1]
@@ -46,6 +46,12 @@ spec = do
       activateDirectoryPath mainWindow [2]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
+
+  describe "command entry" $
+    it "is named" $ do
+      (mainWindow, _) <- loadDefaultGui
+      name <- widgetGetName =<< getCommandEntry mainWindow
+      name `shouldBe` "commandEntry"
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
@@ -132,56 +138,62 @@ spec = do
 
 launchNewFile :: IO Window
 launchNewFile = do
-      (mainWindow, ctx) <- loadDefaultGui
-      editNewFile ctx mainWindow
-      return mainWindow
+    (mainWindow, ctx) <- loadDefaultGui
+    editNewFile ctx mainWindow
+    return mainWindow
 
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do
-      (mainWindow, ctx) <- loadDefaultGui
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
-      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
-      textBufferSetModified buffer True
-      return (mainWindow, buffer)
+    (mainWindow, ctx) <- loadDefaultGui
+    launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+    buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+    textBufferSetModified buffer True
+    return (mainWindow, buffer)
 
 launchStubbedEditorTab :: Window -> Context -> String -> IO ()
 launchStubbedEditorTab mainWindow ctx file = do
-      tabbed <- getActiveEditorNotebook mainWindow
-      launchNewFileEditor ctx stubbedFileLoader tabbed file
+    tabbed <- getActiveEditorNotebook mainWindow
+    launchNewFileEditor ctx stubbedFileLoader tabbed file
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
 activateDirectoryPath mainWindow path = do
-      treeView <- getDirectoryListingSidebar mainWindow
-      firstColumn <- treeViewGetColumn treeView 0
-      treeViewRowActivated treeView path $ fromJust firstColumn
+    treeView <- getDirectoryListingSidebar mainWindow
+    firstColumn <- treeViewGetColumn treeView 0
+    treeViewRowActivated treeView path $ fromJust firstColumn
 
 
 getDirectoryListingSidebar :: Window -> IO TreeView
 getDirectoryListingSidebar mainWindow = do
-        paned <- binGetChild mainWindow
-        scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
-        sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
-        return (castToTreeView $ fromJust sidebar)
+    paned <- binGetChild mainWindow
+    scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
+    sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
+    return (castToTreeView $ fromJust sidebar)
 
+getCommandEntry :: Window -> IO Entry
+getCommandEntry mainWindow = do
+    paned <- binGetChild mainWindow
+    box <- panedGetChild2 $ castToPaned $ fromJust paned
+    children <- containerGetChildren $ castToBox $ fromJust box
+    let notebook = children !! 1
+    return $ castToEntry notebook
 
 getActiveEditorTabText :: Window -> IO String
 getActiveEditorTabText mainWindow = do
-      tabbed <- getActiveEditorNotebook mainWindow
-      currentlyActiveEditor <- getActiveEditorTab mainWindow
-      text <- notebookGetTabLabelText tabbed $ fromJust currentlyActiveEditor
-      return $ fromJust text
+    tabbed <- getActiveEditorNotebook mainWindow
+    currentlyActiveEditor <- getActiveEditorTab mainWindow
+    text <- notebookGetTabLabelText tabbed $ fromJust currentlyActiveEditor
+    return $ fromJust text
 
 getNumberOfEditorPages :: Window -> IO Int
 getNumberOfEditorPages = notebookGetNPages <=< getActiveEditorNotebook
 
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
-fileTreeStub =
-        return [
-                Node (DirectoryTreeElement "a" "/xxx/a" True) [
-                        Node (DirectoryTreeElement "b" "/xxx/a/b" False) []],
-                Node (DirectoryTreeElement "c" "/xxx/c" False) [],
-                Node (DirectoryTreeElement "-" "/xxx/cannotRead" False) []]
+fileTreeStub = return [
+    Node (DirectoryTreeElement "a" "/xxx/a" True) [
+        Node (DirectoryTreeElement "b" "/xxx/a/b" False) []],
+    Node (DirectoryTreeElement "c" "/xxx/c" False) [],
+    Node (DirectoryTreeElement "-" "/xxx/cannotRead" False) []]
 
 failingFileWriter :: FileWriter
 failingFileWriter _ _ = throwError $ userError "cannot write files stub"
@@ -191,8 +203,8 @@ blackholeFileWriter _ _ = return ()
 
 mockedFileWriter :: IO (FileWriter, IO (Maybe (String, Text)))
 mockedFileWriter = do
-      recorder <- newIORef Nothing
-      return (curry $ writeIORef recorder . Just, readIORef recorder)
+    recorder <- newIORef Nothing
+    return (curry $ writeIORef recorder . Just, readIORef recorder)
 
 stubbedFileLoader :: FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"

@@ -67,6 +67,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
         setGtkStyle ctx
 
         initSidebar builder
+        initCommandEntry builder
         initMainWindow builder
     where
         loadUiBuilder = do
@@ -78,6 +79,9 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             initSideBarFileTree sidebarTree fileTreeLoader $ launchNewFileEditor ctx fileLoader mainEditNotebook
+        initCommandEntry builder = do
+            commandEntry <- builderGetObject builder castToEntry "command"
+            widgetSetName commandEntry "commandEntry"
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
@@ -275,8 +279,10 @@ getActiveEditorTab mainWindow = do
 getActiveEditorNotebook :: Window -> IO Notebook
 getActiveEditorNotebook mainWindow = do
       paned <- binGetChild mainWindow
-      notebook <- panedGetChild2 $ castToPaned $ fromJust paned
-      return $ castToNotebook $ fromJust notebook
+      box <- panedGetChild2 $ castToPaned $ fromJust paned
+      children <- containerGetChildren $ castToBox $ fromJust box
+      let notebook = head children
+      return $ castToNotebook notebook
 
 tabTitle :: Maybe FilePath -> String
 tabTitle (Just filePath) = filename' filePath
