@@ -47,11 +47,16 @@ spec = do
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
 
-  describe "command entry" $
+  describe "command entry" $ do
     it "is named" $ do
       (mainWindow, _) <- loadDefaultGui
       name <- widgetGetName =<< getCommandEntry mainWindow
       name `shouldBe` "commandEntry"
+    it "can be focused" $ do
+      (mainWindow, _) <- loadDefaultGui
+      focusCommandEntry mainWindow
+      focused <- widgetGetIsFocus =<< getCommandEntry mainWindow
+      focused `shouldBe` True
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
@@ -168,14 +173,6 @@ getDirectoryListingSidebar mainWindow = do
     scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
     sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
     return (castToTreeView $ fromJust sidebar)
-
-getCommandEntry :: Window -> IO Entry
-getCommandEntry mainWindow = do
-    paned <- binGetChild mainWindow
-    box <- panedGetChild2 $ castToPaned $ fromJust paned
-    children <- containerGetChildren $ castToBox $ fromJust box
-    let notebook = children !! 1
-    return $ castToEntry notebook
 
 getActiveEditorTabText :: Window -> IO String
 getActiveEditorTabText mainWindow = do

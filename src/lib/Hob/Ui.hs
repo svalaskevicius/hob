@@ -11,6 +11,7 @@ module Hob.Ui (loadGui,
                closeCurrentEditorTab,
                editNewFile,
                saveCurrentEditorTab,
+               focusCommandEntry,getCommandEntry,
                getActiveEditor) where
 
 import Control.Monad                        (filterM, unless, (<=<))
@@ -92,6 +93,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
                     ([Control], "s") -> liftIO $ saveCurrentEditorTab (fileChooser mainWindow) fileWriter mainWindow >> return True
                     ([Control], "n") -> liftIO $ editNewFile ctx mainWindow >> return True
+                    ([], "Escape") -> liftIO $ focusCommandEntry mainWindow >> return True
                     _ -> return False
 
             return mainWindow
@@ -242,6 +244,16 @@ saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
               textBuf `set` [textBufferModified := False]
               return ()
 
+focusCommandEntry  :: Window -> IO ()
+focusCommandEntry mainWindow = widgetGrabFocus =<< getCommandEntry mainWindow
+
+getCommandEntry :: Window -> IO Entry
+getCommandEntry mainWindow = do
+    children <- getMainAreaBoxChildren mainWindow
+    let notebook = children !! 1
+    return $ castToEntry notebook
+
+
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"
 
@@ -252,37 +264,41 @@ getActiveEditorText mainWindow = do
 
 getEditorText :: TextViewClass a => a -> IO Text
 getEditorText textEdit = do
-      textBuf <- textViewGetBuffer textEdit
-      get textBuf textBufferText
+    textBuf <- textViewGetBuffer textEdit
+    get textBuf textBufferText
 
 getActiveEditor :: Window -> IO (Maybe SourceView)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
 getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
 getEditorFromNotebookTab currentlyActiveEditor =
-      if currentlyActiveEditor `isA` gTypeScrolledWindow then do
-          let textEditScroller = castToScrolledWindow currentlyActiveEditor
-          textEdit <- binGetChild textEditScroller
-          return $ fmap castToSourceView textEdit
-      else return Nothing
+    if currentlyActiveEditor `isA` gTypeScrolledWindow then do
+        let textEditScroller = castToScrolledWindow currentlyActiveEditor
+        textEdit <- binGetChild textEditScroller
+        return $ fmap castToSourceView textEdit
+    else return Nothing
 
 getActiveEditorTab :: Window -> IO (Maybe Widget)
 getActiveEditorTab mainWindow = do
-      tabbed <- getActiveEditorNotebook mainWindow
-      pageNum <- notebookGetCurrentPage tabbed
-      if pageNum < 0 then
-          return Nothing
-      else do
-          tabs <- containerGetChildren tabbed
-          return $ Just $ tabs!!pageNum
+    tabbed <- getActiveEditorNotebook mainWindow
+    pageNum <- notebookGetCurrentPage tabbed
+    if pageNum < 0 then
+        return Nothing
+    else do
+        tabs <- containerGetChildren tabbed
+        return $ Just $ tabs!!pageNum
 
 getActiveEditorNotebook :: Window -> IO Notebook
 getActiveEditorNotebook mainWindow = do
-      paned <- binGetChild mainWindow
-      box <- panedGetChild2 $ castToPaned $ fromJust paned
-      children <- containerGetChildren $ castToBox $ fromJust box
-      let notebook = head children
-      return $ castToNotebook notebook
+    children <- getMainAreaBoxChildren mainWindow
+    let notebook = head children
+    return $ castToNotebook notebook
+
+getMainAreaBoxChildren :: Window -> IO [Widget]
+getMainAreaBoxChildren mainWindow = do
+    paned <- binGetChild mainWindow
+    box <- panedGetChild2 $ castToPaned $ fromJust paned
+    containerGetChildren $ castToBox $ fromJust box
 
 tabTitle :: Maybe FilePath -> String
 tabTitle (Just filePath) = filename' filePath
