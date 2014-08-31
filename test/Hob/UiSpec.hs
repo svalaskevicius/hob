@@ -148,40 +148,38 @@ spec = do
       searchReset mainWindow
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
-      
+
     it "highlights the first match on execute" $ do
-      (mainWindow, buffer) <- loadGuiAndPreviewSearch
-      iterBufferStart <- textBufferGetIterAtOffset buffer 0
-      textBufferSelectRange buffer iterBufferStart iterBufferStart
-      searchExecute mainWindow "text"
-      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
-      start <- textIterGetOffset iterStart
-      end <- textIterGetOffset iterEnd
+      (_, buffer) <- loadGuiAndExecuteSearch
+      (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
     it "highlights the next match from cursor on execute" $ do
-      (mainWindow, buffer) <- loadGuiAndPreviewSearch
-      iterBufferStart <- textBufferGetIterAtOffset buffer 0
-      textBufferSelectRange buffer iterBufferStart iterBufferStart
+      (mainWindow, buffer) <- loadGuiAndExecuteSearch
       searchExecute mainWindow "text"
-      searchExecute mainWindow "text"
-      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
-      start <- textIterGetOffset iterStart
-      end <- textIterGetOffset iterEnd
+      (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (15, 19)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
-      (mainWindow, buffer) <- loadGuiAndPreviewSearch
-      iterBufferStart <- textBufferGetIterAtOffset buffer 0
-      textBufferSelectRange buffer iterBufferStart iterBufferStart
+      (mainWindow, buffer) <- loadGuiAndExecuteSearch
       searchExecute mainWindow "text"
       searchExecute mainWindow "text"
-      searchExecute mainWindow "text"
-      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
-      start <- textIterGetOffset iterStart
-      end <- textIterGetOffset iterEnd
+      (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
+    it "scrolls to the current match on execute" $ do
+      (mainWindow, ctx) <- loadDefaultGui
+      tabbed <- getActiveEditorNotebook mainWindow
+      let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
+      editor <- launchNewEditorForText ctx tabbed Nothing $ pack editorText
+      processGtkEvents
+      searchExecute mainWindow "customised search string at the end"
+      processGtkEvents
+      buffer <- textViewGetBuffer editor
+      visible <- textViewGetVisibleRect editor
+      caretIter <- textBufferGetIterAtMark buffer =<< textBufferGetInsert buffer
+      cursor <- textViewGetIterLocation editor caretIter
+      isRectangleInside visible cursor `shouldBe` True
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
@@ -331,6 +329,21 @@ loadGuiAndPreviewSearch = do
     buffer <- textViewGetBuffer editor
     return (mainWindow, buffer)
 
+loadGuiAndExecuteSearch :: IO (Window, TextBuffer)
+loadGuiAndExecuteSearch = do
+    (mainWindow, buffer) <- loadGuiAndPreviewSearch
+    iterBufferStart <- textBufferGetIterAtOffset buffer 0
+    textBufferSelectRange buffer iterBufferStart iterBufferStart
+    searchExecute mainWindow "text"
+    return (mainWindow, buffer)
+
+getSelectionOffsets :: TextBuffer -> IO (Int, Int)
+getSelectionOffsets buffer = do
+    (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
+    start <- textIterGetOffset iterStart
+    end <- textIterGetOffset iterEnd
+    return (start, end)
+
 checkSearchPreviewTagsAtRanges :: TextBuffer -> [(Int, Int)] -> IO [(Bool, Bool)]
 checkSearchPreviewTagsAtRanges buffer ranges = do
       tagTable <- textBufferGetTagTable buffer
@@ -343,3 +356,10 @@ checkSearchPreviewTagsAtRanges buffer ranges = do
               cL <- textIterBeginsTag iL tag
               cR <- textIterEndsTag iR tag
               return (cL, cR)
+
+isRectangleInside :: Rectangle -> Rectangle -> Bool
+isRectangleInside (Rectangle ax ay aw ah) (Rectangle bx by bw bh) =
+    (ax <= bx) && (ay <= by) && (ax+aw >= bx+bw) && (ay+ah >= by+bh)
+
+processGtkEvents :: IO ()
+processGtkEvents = replicateM_ 500 $ mainIterationDo False

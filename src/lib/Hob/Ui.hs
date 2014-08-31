@@ -255,7 +255,7 @@ editNewFile ctx mainWindow = do
     return ()
 
 saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
-saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
+saveCurrentEditorTab newFileNameChooser fileWriter mainWindow =
     maybeDo saveEditor =<< getActiveEditor mainWindow
     where saveEditor editor = do
               quark <- fileNameQuark
@@ -280,7 +280,7 @@ focusCommandEntry  :: Window -> IO ()
 focusCommandEntry mainWindow = widgetGrabFocus =<< getCommandEntry mainWindow
 
 searchPreview :: Window -> String -> IO ()
-searchPreview mainWindow text = do
+searchPreview mainWindow text =
     maybeDo updateSearchPreview =<< getActiveEditor mainWindow
     where
         updateSearchPreview editor = do
@@ -304,7 +304,7 @@ searchPreview mainWindow text = do
                 Nothing -> return()
 
 searchReset :: Window -> IO ()
-searchReset mainWindow = do
+searchReset mainWindow =
     maybeDo resetSearchPreview =<< getActiveEditor mainWindow
     where
         resetSearchPreview editor = do
@@ -316,18 +316,21 @@ searchReset mainWindow = do
             textBufferRemoveTag buffer tag start end
 
 searchExecute :: Window -> String -> IO ()
-searchExecute mainWindow text = do
+searchExecute mainWindow text =
     maybeDo doSearch =<< getActiveEditor mainWindow
     where
         doSearch editor = do
             buffer <- textViewGetBuffer editor
             (_, start) <- textBufferGetSelectionBounds buffer
-            maybe (retryFromStart buffer) (selectMatch buffer) =<< findNextResult start
+            maybe (retryFromStart editor buffer) (selectMatch editor buffer) =<< findNextResult start
         findNextResult start = textIterForwardSearch start text [TextSearchTextOnly] Nothing
-        selectMatch buffer (start, end) = textBufferSelectRange buffer start end
-        retryFromStart buffer = do
+        selectMatch editor buffer (start, end) = do
+            textBufferSelectRange buffer start end
+            caretMark <- textBufferGetInsert buffer
+            textViewScrollToMark editor caretMark 0.1 Nothing
+        retryFromStart editor buffer = do
             (start, _) <- textBufferGetBounds buffer
-            maybeDo (selectMatch buffer) =<< findNextResult start
+            maybeDo (selectMatch editor buffer) =<< findNextResult start
 
 getCommandEntry :: Window -> IO Entry
 getCommandEntry mainWindow = do
