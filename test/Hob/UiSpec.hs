@@ -1,19 +1,22 @@
 module Hob.UiSpec (main, spec) where
 
-import           Control.Monad.Error
-import           Data.IORef
-import           Data.Maybe
-import           Data.Text                            (Text, pack, unpack)
-import           Data.Tree
-import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.General.StyleContext
-import           Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
-                                                       sourceBufferUndo)
-import qualified Hob.Context                          as HC
-import qualified Hob.Context.StyleContext             as HSC
-import           Hob.DirectoryTree
-import           Hob.Ui
-import           Test.Hspec
+import Control.Monad.Error
+import Data.IORef
+import Data.Maybe
+import Data.Text                            (Text, pack, unpack)
+import Data.Tree
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.General.StyleContext
+import Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
+                                             sourceBufferUndo)
+
+import qualified Hob.Context              as HC
+import qualified Hob.Context.FileContext  as HSF
+import qualified Hob.Context.StyleContext as HSC
+
+import Hob.DirectoryTree
+import Hob.Ui
+import Test.Hspec
 
 main :: IO ()
 main = hspec spec
@@ -319,7 +322,10 @@ emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
 
 stubbedCtx :: IO HC.Context
-stubbedCtx = HC.defaultContext =<< HSC.defaultStyleContext "app-data"
+stubbedCtx = do
+    sc <- HSC.defaultStyleContext "app-data"
+    fc <- HSF.defaultFileContext
+    return $ HC.Context sc fc
 
 loadDefaultGui :: IO (Window, HC.Context)
 loadDefaultGui = do

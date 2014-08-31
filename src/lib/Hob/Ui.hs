@@ -53,6 +53,7 @@ import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
                                              sourceViewSetShowLineNumbers,
                                              sourceViewSetTabWidth)
 import Hob.Context
+import Hob.Context.FileContext
 import Hob.Context.StyleContext
 import Hob.DirectoryTree
 import System.FilePath
@@ -198,7 +199,7 @@ launchNewFileEditor ctx loadFile targetNotebook filePath = do
 launchNewEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
 launchNewEditorForText ctx targetNotebook filePath text = do
     buffer <- sourceBufferNew Nothing
-    maybeDo (setBufferLanguage buffer <=< sourceLanguage ctx) filePath
+    maybeDo (setBufferLanguage buffer <=< sourceLanguage (fileContext ctx)) filePath
 
     sourceBufferBeginNotUndoableAction buffer
     textBufferSetText buffer text
