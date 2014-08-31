@@ -11,7 +11,7 @@ import Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
                                              sourceBufferUndo)
 
 import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HSF
+import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
 
 import Hob.DirectoryTree
@@ -36,19 +36,19 @@ spec = do
       name `shouldBe` "directoryListing"
 
     it "opens a file editor" $ do
-      (mainWindow, _) <- loadDefaultGui
+      (mainWindow, _) <- loadStubbedGui
       activateDirectoryPath mainWindow [1]
       editorText <- getActiveEditorText mainWindow
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 
     it "does not open a file editor for directory" $ do
-      (mainWindow, _) <- loadDefaultGui
+      (mainWindow, _) <- loadStubbedGui
       activateDirectoryPath mainWindow [0]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "does not open a file editor for files it cannot read" $ do
-      (mainWindow, _) <- loadDefaultGui
+      (mainWindow, _) <- loadStubbedGui
       activateDirectoryPath mainWindow [2]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
@@ -118,8 +118,8 @@ spec = do
       unpack editorText `shouldBe` "initial text"
 
     it "sets the tab title when opening a file" $ do
-      (mainWindow, ctx) <- loadDefaultGui
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+      (mainWindow, ctx) <- loadStubbedGui
+      launchEditorTab mainWindow ctx "/xxx/testName.hs"
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "testName.hs"
 
@@ -129,13 +129,13 @@ spec = do
       tabText `shouldBe` "testName.hs*"
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
-      (mainWindow, ctx) <- loadDefaultGui
+      (mainWindow, ctx) <- loadStubbedGui
       notebook <- getActiveEditorNotebook mainWindow
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+      launchEditorTab mainWindow ctx "/xxx/testName.hs"
       currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
-      launchStubbedEditorTab mainWindow ctx "/xxx/c"
+      launchEditorTab mainWindow ctx "/xxx/c"
       pagesBeforeOpeningExistingFile <- notebookGetNPages notebook
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+      launchEditorTab mainWindow ctx "/xxx/testName.hs"
       currentPageAfterLoadingTheFirstLoadedFile <- notebookGetCurrentPage notebook
       pagesAfterOpeningExistingFile <- notebookGetNPages notebook
       pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
@@ -200,28 +200,37 @@ spec = do
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
-      (mainWindow, ctx) <- loadDefaultGui
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+      (mainWindow, ctx) <- loadStubbedGui
+      launchEditorTab mainWindow ctx "/xxx/testName.hs"
       closeCurrentEditorTab mainWindow
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "saves the currently active file" $ do
       (mockedWriter, mockReader) <- mockedFileWriter
-      (mainWindow, ctx) <- loadDefaultGui
-      launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
-      saveCurrentEditorTab emptyFileChooser mockedWriter mainWindow
-
+      sc <- HSC.defaultStyleContext "app-data"
+      fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
+      let ctx = HC.Context sc fc
+      mainWindow <- launchFileInContext ctx "/xxx/testName.hs"
+      saveCurrentEditorTab ctx emptyFileChooser mainWindow
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
     it "skips save when there is no active file" $ do
-      (mainWindow, _) <- loadDefaultGui
-      saveCurrentEditorTab emptyFileChooser failingFileWriter mainWindow
+      sc <- HSC.defaultStyleContext "app-data"
+      fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
+      let ctx = HC.Context sc fc
+      mainWindow <- loadGui ctx
+      saveCurrentEditorTab ctx emptyFileChooser mainWindow
 
     it "marks buffer as unmodified on save" $ do
-      (mainWindow, buffer) <- launchNewFileAndSetModified
-      saveCurrentEditorTab emptyFileChooser blackholeFileWriter mainWindow
+      sc <- HSC.defaultStyleContext "app-data"
+      fc <- HFC.defaultFileContext stubbedFileLoader blackholeFileWriter emptyFileTree
+      let ctx = HC.Context sc fc
+      mainWindow <- launchFileInContext ctx "/xxx/testName.hs"
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      textBufferSetModified buffer True
+      saveCurrentEditorTab ctx emptyFileChooser mainWindow
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
@@ -231,17 +240,19 @@ spec = do
       pagesAfterActivatingDirectory `shouldBe` 1
 
     it "requests filename for a new file" $ do
-      mainWindow <- launchNewFile
       (mockedWriter, mockReader) <- mockedFileWriter
-      saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") mockedWriter mainWindow
+      sc <- HSC.defaultStyleContext "app-data"
+      fc <- HFC.defaultFileContext emptyFileLoader mockedWriter emptyFileTree
+      mainWindow <- launchNewFileInContextAndSaveAs (HC.Context sc fc) "/xxx/fileResponded.hs"
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/fileResponded.hs", pack "")
       tabText <- getActiveEditorTabText mainWindow
       tabText `shouldBe` "fileResponded.hs"
 
     it "updates the tab title from the newly got filepath" $ do
-      mainWindow <- launchNewFile
-      saveCurrentEditorTab (stubbedFileChooser $ Just "/xxx/fileResponded.hs") blackholeFileWriter mainWindow
+      sc <- HSC.defaultStyleContext "app-data"
+      fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
+      mainWindow <- launchNewFileInContextAndSaveAs (HC.Context sc fc) "/xxx/fileResponded.hs"
       buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
       textBufferSetModified buffer True
       tabText <- getActiveEditorTabText mainWindow
@@ -253,18 +264,31 @@ launchNewFile = do
     editNewFile ctx mainWindow
     return mainWindow
 
+launchFileInContext :: HC.Context -> String -> IO Window
+launchFileInContext ctx filename = do
+      mainWindow <- loadGui ctx
+      launchEditorTab mainWindow ctx filename
+      return mainWindow
+
+launchNewFileInContextAndSaveAs :: HC.Context -> String -> IO Window
+launchNewFileInContextAndSaveAs ctx filename = do
+      mainWindow <- loadGui ctx
+      editNewFile ctx mainWindow
+      saveCurrentEditorTab ctx (stubbedFileChooser $ Just filename) mainWindow
+      return mainWindow
+
 launchNewFileAndSetModified :: IO (Window, TextBuffer)
 launchNewFileAndSetModified = do
-    (mainWindow, ctx) <- loadDefaultGui
-    launchStubbedEditorTab mainWindow ctx "/xxx/testName.hs"
+    (mainWindow, ctx) <- loadStubbedGui
+    launchEditorTab mainWindow ctx "/xxx/testName.hs"
     buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
     textBufferSetModified buffer True
     return (mainWindow, buffer)
 
-launchStubbedEditorTab :: Window -> HC.Context -> String -> IO ()
-launchStubbedEditorTab mainWindow ctx file = do
+launchEditorTab :: Window -> HC.Context -> String -> IO ()
+launchEditorTab mainWindow ctx file = do
     tabbed <- getActiveEditorNotebook mainWindow
-    launchNewFileEditor ctx stubbedFileLoader tabbed file
+    launchNewFileEditor ctx tabbed file
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
 activateDirectoryPath mainWindow path = do
@@ -298,18 +322,15 @@ fileTreeStub = return [
     Node (DirectoryTreeElement "c" "/xxx/c" False) [],
     Node (DirectoryTreeElement "-" "/xxx/cannotRead" False) []]
 
-failingFileWriter :: FileWriter
+failingFileWriter :: HFC.FileWriter
 failingFileWriter _ _ = throwError $ userError "cannot write files stub"
 
-blackholeFileWriter :: FileWriter
-blackholeFileWriter _ _ = return ()
-
-mockedFileWriter :: IO (FileWriter, IO (Maybe (String, Text)))
+mockedFileWriter :: IO (HFC.FileWriter, IO (Maybe (String, Text)))
 mockedFileWriter = do
     recorder <- newIORef Nothing
     return (curry $ writeIORef recorder . Just, readIORef recorder)
 
-stubbedFileLoader :: FileLoader
+stubbedFileLoader :: HFC.FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
 stubbedFileLoader "/xxx/cannotRead" = return Nothing
 stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
@@ -321,16 +342,38 @@ stubbedFileChooser = return
 emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
 
+defaultCtx :: IO HC.Context
+defaultCtx = do
+    sc <- HSC.defaultStyleContext "app-data"
+    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
+    return $ HC.Context sc fc
+
+
 stubbedCtx :: IO HC.Context
 stubbedCtx = do
     sc <- HSC.defaultStyleContext "app-data"
-    fc <- HSF.defaultFileContext
+    fc <- HFC.defaultFileContext stubbedFileLoader failingFileWriter fileTreeStub
     return $ HC.Context sc fc
+
+blackholeFileWriter :: HFC.FileWriter
+blackholeFileWriter _ _ = return ()
+
+emptyFileTree :: HFC.FileTreeLoader
+emptyFileTree = return []
+
+emptyFileLoader :: HFC.FileLoader
+emptyFileLoader _ = return $ Just $ pack ""
 
 loadDefaultGui :: IO (Window, HC.Context)
 loadDefaultGui = do
+    ctx <- defaultCtx
+    mainWindow <- loadGui ctx
+    return (mainWindow, ctx)
+
+loadStubbedGui :: IO (Window, HC.Context)
+loadStubbedGui = do
     ctx <- stubbedCtx
-    mainWindow <- loadGui ctx fileTreeStub stubbedFileLoader failingFileWriter
+    mainWindow <- loadGui ctx
     return (mainWindow, ctx)
 
 loadDefaultGuiWithCommandAndItsStyleContext :: IO (Window, Entry, StyleContext)

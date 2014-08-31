@@ -1,6 +1,4 @@
 module Hob.Ui (loadGui,
-               FileLoader,
-               FileWriter,
                NewFileNameChooser,
                getActiveEditorText,
                getActiveEditorTab,
@@ -59,15 +57,11 @@ import Hob.DirectoryTree
 import System.FilePath
 import System.Glib.GObject
 
-type FileTreeLoader = IO (Forest DirectoryTreeElement)
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
 
-type FileLoader = FilePath -> IO (Maybe Text)
-type FileWriter = FilePath -> Text -> IO ()
-
-loadGui :: Context -> FileTreeLoader -> FileLoader -> FileWriter -> IO Window
-loadGui ctx fileTreeLoader fileLoader fileWriter = do
+loadGui :: Context -> IO Window
+loadGui ctx = do
         _ <- initGUI
 
         builder <- loadUiBuilder
@@ -85,7 +79,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree sidebarTree fileTreeLoader $ launchNewFileEditor ctx fileLoader mainEditNotebook
+            initSideBarFileTree ctx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
         initCommandEntry builder = do
             commandEntry <- builderGetObject builder castToEntry "command"
             widgetSetName commandEntry "commandEntry"
@@ -126,7 +120,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                 key <- eventKeyName
                 case (modifier, unpack key) of
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
-                    ([Control], "s") -> liftIO $ saveCurrentEditorTab (fileChooser mainWindow) fileWriter mainWindow >> return True
+                    ([Control], "s") -> liftIO $ saveCurrentEditorTab ctx (fileChooser mainWindow) mainWindow >> return True
                     ([Control], "n") -> liftIO $ editNewFile ctx mainWindow >> return True
                     ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry mainWindow >> return True
                     _ -> return False
@@ -146,8 +140,9 @@ setGtkStyle ctx = do
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
-initSideBarFileTree :: TreeView -> FileTreeLoader -> NewFileEditorLauncher -> IO ()
-initSideBarFileTree treeView fileTreeLoader launchFile = do
+initSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
+initSideBarFileTree ctx treeView launchFile = do
+    let fileTreeLoader = contextFileTreeLoader . fileContext $ ctx
     treeModel <- treeStoreNew =<< fileTreeLoader
     customStoreSetColumn treeModel (makeColumnIdString 0) elementLabel
 
@@ -178,13 +173,14 @@ initSideBarFileTree treeView fileTreeLoader launchFile = do
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
 
 
-launchNewFileEditor :: Context -> FileLoader -> Notebook -> NewFileEditorLauncher
-launchNewFileEditor ctx loadFile targetNotebook filePath = do
+launchNewFileEditor :: Context -> Notebook -> NewFileEditorLauncher
+launchNewFileEditor ctx targetNotebook filePath = do
+    let fileLoader = contextFileLoader . fileContext $ ctx
     editors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
     editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
     case alreadyLoadedPage editorsForFile of
         Just nr -> notebookSetCurrentPage targetNotebook nr
-        Nothing -> maybeDo launchEditor =<< loadFile filePath
+        Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
     where launchEditor text = do
               editor <- launchNewEditorForText ctx targetNotebook (Just filePath) text
@@ -256,10 +252,11 @@ editNewFile ctx mainWindow = do
     _ <- launchNewEditorForText ctx tabbed Nothing $ pack ""
     return ()
 
-saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
-saveCurrentEditorTab newFileNameChooser fileWriter mainWindow =
+saveCurrentEditorTab :: Context -> NewFileNameChooser -> Window -> IO ()
+saveCurrentEditorTab ctx newFileNameChooser mainWindow =
     maybeDo saveEditor =<< getActiveEditor mainWindow
-    where saveEditor editor = do
+    where fileWriter = contextFileWriter . fileContext $ ctx
+          saveEditor editor = do
               quark <- fileNameQuark
               path <- objectGetAttributeUnsafe quark editor
               case path of

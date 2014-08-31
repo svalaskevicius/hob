@@ -13,7 +13,8 @@ import           System.FilePath
 import           System.IO           (hPutStr, stderr)
 
 import Hob.Context
-import Hob.Context.FileContext  (defaultFileContext)
+import Hob.Context.FileContext  (FileLoader (..), FileTreeLoader (..),
+                                 FileWriter (..), defaultFileContext)
 import Hob.Context.StyleContext (defaultStyleContext)
 import Hob.DirectoryTree
 import Hob.Ui
@@ -22,15 +23,16 @@ import Paths_hob
 
 main :: IO ()
 main = do
-    projectRoot <- getProjectDirectory
-    fileCtx <- defaultFileContext
-    styleCtx <- defaultStyleContext =<< getDataDir
-    let ctx = Context styleCtx fileCtx
-    mainWindow <- loadGui ctx (fileTreeFromDirectory projectRoot) loadFile storeFile
+    mainWindow <- loadGui =<< context
     _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow
     mainGUI
     where
+         context = do
+             projectRoot <- getProjectDirectory
+             fileCtx <- defaultFileContext loadFile storeFile (fileTreeFromDirectory projectRoot)
+             styleCtx <- defaultStyleContext =<< getDataDir
+             return $ Context styleCtx fileCtx
          getProjectDirectory = do
              args <- getArgs
              case args of
@@ -39,7 +41,7 @@ main = do
                  _ -> error "unsupported command options"
 
 
-fileTreeFromDirectory :: FilePath -> IO (Forest DirectoryTreeElement)
+fileTreeFromDirectory :: FilePath -> FileTreeLoader
 fileTreeFromDirectory = fileTreeGenerator getDirectoryContents doesDirectoryExist
 
 loadFile :: FileLoader
