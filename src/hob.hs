@@ -13,6 +13,7 @@ import           System.FilePath
 import           System.IO           (hPutStr, stderr)
 
 import Hob.Context
+import Hob.Context.StyleContext (defaultStyleContext)
 import Hob.DirectoryTree
 import Hob.Ui
 
@@ -21,7 +22,7 @@ import Paths_hob
 main :: IO ()
 main = do
     projectRoot <- getProjectDirectory
-    ctx <- defaultContext =<< getDataDir
+    ctx <- defaultContext =<< defaultStyleContext =<< getDataDir
     mainWindow <- loadGui ctx (fileTreeFromDirectory projectRoot) loadFile storeFile
     _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll mainWindow

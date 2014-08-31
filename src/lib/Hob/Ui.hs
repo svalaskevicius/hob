@@ -53,6 +53,7 @@ import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
                                              sourceViewSetShowLineNumbers,
                                              sourceViewSetTabWidth)
 import Hob.Context
+import Hob.Context.StyleContext
 import Hob.DirectoryTree
 import System.FilePath
 import System.Glib.GObject
@@ -77,7 +78,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
     where
         loadUiBuilder = do
             builder <- builderNew
-            builderAddFromFile builder $ uiFile ctx
+            builderAddFromFile builder $ uiFile $ styleContext ctx
             return builder
         initSidebar builder = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
@@ -140,7 +141,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
 setGtkStyle :: Context -> IO ()
 setGtkStyle ctx = do
     cssProvider <- cssProviderNew
-    cssProviderLoadFromPath cssProvider $ uiTheme ctx
+    cssProviderLoadFromPath cssProvider $ uiTheme $ styleContext ctx
     maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
@@ -204,7 +205,7 @@ launchNewEditorForText ctx targetNotebook filePath text = do
     textBufferSetModified buffer False
     sourceBufferEndNotUndoableAction buffer
 
-    sourceBufferSetStyleScheme buffer =<< sourceStyleScheme ctx filePath
+    sourceBufferSetStyleScheme buffer =<< sourceStyleScheme (styleContext ctx) filePath
 
     editor <- sourceViewNewWithBuffer buffer
     sourceViewSetShowLineNumbers editor True
@@ -219,7 +220,7 @@ launchNewEditorForText ctx targetNotebook filePath text = do
     scrolledWindow <- scrolledWindowNew Nothing Nothing
     scrolledWindow `containerAdd` editor
 
-    widgetModifyFont editor =<< sourceStyleFont ctx filePath
+    widgetModifyFont editor =<< sourceStyleFont (styleContext ctx) filePath
 
     widgetShowAll scrolledWindow
     tabNr <- notebookAppendPage targetNotebook scrolledWindow title

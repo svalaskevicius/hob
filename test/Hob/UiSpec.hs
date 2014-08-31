@@ -1,18 +1,19 @@
 module Hob.UiSpec (main, spec) where
 
-import Control.Monad.Error
-import Data.IORef
-import Data.Maybe
-import Data.Text                            (Text, pack, unpack)
-import Data.Tree
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.StyleContext
-import Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
-                                             sourceBufferUndo)
-import Hob.Context
-import Hob.DirectoryTree
-import Hob.Ui
-import Test.Hspec
+import           Control.Monad.Error
+import           Data.IORef
+import           Data.Maybe
+import           Data.Text                            (Text, pack, unpack)
+import           Data.Tree
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.General.StyleContext
+import           Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
+                                                       sourceBufferUndo)
+import qualified Hob.Context                          as HC
+import qualified Hob.Context.StyleContext             as HSC
+import           Hob.DirectoryTree
+import           Hob.Ui
+import           Test.Hspec
 
 main :: IO ()
 main = hspec spec
@@ -257,7 +258,7 @@ launchNewFileAndSetModified = do
     textBufferSetModified buffer True
     return (mainWindow, buffer)
 
-launchStubbedEditorTab :: Window -> Context -> String -> IO ()
+launchStubbedEditorTab :: Window -> HC.Context -> String -> IO ()
 launchStubbedEditorTab mainWindow ctx file = do
     tabbed <- getActiveEditorNotebook mainWindow
     launchNewFileEditor ctx stubbedFileLoader tabbed file
@@ -317,10 +318,10 @@ stubbedFileChooser = return
 emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
 
-stubbedCtx :: IO Context
-stubbedCtx = defaultContext "app-data"
+stubbedCtx :: IO HC.Context
+stubbedCtx = HC.defaultContext =<< HSC.defaultStyleContext "app-data"
 
-loadDefaultGui :: IO (Window, Context)
+loadDefaultGui :: IO (Window, HC.Context)
 loadDefaultGui = do
     ctx <- stubbedCtx
     mainWindow <- loadGui ctx fileTreeStub stubbedFileLoader failingFileWriter
