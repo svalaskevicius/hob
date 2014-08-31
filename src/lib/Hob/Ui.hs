@@ -11,7 +11,7 @@ module Hob.Ui (loadGui,
                closeCurrentEditorTab,
                editNewFile,
                saveCurrentEditorTab,
-               focusCommandEntry,getCommandEntry,
+               focusCommandEntry,getCommandEntry,searchPreview,searchReset,
                getActiveEditor) where
 
 import Control.Monad                        (filterM, unless, (<=<))
@@ -83,6 +83,29 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
         initCommandEntry builder = do
             commandEntry <- builderGetObject builder castToEntry "command"
             widgetSetName commandEntry "commandEntry"
+            styleContext <- widgetGetStyleContext commandEntry
+            mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            commandEntry `on` editableChanged $ do
+                text <- entryGetText commandEntry
+                case text of
+                    '/':searchText -> do
+                        styleContextRemoveClass styleContext "error"
+                        putStrLn $ "searching for " ++ searchText
+                        searchPreview mainWindow searchText
+                        return ()
+                    "" -> searchReset mainWindow >> styleContextRemoveClass styleContext "error"
+                    _ -> searchReset mainWindow >> styleContextAddClass styleContext "error"
+
+
+            _ <- commandEntry `on` keyPressEvent $ do
+                modifier <- eventModifier
+                key <- eventKeyName
+                case (modifier, unpack key) of
+                    ([], "Return") -> return True
+                    _ -> return False
+
+
+            return ()
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
@@ -246,6 +269,45 @@ saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
 
 focusCommandEntry  :: Window -> IO ()
 focusCommandEntry mainWindow = widgetGrabFocus =<< getCommandEntry mainWindow
+
+searchPreview :: Window -> String -> IO ()
+searchPreview mainWindow text = do
+    editor <- getActiveEditor mainWindow
+    maybeDo updateSearchPreview editor
+    where
+        updateSearchPreview editor = do
+            buffer <- textViewGetBuffer editor
+            tagTable <- textBufferGetTagTable buffer
+            tag <- maybe (addNewSearchTag tagTable) return =<< textTagTableLookup tagTable "search"
+            (start, end) <- textBufferGetBounds buffer
+            textBufferRemoveTag buffer tag start end
+            addNewSearchTags buffer tag start end
+        addNewSearchTag tagTable = do
+            tag <- textTagNew $ Just $ pack "search"
+            tag `set` [textTagBackground := "#707550"]
+            textTagTableAdd tagTable tag
+            return tag
+        addNewSearchTags buffer tag start end = do
+            result <- textIterForwardSearch start text [TextSearchTextOnly] (Just end)
+            case result of
+                Just (matchStart, matchEnd) -> do
+                    textBufferApplyTag buffer tag matchStart matchEnd
+                    addNewSearchTags buffer tag matchEnd end
+                Nothing -> return()
+
+searchReset :: Window -> IO ()
+searchReset mainWindow = do
+    editor <- getActiveEditor mainWindow
+    maybeDo resetSearchPreview editor
+    where
+        resetSearchPreview editor = do
+            buffer <- textViewGetBuffer editor
+            tagTable <- textBufferGetTagTable buffer
+            maybeDo (removeEditorTag buffer) =<< textTagTableLookup tagTable "search"
+        removeEditorTag buffer tag = do
+            (start, end) <- textBufferGetBounds buffer
+            textBufferRemoveTag buffer tag start end
+
 
 getCommandEntry :: Window -> IO Entry
 getCommandEntry mainWindow = do

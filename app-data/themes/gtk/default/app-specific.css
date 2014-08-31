@@ -1,1 +1,5 @@
-
+.entry.error, .entry.error:focus {
+  color: #FF7777;
+  background-color: mix(@theme_bg_color, red, 0.1);
+  border-color: red;
+}

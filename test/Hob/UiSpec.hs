@@ -3,10 +3,12 @@ module Hob.UiSpec (main, spec) where
 import Control.Monad.Error
 import Data.IORef
 import Data.Maybe
-import Data.Text                  (Text, pack, unpack)
+import Data.Text                            (Text, pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
+import Graphics.UI.Gtk.General.StyleContext
+import Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
+                                             sourceBufferUndo)
 import Hob.Context
 import Hob.DirectoryTree
 import Hob.Ui
@@ -52,11 +54,41 @@ spec = do
       (mainWindow, _) <- loadDefaultGui
       name <- widgetGetName =<< getCommandEntry mainWindow
       name `shouldBe` "commandEntry"
+
     it "can be focused" $ do
       (mainWindow, _) <- loadDefaultGui
       focusCommandEntry mainWindow
       focused <- widgetGetIsFocus =<< getCommandEntry mainWindow
       focused `shouldBe` True
+
+    it "initially there is no error class applied" $ do
+      (mainWindow, _) <- loadDefaultGui
+      styleContext <- widgetGetStyleContext =<< getCommandEntry mainWindow
+      hasErrorClass <- styleContextHasClass styleContext "error"
+      hasErrorClass `shouldBe` False
+
+    it "applies error style class if the command is unknown" $ do
+      (mainWindow, _) <- loadDefaultGui
+      commandEntry <- getCommandEntry mainWindow
+      entrySetText commandEntry "qweqwe"
+      styleContext <- widgetGetStyleContext commandEntry
+      hasErrorClass <- styleContextHasClass styleContext "error"
+      hasErrorClass `shouldBe` True
+
+    it "removes error style on empty command" $ do
+      (_, commandEntry, styleContext) <- loadDefaultGuiWithCommandAndItsStyleContext
+      entrySetText commandEntry "not empty"
+      styleContextAddClass styleContext "error"
+      entrySetText commandEntry ""
+      hasErrorClass <- styleContextHasClass styleContext "error"
+      hasErrorClass `shouldBe` False
+
+    it "removes error style on search command" $ do
+      (_, commandEntry, styleContext) <- loadDefaultGuiWithCommandAndItsStyleContext
+      styleContextAddClass styleContext "error"
+      entrySetText commandEntry "/asd"
+      hasErrorClass <- styleContextHasClass styleContext "error"
+      hasErrorClass `shouldBe` False
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
@@ -91,6 +123,31 @@ spec = do
       pagesAfterOpeningExistingFile <- notebookGetNPages notebook
       pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
       currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
+
+  describe "text search command" $ do
+    it "creates search tag on preview" $ do
+      (_, buffer) <- loadGuiAndPreviewSearch
+      tagTable <- textBufferGetTagTable buffer
+      tag <- textTagTableLookup tagTable "search"
+      isNothing tag `shouldBe` False
+
+
+    it "applies search tag for matches on preview" $ do
+      (_, buffer) <- loadGuiAndPreviewSearch
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(True, True), (True, True)]
+
+    it "removes search tag from previous search on preview" $ do
+      (mainWindow, buffer) <- loadGuiAndPreviewSearch
+      searchPreview mainWindow "!"
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(False, False), (False, False)]
+
+    it "removes all serch tags on reset" $ do
+      (mainWindow, buffer) <- loadGuiAndPreviewSearch
+      searchReset mainWindow
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(False, False), (False, False)]
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
@@ -223,3 +280,32 @@ loadDefaultGui = do
     ctx <- stubbedCtx
     mainWindow <- loadGui ctx fileTreeStub stubbedFileLoader failingFileWriter
     return (mainWindow, ctx)
+
+loadDefaultGuiWithCommandAndItsStyleContext :: IO (Window, Entry, StyleContext)
+loadDefaultGuiWithCommandAndItsStyleContext = do
+    (mainWindow, _) <- loadDefaultGui
+    commandEntry <- getCommandEntry mainWindow
+    styleContext <- widgetGetStyleContext commandEntry
+    return (mainWindow, commandEntry, styleContext)
+
+loadGuiAndPreviewSearch :: IO (Window, TextBuffer)
+loadGuiAndPreviewSearch = do
+    (mainWindow, ctx) <- loadDefaultGui
+    tabbed <- getActiveEditorNotebook mainWindow
+    editor <- launchNewEditorForText ctx tabbed Nothing $ pack "text - initial text!"
+    searchPreview mainWindow "text"
+    buffer <- textViewGetBuffer editor
+    return (mainWindow, buffer)
+
+checkSearchPreviewTagsAtRanges :: TextBuffer -> [(Int, Int)] -> IO [(Bool, Bool)]
+checkSearchPreviewTagsAtRanges buffer ranges = do
+      tagTable <- textBufferGetTagTable buffer
+      tag <- textTagTableLookup tagTable "search"
+      mapM (checkPair tag) ranges
+      where
+          checkPair tag (l, r) = do
+              iL <- textBufferGetIterAtOffset buffer l
+              iR <- textBufferGetIterAtOffset buffer r
+              cL <- textIterBeginsTag iL tag
+              cR <- textIterEndsTag iR tag
+              return (cL, cR)
