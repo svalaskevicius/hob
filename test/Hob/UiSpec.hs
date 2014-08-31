@@ -143,11 +143,45 @@ spec = do
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
-    it "removes all serch tags on reset" $ do
+    it "removes all search tags on reset" $ do
       (mainWindow, buffer) <- loadGuiAndPreviewSearch
       searchReset mainWindow
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
+      
+    it "highlights the first match on execute" $ do
+      (mainWindow, buffer) <- loadGuiAndPreviewSearch
+      iterBufferStart <- textBufferGetIterAtOffset buffer 0
+      textBufferSelectRange buffer iterBufferStart iterBufferStart
+      searchExecute mainWindow "text"
+      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
+      start <- textIterGetOffset iterStart
+      end <- textIterGetOffset iterEnd
+      (start, end) `shouldBe` (0, 4)
+
+    it "highlights the next match from cursor on execute" $ do
+      (mainWindow, buffer) <- loadGuiAndPreviewSearch
+      iterBufferStart <- textBufferGetIterAtOffset buffer 0
+      textBufferSelectRange buffer iterBufferStart iterBufferStart
+      searchExecute mainWindow "text"
+      searchExecute mainWindow "text"
+      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
+      start <- textIterGetOffset iterStart
+      end <- textIterGetOffset iterEnd
+      (start, end) `shouldBe` (15, 19)
+
+    it "wraps the search from start if there are no matches till the end on execute" $ do
+      (mainWindow, buffer) <- loadGuiAndPreviewSearch
+      iterBufferStart <- textBufferGetIterAtOffset buffer 0
+      textBufferSelectRange buffer iterBufferStart iterBufferStart
+      searchExecute mainWindow "text"
+      searchExecute mainWindow "text"
+      searchExecute mainWindow "text"
+      (iterStart, iterEnd) <- textBufferGetSelectionBounds buffer
+      start <- textIterGetOffset iterStart
+      end <- textIterGetOffset iterEnd
+      (start, end) `shouldBe` (0, 4)
+
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do

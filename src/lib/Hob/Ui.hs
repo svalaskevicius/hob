@@ -11,7 +11,11 @@ module Hob.Ui (loadGui,
                closeCurrentEditorTab,
                editNewFile,
                saveCurrentEditorTab,
-               focusCommandEntry,getCommandEntry,searchPreview,searchReset,
+               focusCommandEntry,
+               getCommandEntry,
+               searchPreview,
+               searchReset,
+               searchExecute,
                getActiveEditor) where
 
 import Control.Monad                        (filterM, unless, (<=<))
@@ -92,7 +96,6 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                         styleContextRemoveClass styleContext "error"
                         putStrLn $ "searching for " ++ searchText
                         searchPreview mainWindow searchText
-                        return ()
                     "" -> searchReset mainWindow >> styleContextRemoveClass styleContext "error"
                     _ -> searchReset mainWindow >> styleContextAddClass styleContext "error"
 
@@ -101,7 +104,14 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 case (modifier, unpack key) of
-                    ([], "Return") -> return True
+                    ([], "Return") -> liftIO $ do
+                        text <- entryGetText commandEntry
+                        case text of
+                            '/':searchText -> searchExecute mainWindow searchText
+                            "" -> searchReset mainWindow >> styleContextRemoveClass styleContext "error"
+                            _ -> searchReset mainWindow >> styleContextAddClass styleContext "error"
+
+                        return True
                     _ -> return False
 
 
@@ -246,8 +256,7 @@ editNewFile ctx mainWindow = do
 
 saveCurrentEditorTab :: NewFileNameChooser -> FileWriter -> Window -> IO ()
 saveCurrentEditorTab newFileNameChooser fileWriter mainWindow = do
-    editor <- getActiveEditor mainWindow
-    maybeDo saveEditor editor
+    maybeDo saveEditor =<< getActiveEditor mainWindow
     where saveEditor editor = do
               quark <- fileNameQuark
               path <- objectGetAttributeUnsafe quark editor
@@ -272,8 +281,7 @@ focusCommandEntry mainWindow = widgetGrabFocus =<< getCommandEntry mainWindow
 
 searchPreview :: Window -> String -> IO ()
 searchPreview mainWindow text = do
-    editor <- getActiveEditor mainWindow
-    maybeDo updateSearchPreview editor
+    maybeDo updateSearchPreview =<< getActiveEditor mainWindow
     where
         updateSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -297,8 +305,7 @@ searchPreview mainWindow text = do
 
 searchReset :: Window -> IO ()
 searchReset mainWindow = do
-    editor <- getActiveEditor mainWindow
-    maybeDo resetSearchPreview editor
+    maybeDo resetSearchPreview =<< getActiveEditor mainWindow
     where
         resetSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -308,6 +315,19 @@ searchReset mainWindow = do
             (start, end) <- textBufferGetBounds buffer
             textBufferRemoveTag buffer tag start end
 
+searchExecute :: Window -> String -> IO ()
+searchExecute mainWindow text = do
+    maybeDo doSearch =<< getActiveEditor mainWindow
+    where
+        doSearch editor = do
+            buffer <- textViewGetBuffer editor
+            (_, start) <- textBufferGetSelectionBounds buffer
+            maybe (retryFromStart buffer) (selectMatch buffer) =<< findNextResult start
+        findNextResult start = textIterForwardSearch start text [TextSearchTextOnly] Nothing
+        selectMatch buffer (start, end) = textBufferSelectRange buffer start end
+        retryFromStart buffer = do
+            (start, _) <- textBufferGetBounds buffer
+            maybeDo (selectMatch buffer) =<< findNextResult start
 
 getCommandEntry :: Window -> IO Entry
 getCommandEntry mainWindow = do
