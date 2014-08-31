@@ -11,7 +11,7 @@ module Hob.Ui (loadGui,
                closeCurrentEditorTab,
                editNewFile,
                saveCurrentEditorTab,
-               focusCommandEntry,
+               toggleFocusOnCommandEntry,
                getCommandEntry,
                searchPreview,
                searchReset,
@@ -126,7 +126,7 @@ loadGui ctx fileTreeLoader fileLoader fileWriter = do
                     ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
                     ([Control], "s") -> liftIO $ saveCurrentEditorTab (fileChooser mainWindow) fileWriter mainWindow >> return True
                     ([Control], "n") -> liftIO $ editNewFile ctx mainWindow >> return True
-                    ([], "Escape") -> liftIO $ focusCommandEntry mainWindow >> return True
+                    ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry mainWindow >> return True
                     _ -> return False
 
             return mainWindow
@@ -276,8 +276,14 @@ saveCurrentEditorTab newFileNameChooser fileWriter mainWindow =
               textBuf `set` [textBufferModified := False]
               return ()
 
-focusCommandEntry  :: Window -> IO ()
-focusCommandEntry mainWindow = widgetGrabFocus =<< getCommandEntry mainWindow
+toggleFocusOnCommandEntry  :: Window -> IO ()
+toggleFocusOnCommandEntry mainWindow = do
+    commandEntry <- getCommandEntry mainWindow
+    isFocused <- widgetGetIsFocus commandEntry
+    if isFocused then
+        maybeDo widgetGrabFocus =<< getActiveEditor mainWindow
+    else
+        widgetGrabFocus commandEntry
 
 searchPreview :: Window -> String -> IO ()
 searchPreview mainWindow text =

@@ -57,9 +57,22 @@ spec = do
 
     it "can be focused" $ do
       (mainWindow, _) <- loadDefaultGui
-      focusCommandEntry mainWindow
-      focused <- widgetGetIsFocus =<< getCommandEntry mainWindow
+      focused <- toggleFocusOnCommandEntryAndReturnState mainWindow
       focused `shouldBe` True
+
+    it "focus stays on toggle if there is no editor to focus to" $ do
+      (mainWindow, _) <- loadDefaultGui
+      toggleFocusOnCommandEntry mainWindow
+      focused <- toggleFocusOnCommandEntryAndReturnState mainWindow
+      focused `shouldBe` True
+
+    it "focus moves to editor on toggle" $ do
+      mainWindow <- launchNewFile
+      toggleFocusOnCommandEntry mainWindow
+      commandFocused <- toggleFocusOnCommandEntryAndReturnState mainWindow
+      editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor mainWindow
+      commandFocused `shouldBe` False
+      editorFocused `shouldBe` True
 
     it "initially there is no error class applied" $ do
       (mainWindow, _) <- loadDefaultGui
@@ -356,6 +369,11 @@ checkSearchPreviewTagsAtRanges buffer ranges = do
               cL <- textIterBeginsTag iL tag
               cR <- textIterEndsTag iR tag
               return (cL, cR)
+
+toggleFocusOnCommandEntryAndReturnState :: Window -> IO Bool
+toggleFocusOnCommandEntryAndReturnState mainWindow = do
+    toggleFocusOnCommandEntry mainWindow
+    widgetGetIsFocus =<< getCommandEntry mainWindow
 
 isRectangleInside :: Rectangle -> Rectangle -> Bool
 isRectangleInside (Rectangle ax ay aw ah) (Rectangle bx by bw bh) =
