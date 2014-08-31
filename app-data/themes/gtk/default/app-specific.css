@@ -3,3 +3,8 @@
   background-color: mix(@theme_bg_color, red, 0.1);
   border-color: red;
 }
+
+.entry.error:selected {
+  color: #FFEE99;
+  background-color: mix(@theme_bg_color, yellow, 0.2);
+}
