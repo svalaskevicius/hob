@@ -69,7 +69,7 @@ loadGui fileContext styleContext = do
 
         ctx <- initMainWindow builder
         initSidebar ctx builder
-        initCommandEntry builder
+        initCommandEntry ctx builder
         return ctx
     where
         loadUiBuilder = do
@@ -81,7 +81,7 @@ loadGui fileContext styleContext = do
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             initSideBarFileTree fileContext sidebarTree $ launchNewFileEditor ctx mainEditNotebook
-        initCommandEntry builder = do
+        initCommandEntry ctx builder = do
             commandEntry <- builderGetObject builder castToEntry "command"
             widgetSetName commandEntry "commandEntry"
             styleContext <- widgetGetStyleContext commandEntry
@@ -92,9 +92,9 @@ loadGui fileContext styleContext = do
                     '/':searchText -> do
                         GtkSc.styleContextRemoveClass styleContext "error"
                         putStrLn $ "searching for " ++ searchText
-                        searchPreview mainWindow searchText
-                    "" -> searchReset mainWindow >> GtkSc.styleContextRemoveClass styleContext "error"
-                    _ -> searchReset mainWindow >> GtkSc.styleContextAddClass styleContext "error"
+                        searchPreview ctx searchText
+                    "" -> searchReset ctx >> GtkSc.styleContextRemoveClass styleContext "error"
+                    _ -> searchReset ctx >> GtkSc.styleContextAddClass styleContext "error"
 
 
             _ <- commandEntry `on` keyPressEvent $ do
@@ -104,9 +104,9 @@ loadGui fileContext styleContext = do
                     ([], "Return") -> liftIO $ do
                         text <- entryGetText commandEntry
                         case text of
-                            '/':searchText -> searchExecute mainWindow searchText
-                            "" -> searchReset mainWindow >> GtkSc.styleContextRemoveClass styleContext "error"
-                            _ -> searchReset mainWindow >> GtkSc.styleContextAddClass styleContext "error"
+                            '/':searchText -> searchExecute ctx searchText
+                            "" -> searchReset ctx >> GtkSc.styleContextRemoveClass styleContext "error"
+                            _ -> searchReset ctx >> GtkSc.styleContextAddClass styleContext "error"
 
                         return True
                     _ -> return False
@@ -121,10 +121,10 @@ loadGui fileContext styleContext = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 case (modifier, unpack key) of
-                    ([Control], "w") -> liftIO $ closeCurrentEditorTab mainWindow >> return True
-                    ([Control], "s") -> liftIO $ saveCurrentEditorTab ctx (fileChooser mainWindow) mainWindow >> return True
-                    ([Control], "n") -> liftIO $ editNewFile ctx mainWindow >> return True
-                    ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry mainWindow >> return True
+                    ([Control], "w") -> liftIO $ closeCurrentEditorTab ctx >> return True
+                    ([Control], "s") -> liftIO $ saveCurrentEditorTab ctx (fileChooser mainWindow) >> return True
+                    ([Control], "n") -> liftIO $ editNewFile ctx >> return True
+                    ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry ctx >> return True
                     _ -> return False
 
             return ctx
@@ -237,9 +237,9 @@ launchNewEditorForText ctx targetNotebook filePath text = do
         setBufferLanguage buffer Nothing = return()
 
 
-closeCurrentEditorTab :: Window -> IO ()
-closeCurrentEditorTab mainWindow = do
-    tabbed <- getActiveEditorNotebook mainWindow
+closeCurrentEditorTab :: Context -> IO ()
+closeCurrentEditorTab ctx = do
+    tabbed <- getActiveEditorNotebook ctx
     currentPage <- notebookGetCurrentPage tabbed
     nthPage <- notebookGetNthPage tabbed currentPage
     case nthPage of
@@ -248,15 +248,15 @@ closeCurrentEditorTab mainWindow = do
             widgetDestroy pageContents
         Nothing -> return ()
 
-editNewFile :: Context -> Window -> IO ()
-editNewFile ctx mainWindow = do
-    tabbed <- getActiveEditorNotebook mainWindow
+editNewFile :: Context -> IO ()
+editNewFile ctx = do
+    tabbed <- getActiveEditorNotebook ctx
     _ <- launchNewEditorForText ctx tabbed Nothing $ pack ""
     return ()
 
-saveCurrentEditorTab :: Context -> NewFileNameChooser -> Window -> IO ()
-saveCurrentEditorTab ctx newFileNameChooser mainWindow =
-    maybeDo saveEditor =<< getActiveEditor mainWindow
+saveCurrentEditorTab :: Context -> NewFileNameChooser -> IO ()
+saveCurrentEditorTab ctx newFileNameChooser =
+    maybeDo saveEditor =<< getActiveEditor ctx
     where fileWriter = contextFileWriter . fileContext $ ctx
           saveEditor editor = do
               quark <- fileNameQuark
@@ -277,18 +277,18 @@ saveCurrentEditorTab ctx newFileNameChooser mainWindow =
               textBuf `set` [textBufferModified := False]
               return ()
 
-toggleFocusOnCommandEntry  :: Window -> IO ()
-toggleFocusOnCommandEntry mainWindow = do
-    commandEntry <- getCommandEntry mainWindow
+toggleFocusOnCommandEntry :: Context -> IO ()
+toggleFocusOnCommandEntry ctx = do
+    commandEntry <- getCommandEntry ctx
     isFocused <- widgetGetIsFocus commandEntry
     if isFocused then
-        maybeDo widgetGrabFocus =<< getActiveEditor mainWindow
+        maybeDo widgetGrabFocus =<< getActiveEditor ctx
     else
         widgetGrabFocus commandEntry
 
-searchPreview :: Window -> String -> IO ()
-searchPreview mainWindow text =
-    maybeDo updateSearchPreview =<< getActiveEditor mainWindow
+searchPreview :: Context -> String -> IO ()
+searchPreview ctx text =
+    maybeDo updateSearchPreview =<< getActiveEditor ctx
     where
         updateSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -310,9 +310,9 @@ searchPreview mainWindow text =
                     addNewSearchTags buffer tag matchEnd end
                 Nothing -> return()
 
-searchReset :: Window -> IO ()
-searchReset mainWindow =
-    maybeDo resetSearchPreview =<< getActiveEditor mainWindow
+searchReset :: Context -> IO ()
+searchReset ctx =
+    maybeDo resetSearchPreview =<< getActiveEditor ctx
     where
         resetSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -322,9 +322,9 @@ searchReset mainWindow =
             (start, end) <- textBufferGetBounds buffer
             textBufferRemoveTag buffer tag start end
 
-searchExecute :: Window -> String -> IO ()
-searchExecute mainWindow text =
-    maybeDo doSearch =<< getActiveEditor mainWindow
+searchExecute :: Context -> String -> IO ()
+searchExecute ctx text =
+    maybeDo doSearch =<< getActiveEditor ctx
     where
         doSearch editor = do
             buffer <- textViewGetBuffer editor
@@ -339,9 +339,9 @@ searchExecute mainWindow text =
             (start, _) <- textBufferGetBounds buffer
             maybeDo (selectMatch editor buffer) =<< findNextResult start
 
-getCommandEntry :: Window -> IO Entry
-getCommandEntry mainWindow = do
-    children <- getMainAreaBoxChildren mainWindow
+getCommandEntry :: Context -> IO Entry
+getCommandEntry ctx = do
+    children <- getMainAreaBoxChildren ctx
     let notebook = children !! 1
     return $ castToEntry notebook
 
@@ -349,9 +349,9 @@ getCommandEntry mainWindow = do
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"
 
-getActiveEditorText :: Window -> IO (Maybe Text)
-getActiveEditorText mainWindow = do
-    editor <- getActiveEditor mainWindow
+getActiveEditorText :: Context -> IO (Maybe Text)
+getActiveEditorText ctx = do
+    editor <- getActiveEditor ctx
     maybe (return Nothing) ((return . Just) <=< getEditorText) editor
 
 getEditorText :: TextViewClass a => a -> IO Text
@@ -359,7 +359,7 @@ getEditorText textEdit = do
     textBuf <- textViewGetBuffer textEdit
     get textBuf textBufferText
 
-getActiveEditor :: Window -> IO (Maybe SourceView)
+getActiveEditor :: Context -> IO (Maybe SourceView)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
 getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
@@ -370,9 +370,9 @@ getEditorFromNotebookTab currentlyActiveEditor =
         return $ fmap castToSourceView textEdit
     else return Nothing
 
-getActiveEditorTab :: Window -> IO (Maybe Widget)
-getActiveEditorTab mainWindow = do
-    tabbed <- getActiveEditorNotebook mainWindow
+getActiveEditorTab :: Context -> IO (Maybe Widget)
+getActiveEditorTab ctx = do
+    tabbed <- getActiveEditorNotebook ctx
     pageNum <- notebookGetCurrentPage tabbed
     if pageNum < 0 then
         return Nothing
@@ -380,15 +380,15 @@ getActiveEditorTab mainWindow = do
         tabs <- containerGetChildren tabbed
         return $ Just $ tabs!!pageNum
 
-getActiveEditorNotebook :: Window -> IO Notebook
-getActiveEditorNotebook mainWindow = do
-    children <- getMainAreaBoxChildren mainWindow
+getActiveEditorNotebook :: Context -> IO Notebook
+getActiveEditorNotebook ctx = do
+    children <- getMainAreaBoxChildren ctx
     let notebook = head children
     return $ castToNotebook notebook
 
-getMainAreaBoxChildren :: Window -> IO [Widget]
-getMainAreaBoxChildren mainWindow = do
-    paned <- binGetChild mainWindow
+getMainAreaBoxChildren :: Context -> IO [Widget]
+getMainAreaBoxChildren ctx = do
+    paned <- binGetChild $ mainWindow ctx
     box <- panedGetChild2 $ castToPaned $ fromJust paned
     containerGetChildren $ castToBox $ fromJust box
 
