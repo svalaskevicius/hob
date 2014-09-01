@@ -2,7 +2,6 @@ module Hob.Ui (loadGui,
                NewFileNameChooser,
                getActiveEditorText,
                getActiveEditorTab,
-               getActiveEditorNotebook,
                launchNewEditorForText,
                launchNewFileEditor,
                getEditorText,
@@ -10,7 +9,6 @@ module Hob.Ui (loadGui,
                editNewFile,
                saveCurrentEditorTab,
                toggleFocusOnCommandEntry,
-               getCommandEntry,
                searchPreview,
                searchReset,
                searchExecute,
@@ -115,8 +113,10 @@ loadGui fileContext styleContext = do
             return ()
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            mainNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
+            commandEntry <- builderGetObject builder castToEntry "command"
+            let ctx = Context styleContext fileContext mainWindow mainNotebook commandEntry
             widgetSetName mainWindow "mainWindow"
-            let ctx = Context styleContext fileContext mainWindow
             _ <- mainWindow `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
@@ -239,7 +239,6 @@ launchNewEditorForText ctx targetNotebook filePath text = do
 
 closeCurrentEditorTab :: Context -> IO ()
 closeCurrentEditorTab ctx = do
-    tabbed <- getActiveEditorNotebook ctx
     currentPage <- notebookGetCurrentPage tabbed
     nthPage <- notebookGetNthPage tabbed currentPage
     case nthPage of
@@ -247,12 +246,13 @@ closeCurrentEditorTab ctx = do
             notebookRemovePage tabbed currentPage
             widgetDestroy pageContents
         Nothing -> return ()
+    where tabbed = mainNotebook ctx
 
 editNewFile :: Context -> IO ()
 editNewFile ctx = do
-    tabbed <- getActiveEditorNotebook ctx
     _ <- launchNewEditorForText ctx tabbed Nothing $ pack ""
     return ()
+    where tabbed = mainNotebook ctx
 
 saveCurrentEditorTab :: Context -> NewFileNameChooser -> IO ()
 saveCurrentEditorTab ctx newFileNameChooser =
@@ -279,12 +279,12 @@ saveCurrentEditorTab ctx newFileNameChooser =
 
 toggleFocusOnCommandEntry :: Context -> IO ()
 toggleFocusOnCommandEntry ctx = do
-    commandEntry <- getCommandEntry ctx
-    isFocused <- widgetGetIsFocus commandEntry
+    isFocused <- widgetGetIsFocus cmdEntry
     if isFocused then
         maybeDo widgetGrabFocus =<< getActiveEditor ctx
     else
-        widgetGrabFocus commandEntry
+        widgetGrabFocus cmdEntry
+    where cmdEntry = commandEntry ctx
 
 searchPreview :: Context -> String -> IO ()
 searchPreview ctx text =
@@ -339,13 +339,6 @@ searchExecute ctx text =
             (start, _) <- textBufferGetBounds buffer
             maybeDo (selectMatch editor buffer) =<< findNextResult start
 
-getCommandEntry :: Context -> IO Entry
-getCommandEntry ctx = do
-    children <- getMainAreaBoxChildren ctx
-    let notebook = children !! 1
-    return $ castToEntry notebook
-
-
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"
 
@@ -372,25 +365,13 @@ getEditorFromNotebookTab currentlyActiveEditor =
 
 getActiveEditorTab :: Context -> IO (Maybe Widget)
 getActiveEditorTab ctx = do
-    tabbed <- getActiveEditorNotebook ctx
     pageNum <- notebookGetCurrentPage tabbed
     if pageNum < 0 then
         return Nothing
     else do
         tabs <- containerGetChildren tabbed
         return $ Just $ tabs!!pageNum
-
-getActiveEditorNotebook :: Context -> IO Notebook
-getActiveEditorNotebook ctx = do
-    children <- getMainAreaBoxChildren ctx
-    let notebook = head children
-    return $ castToNotebook notebook
-
-getMainAreaBoxChildren :: Context -> IO [Widget]
-getMainAreaBoxChildren ctx = do
-    paned <- binGetChild $ mainWindow ctx
-    box <- panedGetChild2 $ castToPaned $ fromJust paned
-    containerGetChildren $ castToBox $ fromJust box
+    where tabbed = mainNotebook ctx
 
 tabTitle :: Maybe FilePath -> String
 tabTitle (Just filePath) = filename' filePath

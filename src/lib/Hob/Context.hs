@@ -4,7 +4,7 @@ module Hob.Context (
 
 import Control.Monad   (liftM)
 import System.FilePath (FilePath (..), (</>))
-import Graphics.UI.Gtk (Window)
+import Graphics.UI.Gtk (Window, Notebook, Entry)
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -12,5 +12,7 @@ import Hob.Context.StyleContext
 data Context = Context {
     styleContext :: StyleContext,
     fileContext  :: FileContext,
-    mainWindow   :: Window
+    mainWindow   :: Window,
+    mainNotebook :: Notebook,
+    commandEntry :: Entry
 }

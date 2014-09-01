@@ -56,7 +56,7 @@ spec = do
   describe "command entry" $ do
     it "is named" $ do
       ctx <- loadDefaultGui
-      name <- widgetGetName =<< getCommandEntry ctx
+      name <- widgetGetName $ HC.commandEntry ctx
       name `shouldBe` "commandEntry"
 
     it "can be focused" $ do
@@ -80,13 +80,13 @@ spec = do
 
     it "initially there is no error class applied" $ do
       ctx <- loadDefaultGui
-      styleContext <- widgetGetStyleContext =<< getCommandEntry ctx
+      styleContext <- widgetGetStyleContext $ HC.commandEntry ctx
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
 
     it "applies error style class if the command is unknown" $ do
       ctx <- loadDefaultGui
-      commandEntry <- getCommandEntry ctx
+      let commandEntry = HC.commandEntry ctx
       entrySetText commandEntry "qweqwe"
       styleContext <- widgetGetStyleContext commandEntry
       hasErrorClass <- styleContextHasClass styleContext "error"
@@ -110,8 +110,8 @@ spec = do
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
       ctx <- loadDefaultGui
-      tabbed <- getActiveEditorNotebook ctx
-      editor <- launchNewEditorForText ctx tabbed Nothing $ pack "initial text"
+      let notebook = HC.mainNotebook ctx
+      editor <- launchNewEditorForText ctx notebook Nothing $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
       editorText <- getEditorText editor
@@ -130,7 +130,7 @@ spec = do
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
       ctx <- loadStubbedGui
-      notebook <- getActiveEditorNotebook ctx
+      let notebook = HC.mainNotebook ctx
       launchEditorTab ctx "/xxx/testName.hs"
       currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
       launchEditorTab ctx "/xxx/c"
@@ -186,9 +186,9 @@ spec = do
 
     it "scrolls to the current match on execute" $ do
       ctx <- loadDefaultGui
-      tabbed <- getActiveEditorNotebook ctx
+      let notebook = HC.mainNotebook ctx
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
-      editor <- launchNewEditorForText ctx tabbed Nothing $ pack editorText
+      editor <- launchNewEditorForText ctx notebook Nothing $ pack editorText
       processGtkEvents
       searchExecute ctx "customised search string at the end"
       processGtkEvents
@@ -284,8 +284,8 @@ launchNewFileAndSetModified = do
 
 launchEditorTab :: HC.Context -> String -> IO ()
 launchEditorTab ctx file = do
-    tabbed <- getActiveEditorNotebook ctx
-    launchNewFileEditor ctx tabbed file
+    let notebook = HC.mainNotebook ctx
+    launchNewFileEditor ctx notebook file
 
 activateDirectoryPath :: HC.Context -> TreePath -> IO ()
 activateDirectoryPath ctx path = do
@@ -303,13 +303,13 @@ getDirectoryListingSidebar ctx = do
 
 getActiveEditorTabText :: HC.Context  -> IO String
 getActiveEditorTabText ctx = do
-    tabbed <- getActiveEditorNotebook ctx
+    let notebook = HC.mainNotebook ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
-    text <- notebookGetTabLabelText tabbed $ fromJust currentlyActiveEditor
+    text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text
 
 getNumberOfEditorPages :: HC.Context -> IO Int
-getNumberOfEditorPages = notebookGetNPages <=< getActiveEditorNotebook
+getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook
 
 
 fileTreeStub :: IO (Forest DirectoryTreeElement)
@@ -363,15 +363,15 @@ loadStubbedGui = do
 loadDefaultGuiWithCommandAndItsStyleContext :: IO (HC.Context, Entry, StyleContext)
 loadDefaultGuiWithCommandAndItsStyleContext = do
     ctx <- loadDefaultGui
-    commandEntry <- getCommandEntry ctx
+    let commandEntry = HC.commandEntry ctx
     styleContext <- widgetGetStyleContext commandEntry
     return (ctx, commandEntry, styleContext)
 
 loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultGui
-    tabbed <- getActiveEditorNotebook ctx
-    editor <- launchNewEditorForText ctx tabbed Nothing $ pack "text - initial text!"
+    let notebook = HC.mainNotebook ctx
+    editor <- launchNewEditorForText ctx notebook Nothing $ pack "text - initial text!"
     searchPreview ctx "text"
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
@@ -406,7 +406,7 @@ checkSearchPreviewTagsAtRanges buffer ranges = do
 toggleFocusOnCommandEntryAndReturnState :: HC.Context -> IO Bool
 toggleFocusOnCommandEntryAndReturnState ctx = do
     toggleFocusOnCommandEntry ctx
-    widgetGetIsFocus =<< getCommandEntry ctx
+    widgetGetIsFocus $ HC.commandEntry ctx
 
 isRectangleInside :: Rectangle -> Rectangle -> Bool
 isRectangleInside (Rectangle ax ay aw ah) (Rectangle bx by bw bh) =
