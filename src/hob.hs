@@ -23,16 +23,17 @@ import Paths_hob
 
 main :: IO ()
 main = do
-    mainWindow <- loadGui =<< context
-    _ <- mainWindow `on` deleteEvent $ liftIO mainQuit >> return False
-    widgetShowAll mainWindow
+    fileContext <- getFileContext
+    styleContext <- getStyleContext
+    ctx <- loadGui fileContext styleContext
+    _ <- (mainWindow ctx) `on` deleteEvent $ liftIO mainQuit >> return False
+    widgetShowAll $ mainWindow ctx
     mainGUI
     where
-         context = do
+         getFileContext = do
              projectRoot <- getProjectDirectory
-             fileCtx <- defaultFileContext loadFile storeFile (fileTreeFromDirectory projectRoot)
-             styleCtx <- defaultStyleContext =<< getDataDir
-             return $ Context styleCtx fileCtx
+             defaultFileContext loadFile storeFile (fileTreeFromDirectory projectRoot)
+         getStyleContext = defaultStyleContext =<< getDataDir
          getProjectDirectory = do
              args <- getArgs
              case args of

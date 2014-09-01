@@ -25,7 +25,7 @@ import Filesystem.Path.CurrentOS            (decodeString, encodeString,
                                              filename)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.CssProvider
-import Graphics.UI.Gtk.General.StyleContext
+import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import Graphics.UI.Gtk.ModelView            as Mv
 import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
                                              SourceLanguageManager, SourceView,
@@ -60,26 +60,27 @@ import System.Glib.GObject
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
 
-loadGui :: Context -> IO Window
-loadGui ctx = do
+loadGui :: FileContext -> StyleContext -> IO Context
+loadGui fileContext styleContext = do
         _ <- initGUI
 
         builder <- loadUiBuilder
-        setGtkStyle ctx
+        setGtkStyle styleContext
 
-        initSidebar builder
+        ctx <- initMainWindow builder
+        initSidebar ctx builder
         initCommandEntry builder
-        initMainWindow builder
+        return ctx
     where
         loadUiBuilder = do
             builder <- builderNew
-            builderAddFromFile builder $ uiFile $ styleContext ctx
+            builderAddFromFile builder $ uiFile styleContext
             return builder
-        initSidebar builder = do
+        initSidebar ctx builder = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree ctx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
+            initSideBarFileTree fileContext sidebarTree $ launchNewFileEditor ctx mainEditNotebook
         initCommandEntry builder = do
             commandEntry <- builderGetObject builder castToEntry "command"
             widgetSetName commandEntry "commandEntry"
@@ -89,11 +90,11 @@ loadGui ctx = do
                 text <- entryGetText commandEntry
                 case text of
                     '/':searchText -> do
-                        styleContextRemoveClass styleContext "error"
+                        GtkSc.styleContextRemoveClass styleContext "error"
                         putStrLn $ "searching for " ++ searchText
                         searchPreview mainWindow searchText
-                    "" -> searchReset mainWindow >> styleContextRemoveClass styleContext "error"
-                    _ -> searchReset mainWindow >> styleContextAddClass styleContext "error"
+                    "" -> searchReset mainWindow >> GtkSc.styleContextRemoveClass styleContext "error"
+                    _ -> searchReset mainWindow >> GtkSc.styleContextAddClass styleContext "error"
 
 
             _ <- commandEntry `on` keyPressEvent $ do
@@ -104,8 +105,8 @@ loadGui ctx = do
                         text <- entryGetText commandEntry
                         case text of
                             '/':searchText -> searchExecute mainWindow searchText
-                            "" -> searchReset mainWindow >> styleContextRemoveClass styleContext "error"
-                            _ -> searchReset mainWindow >> styleContextAddClass styleContext "error"
+                            "" -> searchReset mainWindow >> GtkSc.styleContextRemoveClass styleContext "error"
+                            _ -> searchReset mainWindow >> GtkSc.styleContextAddClass styleContext "error"
 
                         return True
                     _ -> return False
@@ -115,6 +116,7 @@ loadGui ctx = do
         initMainWindow builder = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             widgetSetName mainWindow "mainWindow"
+            let ctx = Context styleContext fileContext mainWindow
             _ <- mainWindow `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
@@ -125,7 +127,7 @@ loadGui ctx = do
                     ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry mainWindow >> return True
                     _ -> return False
 
-            return mainWindow
+            return ctx
         fileChooser mainWindow = do
             dialog <- fileChooserDialogNew Nothing (Just mainWindow) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
             response <- dialogRun dialog
@@ -133,16 +135,16 @@ loadGui ctx = do
             widgetDestroy dialog
             return file
 
-setGtkStyle :: Context -> IO ()
-setGtkStyle ctx = do
+setGtkStyle :: StyleContext -> IO ()
+setGtkStyle styleContext = do
     cssProvider <- cssProviderNew
-    cssProviderLoadFromPath cssProvider $ uiTheme $ styleContext ctx
-    maybe (return()) (\screen -> styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
+    cssProviderLoadFromPath cssProvider $ uiTheme styleContext
+    maybe (return()) (\screen -> GtkSc.styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
-initSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
-initSideBarFileTree ctx treeView launchFile = do
-    let fileTreeLoader = contextFileTreeLoader . fileContext $ ctx
+initSideBarFileTree :: FileContext -> TreeView -> NewFileEditorLauncher -> IO ()
+initSideBarFileTree fileCtx treeView launchFile = do
+    let fileTreeLoader = contextFileTreeLoader fileCtx
     treeModel <- treeStoreNew =<< fileTreeLoader
     customStoreSetColumn treeModel (makeColumnIdString 0) elementLabel
 

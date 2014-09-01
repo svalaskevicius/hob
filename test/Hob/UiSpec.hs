@@ -25,68 +25,68 @@ spec :: Spec
 spec = do
   describe "mainWindow" $
     it "is named" $ do
-      (mainWindow, _) <- loadDefaultGui
-      name <- widgetGetName mainWindow
+      ctx <- loadDefaultGui
+      name <- widgetGetName $ HC.mainWindow ctx
       name `shouldBe` "mainWindow"
 
   describe "sidebar" $ do
     it "is named" $ do
-      (mainWindow, _) <- loadDefaultGui
-      name <- widgetGetName =<< getDirectoryListingSidebar mainWindow
+      ctx <- loadDefaultGui
+      name <- widgetGetName <=< getDirectoryListingSidebar $ HC.mainWindow ctx
       name `shouldBe` "directoryListing"
 
     it "opens a file editor" $ do
-      (mainWindow, _) <- loadStubbedGui
-      activateDirectoryPath mainWindow [1]
-      editorText <- getActiveEditorText mainWindow
+      ctx <- loadStubbedGui
+      activateDirectoryPath (HC.mainWindow ctx) [1]
+      editorText <- getActiveEditorText $ HC.mainWindow ctx
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 
     it "does not open a file editor for directory" $ do
-      (mainWindow, _) <- loadStubbedGui
-      activateDirectoryPath mainWindow [0]
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      ctx <- loadStubbedGui
+      activateDirectoryPath (HC.mainWindow ctx) [0]
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages $ HC.mainWindow ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "does not open a file editor for files it cannot read" $ do
-      (mainWindow, _) <- loadStubbedGui
-      activateDirectoryPath mainWindow [2]
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      ctx <- loadStubbedGui
+      activateDirectoryPath (HC.mainWindow ctx) [2]
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages $ HC.mainWindow ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 
   describe "command entry" $ do
     it "is named" $ do
-      (mainWindow, _) <- loadDefaultGui
-      name <- widgetGetName =<< getCommandEntry mainWindow
+      ctx <- loadDefaultGui
+      name <- widgetGetName <=< getCommandEntry $ HC.mainWindow ctx
       name `shouldBe` "commandEntry"
 
     it "can be focused" $ do
-      (mainWindow, _) <- loadDefaultGui
-      focused <- toggleFocusOnCommandEntryAndReturnState mainWindow
+      ctx <- loadDefaultGui
+      focused <- toggleFocusOnCommandEntryAndReturnState $ HC.mainWindow ctx
       focused `shouldBe` True
 
     it "focus stays on toggle if there is no editor to focus to" $ do
-      (mainWindow, _) <- loadDefaultGui
-      toggleFocusOnCommandEntry mainWindow
-      focused <- toggleFocusOnCommandEntryAndReturnState mainWindow
+      ctx <- loadDefaultGui
+      toggleFocusOnCommandEntry $ HC.mainWindow ctx
+      focused <- toggleFocusOnCommandEntryAndReturnState $ HC.mainWindow ctx
       focused `shouldBe` True
 
     it "focus moves to editor on toggle" $ do
-      mainWindow <- launchNewFile
-      toggleFocusOnCommandEntry mainWindow
-      commandFocused <- toggleFocusOnCommandEntryAndReturnState mainWindow
-      editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor mainWindow
+      ctx <- launchNewFile
+      toggleFocusOnCommandEntry $ HC.mainWindow ctx
+      commandFocused <- toggleFocusOnCommandEntryAndReturnState $ HC.mainWindow ctx
+      editorFocused <- widgetGetIsFocus . fromJust <=< getActiveEditor $ HC.mainWindow ctx
       commandFocused `shouldBe` False
       editorFocused `shouldBe` True
 
     it "initially there is no error class applied" $ do
-      (mainWindow, _) <- loadDefaultGui
-      styleContext <- widgetGetStyleContext =<< getCommandEntry mainWindow
+      ctx <- loadDefaultGui
+      styleContext <- widgetGetStyleContext <=< getCommandEntry $ HC.mainWindow ctx
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
 
     it "applies error style class if the command is unknown" $ do
-      (mainWindow, _) <- loadDefaultGui
-      commandEntry <- getCommandEntry mainWindow
+      ctx <- loadDefaultGui
+      commandEntry <- getCommandEntry $ HC.mainWindow ctx
       entrySetText commandEntry "qweqwe"
       styleContext <- widgetGetStyleContext commandEntry
       hasErrorClass <- styleContextHasClass styleContext "error"
@@ -109,8 +109,8 @@ spec = do
 
   describe "edit area" $ do
     it "does not allow to undo the intial loaded source" $ do
-      (mainWindow, ctx) <- loadDefaultGui
-      tabbed <- getActiveEditorNotebook mainWindow
+      ctx <- loadDefaultGui
+      tabbed <- getActiveEditorNotebook $ HC.mainWindow ctx
       editor <- launchNewEditorForText ctx tabbed Nothing $ pack "initial text"
       buffer <- textViewGetBuffer editor
       sourceBufferUndo $ castToSourceBuffer buffer
@@ -118,24 +118,24 @@ spec = do
       unpack editorText `shouldBe` "initial text"
 
     it "sets the tab title when opening a file" $ do
-      (mainWindow, ctx) <- loadStubbedGui
-      launchEditorTab mainWindow ctx "/xxx/testName.hs"
-      tabText <- getActiveEditorTabText mainWindow
+      ctx <- loadStubbedGui
+      launchEditorTab ctx "/xxx/testName.hs"
+      tabText <- getActiveEditorTabText $ HC.mainWindow ctx
       tabText `shouldBe` "testName.hs"
 
     it "updates the tab title to reflect if buffer is modified" $ do
-      (mainWindow, _) <- launchNewFileAndSetModified
-      tabText <- getActiveEditorTabText mainWindow
+      ctx <- launchNewFileAndSetModified
+      tabText <- getActiveEditorTabText $ HC.mainWindow ctx
       tabText `shouldBe` "testName.hs*"
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
-      (mainWindow, ctx) <- loadStubbedGui
-      notebook <- getActiveEditorNotebook mainWindow
-      launchEditorTab mainWindow ctx "/xxx/testName.hs"
+      ctx <- loadStubbedGui
+      notebook <- getActiveEditorNotebook $ HC.mainWindow ctx
+      launchEditorTab ctx "/xxx/testName.hs"
       currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
-      launchEditorTab mainWindow ctx "/xxx/c"
+      launchEditorTab ctx "/xxx/c"
       pagesBeforeOpeningExistingFile <- notebookGetNPages notebook
-      launchEditorTab mainWindow ctx "/xxx/testName.hs"
+      launchEditorTab ctx "/xxx/testName.hs"
       currentPageAfterLoadingTheFirstLoadedFile <- notebookGetCurrentPage notebook
       pagesAfterOpeningExistingFile <- notebookGetNPages notebook
       pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
@@ -155,14 +155,14 @@ spec = do
       tagStates `shouldBe` [(True, True), (True, True)]
 
     it "removes search tag from previous search on preview" $ do
-      (mainWindow, buffer) <- loadGuiAndPreviewSearch
-      searchPreview mainWindow "!"
+      (ctx, buffer) <- loadGuiAndPreviewSearch
+      searchPreview (HC.mainWindow ctx) "!"
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
     it "removes all search tags on reset" $ do
-      (mainWindow, buffer) <- loadGuiAndPreviewSearch
-      searchReset mainWindow
+      (ctx, buffer) <- loadGuiAndPreviewSearch
+      searchReset $ HC.mainWindow ctx
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
@@ -172,20 +172,21 @@ spec = do
       (start, end) `shouldBe` (0, 4)
 
     it "highlights the next match from cursor on execute" $ do
-      (mainWindow, buffer) <- loadGuiAndExecuteSearch
-      searchExecute mainWindow "text"
+      (ctx, buffer) <- loadGuiAndExecuteSearch
+      searchExecute (HC.mainWindow ctx) "text"
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (15, 19)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
-      (mainWindow, buffer) <- loadGuiAndExecuteSearch
-      searchExecute mainWindow "text"
-      searchExecute mainWindow "text"
+      (ctx, buffer) <- loadGuiAndExecuteSearch
+      searchExecute (HC.mainWindow ctx) "text"
+      searchExecute (HC.mainWindow ctx) "text"
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
     it "scrolls to the current match on execute" $ do
-      (mainWindow, ctx) <- loadDefaultGui
+      ctx <- loadDefaultGui
+      let mainWindow = HC.mainWindow ctx
       tabbed <- getActiveEditorNotebook mainWindow
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
       editor <- launchNewEditorForText ctx tabbed Nothing $ pack editorText
@@ -200,8 +201,9 @@ spec = do
 
   describe "editor commands" $ do
     it "closes the currently active editor tab" $ do
-      (mainWindow, ctx) <- loadStubbedGui
-      launchEditorTab mainWindow ctx "/xxx/testName.hs"
+      ctx <- loadStubbedGui
+      let mainWindow = HC.mainWindow ctx
+      launchEditorTab ctx "/xxx/testName.hs"
       closeCurrentEditorTab mainWindow
       pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
       pagesAfterActivatingDirectory `shouldBe` 0
@@ -210,84 +212,81 @@ spec = do
       (mockedWriter, mockReader) <- mockedFileWriter
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
-      let ctx = HC.Context sc fc
-      mainWindow <- launchFileInContext ctx "/xxx/testName.hs"
-      saveCurrentEditorTab ctx emptyFileChooser mainWindow
+      ctx <- launchFileInContext fc sc "/xxx/testName.hs"
+      saveCurrentEditorTab ctx emptyFileChooser $ HC.mainWindow ctx
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
     it "skips save when there is no active file" $ do
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
-      let ctx = HC.Context sc fc
-      mainWindow <- loadGui ctx
-      saveCurrentEditorTab ctx emptyFileChooser mainWindow
+      ctx <- loadGui fc sc
+      saveCurrentEditorTab ctx emptyFileChooser $ HC.mainWindow ctx
 
     it "marks buffer as unmodified on save" $ do
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader blackholeFileWriter emptyFileTree
-      let ctx = HC.Context sc fc
-      mainWindow <- launchFileInContext ctx "/xxx/testName.hs"
-      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      ctx <- launchFileInContext fc sc "/xxx/testName.hs"
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ HC.mainWindow ctx
       textBufferSetModified buffer True
-      saveCurrentEditorTab ctx emptyFileChooser mainWindow
+      saveCurrentEditorTab ctx emptyFileChooser $ HC.mainWindow ctx
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
     it "creates a new unnamed file" $ do
-      mainWindow <- launchNewFile
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages mainWindow
+      ctx <- launchNewFile
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages $ HC.mainWindow ctx
       pagesAfterActivatingDirectory `shouldBe` 1
 
     it "requests filename for a new file" $ do
       (mockedWriter, mockReader) <- mockedFileWriter
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader mockedWriter emptyFileTree
-      mainWindow <- launchNewFileInContextAndSaveAs (HC.Context sc fc) "/xxx/fileResponded.hs"
+      ctx <- launchNewFileInContextAndSaveAs fc sc "/xxx/fileResponded.hs"
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/fileResponded.hs", pack "")
-      tabText <- getActiveEditorTabText mainWindow
+      tabText <- getActiveEditorTabText $ HC.mainWindow ctx
       tabText `shouldBe` "fileResponded.hs"
 
     it "updates the tab title from the newly got filepath" $ do
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-      mainWindow <- launchNewFileInContextAndSaveAs (HC.Context sc fc) "/xxx/fileResponded.hs"
-      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+      ctx <- launchNewFileInContextAndSaveAs fc sc "/xxx/fileResponded.hs"
+      buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ HC.mainWindow ctx
       textBufferSetModified buffer True
-      tabText <- getActiveEditorTabText mainWindow
+      tabText <- getActiveEditorTabText $ HC.mainWindow ctx
       tabText `shouldBe` "fileResponded.hs*"
 
-launchNewFile :: IO Window
+launchNewFile :: IO HC.Context
 launchNewFile = do
-    (mainWindow, ctx) <- loadDefaultGui
-    editNewFile ctx mainWindow
-    return mainWindow
+    ctx <- loadDefaultGui
+    editNewFile ctx $ HC.mainWindow ctx
+    return ctx
 
-launchFileInContext :: HC.Context -> String -> IO Window
-launchFileInContext ctx filename = do
-      mainWindow <- loadGui ctx
-      launchEditorTab mainWindow ctx filename
-      return mainWindow
+launchFileInContext :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
+launchFileInContext fileCtx styleCtx filename = do
+      ctx <- loadGui fileCtx styleCtx
+      launchEditorTab ctx filename
+      return ctx
 
-launchNewFileInContextAndSaveAs :: HC.Context -> String -> IO Window
-launchNewFileInContextAndSaveAs ctx filename = do
-      mainWindow <- loadGui ctx
-      editNewFile ctx mainWindow
-      saveCurrentEditorTab ctx (stubbedFileChooser $ Just filename) mainWindow
-      return mainWindow
+launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
+launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
+      ctx <- loadGui fileCtx styleCtx
+      editNewFile ctx $ HC.mainWindow ctx
+      saveCurrentEditorTab ctx (stubbedFileChooser $ Just filename) $ HC.mainWindow ctx
+      return ctx
 
-launchNewFileAndSetModified :: IO (Window, TextBuffer)
+launchNewFileAndSetModified :: IO HC.Context
 launchNewFileAndSetModified = do
-    (mainWindow, ctx) <- loadStubbedGui
-    launchEditorTab mainWindow ctx "/xxx/testName.hs"
-    buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ mainWindow
+    ctx <- loadStubbedGui
+    launchEditorTab ctx "/xxx/testName.hs"
+    buffer <- textViewGetBuffer . fromJust <=< getActiveEditor $ HC.mainWindow ctx
     textBufferSetModified buffer True
-    return (mainWindow, buffer)
+    return ctx
 
-launchEditorTab :: Window -> HC.Context -> String -> IO ()
-launchEditorTab mainWindow ctx file = do
-    tabbed <- getActiveEditorNotebook mainWindow
+launchEditorTab :: HC.Context -> String -> IO ()
+launchEditorTab ctx file = do
+    tabbed <- getActiveEditorNotebook $ HC.mainWindow ctx
     launchNewFileEditor ctx tabbed file
 
 activateDirectoryPath :: Window -> TreePath -> IO ()
@@ -342,19 +341,6 @@ stubbedFileChooser = return
 emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
 
-defaultCtx :: IO HC.Context
-defaultCtx = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-    return $ HC.Context sc fc
-
-
-stubbedCtx :: IO HC.Context
-stubbedCtx = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext stubbedFileLoader failingFileWriter fileTreeStub
-    return $ HC.Context sc fc
-
 blackholeFileWriter :: HFC.FileWriter
 blackholeFileWriter _ _ = return ()
 
@@ -364,41 +350,41 @@ emptyFileTree = return []
 emptyFileLoader :: HFC.FileLoader
 emptyFileLoader _ = return $ Just $ pack ""
 
-loadDefaultGui :: IO (Window, HC.Context)
+loadDefaultGui :: IO HC.Context
 loadDefaultGui = do
-    ctx <- defaultCtx
-    mainWindow <- loadGui ctx
-    return (mainWindow, ctx)
+    sc <- HSC.defaultStyleContext "app-data"
+    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
+    loadGui fc sc
 
-loadStubbedGui :: IO (Window, HC.Context)
+loadStubbedGui :: IO HC.Context
 loadStubbedGui = do
-    ctx <- stubbedCtx
-    mainWindow <- loadGui ctx
-    return (mainWindow, ctx)
+    sc <- HSC.defaultStyleContext "app-data"
+    fc <- HFC.defaultFileContext stubbedFileLoader failingFileWriter fileTreeStub
+    loadGui fc sc
 
-loadDefaultGuiWithCommandAndItsStyleContext :: IO (Window, Entry, StyleContext)
+loadDefaultGuiWithCommandAndItsStyleContext :: IO (HC.Context, Entry, StyleContext)
 loadDefaultGuiWithCommandAndItsStyleContext = do
-    (mainWindow, _) <- loadDefaultGui
-    commandEntry <- getCommandEntry mainWindow
+    ctx <- loadDefaultGui
+    commandEntry <- getCommandEntry $ HC.mainWindow ctx
     styleContext <- widgetGetStyleContext commandEntry
-    return (mainWindow, commandEntry, styleContext)
+    return (ctx, commandEntry, styleContext)
 
-loadGuiAndPreviewSearch :: IO (Window, TextBuffer)
+loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndPreviewSearch = do
-    (mainWindow, ctx) <- loadDefaultGui
-    tabbed <- getActiveEditorNotebook mainWindow
+    ctx <- loadDefaultGui
+    tabbed <- getActiveEditorNotebook $ HC.mainWindow ctx
     editor <- launchNewEditorForText ctx tabbed Nothing $ pack "text - initial text!"
-    searchPreview mainWindow "text"
+    searchPreview (HC.mainWindow ctx) "text"
     buffer <- textViewGetBuffer editor
-    return (mainWindow, buffer)
+    return (ctx, buffer)
 
-loadGuiAndExecuteSearch :: IO (Window, TextBuffer)
+loadGuiAndExecuteSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndExecuteSearch = do
-    (mainWindow, buffer) <- loadGuiAndPreviewSearch
+    (ctx, buffer) <- loadGuiAndPreviewSearch
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
-    searchExecute mainWindow "text"
-    return (mainWindow, buffer)
+    searchExecute (HC.mainWindow ctx) "text"
+    return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)
 getSelectionOffsets buffer = do
@@ -412,13 +398,12 @@ checkSearchPreviewTagsAtRanges buffer ranges = do
       tagTable <- textBufferGetTagTable buffer
       tag <- textTagTableLookup tagTable "search"
       mapM (checkPair tag) ranges
-      where
-          checkPair tag (l, r) = do
-              iL <- textBufferGetIterAtOffset buffer l
-              iR <- textBufferGetIterAtOffset buffer r
-              cL <- textIterBeginsTag iL tag
-              cR <- textIterEndsTag iR tag
-              return (cL, cR)
+      where checkPair tag (l, r) = do
+                iterL <- textBufferGetIterAtOffset buffer l
+                iterR <- textBufferGetIterAtOffset buffer r
+                checkL <- textIterBeginsTag iterL tag
+                checkR <- textIterEndsTag iterR tag
+                return (checkL, checkR)
 
 toggleFocusOnCommandEntryAndReturnState :: Window -> IO Bool
 toggleFocusOnCommandEntryAndReturnState mainWindow = do
