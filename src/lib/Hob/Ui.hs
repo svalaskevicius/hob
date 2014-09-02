@@ -48,6 +48,8 @@ import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
                                              sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
                                              sourceViewSetShowLineNumbers,
                                              sourceViewSetTabWidth)
+
+import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -58,14 +60,21 @@ import System.Glib.GObject
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
 
+
 loadGui :: FileContext -> StyleContext -> IO Context
 loadGui fileContext styleContext = do
         _ <- initGUI
 
         builder <- loadUiBuilder
         setGtkStyle styleContext
+        let commands = [
+                           (([Control], "w"), Command Nothing closeCurrentEditorTab),
+                           (([Control], "s"), Command Nothing (runWith saveCurrentEditorTab fileChooser)),
+                           (([Control], "n"), Command Nothing editNewFile),
+                           (([], "Escape"), Command Nothing toggleFocusOnCommandEntry)
+                       ]
 
-        ctx <- initMainWindow builder
+        ctx <- initMainWindow builder commands
         initSidebar ctx builder
         initCommandEntry ctx builder
         return ctx
@@ -111,7 +120,7 @@ loadGui fileContext styleContext = do
 
 
             return ()
-        initMainWindow builder = do
+        initMainWindow builder commands = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             mainNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             commandEntry <- builderGetObject builder castToEntry "command"
@@ -120,20 +129,20 @@ loadGui fileContext styleContext = do
             _ <- mainWindow `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
-                case (modifier, unpack key) of
-                    ([Control], "w") -> liftIO $ closeCurrentEditorTab ctx >> return True
-                    ([Control], "s") -> liftIO $ saveCurrentEditorTab ctx (fileChooser mainWindow) >> return True
-                    ([Control], "n") -> liftIO $ editNewFile ctx >> return True
-                    ([], "Escape") -> liftIO $ toggleFocusOnCommandEntry ctx >> return True
-                    _ -> return False
-
+                maybe (return False)
+                      (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $ 
+                      findCommandByShortCut commands (modifier, unpack key)
             return ctx
-        fileChooser mainWindow = do
-            dialog <- fileChooserDialogNew Nothing (Just mainWindow) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
+        findCommandByShortCut [] shortCut = Nothing
+        findCommandByShortCut ((s, cmd):xs) shortCut = if s == shortCut then Just cmd else findCommandByShortCut xs shortCut
+        fileChooser ctx = do
+            dialog <- fileChooserDialogNew Nothing (Just $ mainWindow ctx) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
             response <- dialogRun dialog
             file <- if response == ResponseOk then fileChooserGetFilename dialog else return Nothing
             widgetDestroy dialog
             return file
+        runWith a b ctx = do
+            a (b ctx) ctx
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleContext = do
@@ -254,8 +263,8 @@ editNewFile ctx = do
     return ()
     where tabbed = mainNotebook ctx
 
-saveCurrentEditorTab :: Context -> NewFileNameChooser -> IO ()
-saveCurrentEditorTab ctx newFileNameChooser =
+saveCurrentEditorTab :: NewFileNameChooser -> Context -> IO ()
+saveCurrentEditorTab newFileNameChooser ctx =
     maybeDo saveEditor =<< getActiveEditor ctx
     where fileWriter = contextFileWriter . fileContext $ ctx
           saveEditor editor = do
