@@ -154,12 +154,6 @@ spec = do
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(True, True), (True, True)]
 
-    it "removes search tag from previous search on preview" $ do
-      (ctx, buffer) <- loadGuiAndPreviewSearch
-      searchPreview ctx "!"
-      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
-      tagStates `shouldBe` [(False, False), (False, False)]
-
     it "removes all search tags on reset" $ do
       (ctx, buffer) <- loadGuiAndPreviewSearch
       searchReset ctx

@@ -342,7 +342,6 @@ searchPreview ctx text =
             tagTable <- textBufferGetTagTable buffer
             tag <- maybe (addNewSearchTag tagTable) return =<< textTagTableLookup tagTable "search"
             (start, end) <- textBufferGetBounds buffer
-            textBufferRemoveTag buffer tag start end
             addNewSearchTags buffer tag start end
         addNewSearchTag tagTable = do
             tag <- textTagNew $ Just $ pack "search"
