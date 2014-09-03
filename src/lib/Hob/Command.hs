@@ -1,5 +1,7 @@
 module Hob.Command (
-    Command(..)
+    PreviewCommand(..),
+    Command(..),
+    CommandMatcher(..)
 ) where
 
 import Graphics.UI.Gtk (Modifier)

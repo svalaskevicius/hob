@@ -16,7 +16,7 @@ module Hob.Ui (loadGui,
 
 import Control.Monad                        (filterM, unless, (<=<))
 import Control.Monad.Trans                  (liftIO)
-import Data.Maybe                           (fromJust, mapMaybe)
+import Data.Maybe                           (fromJust, mapMaybe, isNothing, isJust)
 import Data.Text                            (Text (..), pack, unpack)
 import Data.Tree
 import Filesystem.Path.CurrentOS            (decodeString, encodeString,
@@ -57,8 +57,28 @@ import Hob.DirectoryTree
 import System.FilePath
 import System.Glib.GObject
 
+import Data.IORef
+
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
+
+searchPreview' :: String -> Context -> IO ()
+searchPreview' text ctx = searchPreview ctx text
+
+searchExecute' :: String -> Context -> IO ()
+searchExecute' text ctx = searchExecute ctx text
+
+-- add command, dispatch and clear
+commandPreviewPreviewState :: IO (PreviewCommand -> IO(), Context -> IO())
+commandPreviewPreviewState = do
+    state <- newIORef Nothing
+    return (
+                writeIORef state . Just,
+                \ctx -> do 
+                    resetCommand <- readIORef state
+                    maybeDo (\cmd -> previewReset cmd $ ctx) resetCommand
+                    writeIORef state Nothing 
+            )
 
 
 loadGui :: FileContext -> StyleContext -> IO Context
@@ -73,10 +93,16 @@ loadGui fileContext styleContext = do
                            (([Control], "n"), Command Nothing editNewFile),
                            (([], "Escape"), Command Nothing toggleFocusOnCommandEntry)
                        ]
+        let cmdMatcher = CommandMatcher {
+            matchKeyBinding = findCommandByShortCut commands,
+            matchCommand = (\text -> (case text of
+                                         '/':searchText -> Just $ Command (Just $ PreviewCommand (searchPreview' searchText) searchReset) (searchExecute' searchText);
+                                          _ -> Nothing))
+        }
 
-        ctx <- initMainWindow builder commands
+        ctx <- initMainWindow builder cmdMatcher
         initSidebar ctx builder
-        initCommandEntry ctx builder
+        initCommandEntry ctx builder cmdMatcher
         return ctx
     where
         loadUiBuilder = do
@@ -88,21 +114,28 @@ loadGui fileContext styleContext = do
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             initSideBarFileTree fileContext sidebarTree $ launchNewFileEditor ctx mainEditNotebook
-        initCommandEntry ctx builder = do
+        initCommandEntry ctx builder cmdMatcher = do
             commandEntry <- builderGetObject builder castToEntry "command"
             widgetSetName commandEntry "commandEntry"
             styleContext <- widgetGetStyleContext commandEntry
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            (setLastPreviewCmd, dispatchLastPreviewReset) <- commandPreviewPreviewState
             commandEntry `on` editableChanged $ do
                 text <- entryGetText commandEntry
-                case text of
-                    '/':searchText -> do
+                dispatchLastPreviewReset ctx
+                if text == "" then do
+                    GtkSc.styleContextRemoveClass styleContext "error"
+                else do
+                    let command = matchCommand cmdMatcher text
+                    if isNothing command then do
+                        GtkSc.styleContextAddClass styleContext "error"
+                    else do
                         GtkSc.styleContextRemoveClass styleContext "error"
-                        putStrLn $ "searching for " ++ searchText
-                        searchPreview ctx searchText
-                    "" -> searchReset ctx >> GtkSc.styleContextRemoveClass styleContext "error"
-                    _ -> searchReset ctx >> GtkSc.styleContextAddClass styleContext "error"
-
+                        let prev = commandPreview $ fromJust command
+                        if isJust prev then do
+                            setLastPreviewCmd $ fromJust prev
+                            previewExecute (fromJust prev) ctx
+                        else return()
 
             _ <- commandEntry `on` keyPressEvent $ do
                 modifier <- eventModifier
@@ -110,17 +143,22 @@ loadGui fileContext styleContext = do
                 case (modifier, unpack key) of
                     ([], "Return") -> liftIO $ do
                         text <- entryGetText commandEntry
-                        case text of
-                            '/':searchText -> searchExecute ctx searchText
-                            "" -> searchReset ctx >> GtkSc.styleContextRemoveClass styleContext "error"
-                            _ -> searchReset ctx >> GtkSc.styleContextAddClass styleContext "error"
+                        if text == "" then do
+                            GtkSc.styleContextRemoveClass styleContext "error"
+                        else do
+                            let command = matchCommand cmdMatcher text
+                            if isNothing command then do
+                                GtkSc.styleContextAddClass styleContext "error"
+                            else do
+                                GtkSc.styleContextRemoveClass styleContext "error"
+                                commandExecute (fromJust command) ctx
 
                         return True
                     _ -> return False
 
 
             return ()
-        initMainWindow builder commands = do
+        initMainWindow builder cmdMatcher = do
             mainWindow <- builderGetObject builder castToWindow "mainWindow"
             mainNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             commandEntry <- builderGetObject builder castToEntry "command"
@@ -131,7 +169,7 @@ loadGui fileContext styleContext = do
                 key <- eventKeyName
                 maybe (return False)
                       (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $ 
-                      findCommandByShortCut commands (modifier, unpack key)
+                      matchKeyBinding cmdMatcher (modifier, unpack key)
             return ctx
         findCommandByShortCut [] shortCut = Nothing
         findCommandByShortCut ((s, cmd):xs) shortCut = if s == shortCut then Just cmd else findCommandByShortCut xs shortCut
