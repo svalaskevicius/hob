@@ -14,40 +14,31 @@ module Hob.Ui (loadGui,
                searchExecute,
                getActiveEditor) where
 
-import Control.Monad                        (filterM, unless, (<=<))
-import Control.Monad.Trans                  (liftIO)
-import Data.Maybe                           (fromJust, mapMaybe, isNothing, isJust)
-import Data.Text                            (Text (..), pack, unpack)
-import Data.Tree
-import Filesystem.Path.CurrentOS            (decodeString, encodeString,
-                                             filename)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.CssProvider
+import           Control.Monad                        (filterM, unless, (<=<))
+import           Control.Monad.Trans                  (liftIO)
+import           Data.Maybe                           (fromJust, isJust,
+                                                       isNothing, mapMaybe)
+import           Data.Text                            (Text (..), pack, unpack)
+import           Data.Tree
+import           Filesystem.Path.CurrentOS            (decodeString,
+                                                       encodeString, filename)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
-import Graphics.UI.Gtk.ModelView            as Mv
-import Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
-                                             SourceLanguageManager, SourceView,
-                                             castToSourceView,
-                                             sourceBufferBeginNotUndoableAction,
-                                             sourceBufferEndNotUndoableAction,
-                                             sourceBufferNew,
-                                             sourceBufferSetHighlightSyntax,
-                                             sourceBufferSetLanguage,
-                                             sourceBufferSetStyleScheme,
-                                             sourceLanguageManagerGetLanguage,
-                                             sourceLanguageManagerGetSearchPath,
-                                             sourceLanguageManagerGuessLanguage,
-                                             sourceLanguageManagerNew,
-                                             sourceStyleSchemeManagerGetDefault,
-                                             sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
-                                             sourceViewNewWithBuffer,
-                                             sourceViewSetAutoIndent,
-                                             sourceViewSetDrawSpaces,
-                                             sourceViewSetHighlightCurrentLine,
-                                             sourceViewSetIndentOnTab,
-                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
-                                             sourceViewSetShowLineNumbers,
-                                             sourceViewSetTabWidth)
+import           Graphics.UI.Gtk.ModelView            as Mv
+import           Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
+                                                       SourceLanguageManager,
+                                                       SourceView,
+                                                       castToSourceView, sourceBufferBeginNotUndoableAction, sourceBufferEndNotUndoableAction,
+                                                       sourceBufferNew, sourceBufferSetHighlightSyntax,
+                                                       sourceBufferSetLanguage, sourceBufferSetStyleScheme, sourceLanguageManagerGetLanguage, sourceLanguageManagerGetSearchPath, sourceLanguageManagerGuessLanguage,
+                                                       sourceLanguageManagerNew, sourceStyleSchemeManagerGetDefault, sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
+                                                       sourceViewNewWithBuffer,
+                                                       sourceViewSetAutoIndent,
+                                                       sourceViewSetDrawSpaces, sourceViewSetHighlightCurrentLine,
+                                                       sourceViewSetIndentOnTab,
+                                                       sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs, sourceViewSetShowLineNumbers,
+                                                       sourceViewSetTabWidth)
 
 import Hob.Command
 import Hob.Context
@@ -74,10 +65,10 @@ commandPreviewPreviewState = do
     state <- newIORef Nothing
     return (
                 writeIORef state . Just,
-                \ctx -> do 
+                \ctx -> do
                     resetCommand <- readIORef state
                     maybeDo (\cmd -> previewReset cmd $ ctx) resetCommand
-                    writeIORef state Nothing 
+                    writeIORef state Nothing
             )
 
 
@@ -168,7 +159,7 @@ loadGui fileContext styleContext = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
-                      (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $ 
+                      (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ctx
         findCommandByShortCut [] shortCut = Nothing

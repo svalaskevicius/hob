@@ -214,7 +214,7 @@ spec = do
       fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
       ctx <- loadGui fc sc
       saveCurrentEditorTab emptyFileChooser ctx
-      
+
     it "marks buffer as unmodified on save" $ do
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader blackholeFileWriter emptyFileTree

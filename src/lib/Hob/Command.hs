@@ -6,26 +6,26 @@ module Hob.Command (
     mempty, mappend
 ) where
 
-import Graphics.UI.Gtk (Modifier)
+import Data.Maybe      (isJust)
 import Data.Monoid
-import Data.Maybe (isJust)
+import Graphics.UI.Gtk (Modifier)
 import Hob.Context
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: Context -> IO (),
-                    previewReset :: Context -> IO ()
+                    previewReset   :: Context -> IO ()
                 }
 
 data CommandHandler = CommandHandler {
                     commandPreview :: Maybe (PreviewCommandHandler),
                     commandExecute :: Context -> IO ()
                 }
-                
+
 type KeyboardBinding = ([Modifier], String)
 
 data CommandMatcher = CommandMatcher {
                     matchKeyBinding :: KeyboardBinding -> Maybe (CommandHandler),
-                    matchCommand :: String -> Maybe (CommandHandler)
+                    matchCommand    :: String -> Maybe (CommandHandler)
                 }
 
 instance Monoid CommandMatcher where
@@ -34,10 +34,10 @@ instance Monoid CommandMatcher where
 
 combineMatchKeyBinding :: CommandMatcher -> CommandMatcher -> KeyboardBinding -> Maybe (CommandHandler)
 combineMatchKeyBinding = combineMatcher matchKeyBinding
-          
+
 combineMatchCommand :: CommandMatcher -> CommandMatcher -> String -> Maybe (CommandHandler)
 combineMatchCommand = combineMatcher matchCommand
-          
+
 combineMatcher :: (CommandMatcher -> a -> Maybe (CommandHandler)) -> CommandMatcher -> CommandMatcher -> a -> Maybe (CommandHandler)
 combineMatcher combiner l r cmd = if isJust rightResult then rightResult else leftResult
     where leftResult = combiner l cmd
