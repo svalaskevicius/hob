@@ -2,9 +2,9 @@ module Hob.Command (
     PreviewCommandHandler(..),
     CommandHandler(..),
     CommandMatcher(..),
-    KeyboardBinding(..),
-    KeyCommandMatcher(..),
-    TextCommandMatcher(..)
+    KeyboardBinding,
+    KeyCommandMatcher,
+    TextCommandMatcher
 ) where
 
 import Data.Maybe      (isJust)

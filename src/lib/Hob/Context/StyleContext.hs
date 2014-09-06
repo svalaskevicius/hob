@@ -15,7 +15,7 @@ import Graphics.UI.Gtk.SourceView    (SourceStyleScheme,
                                       sourceStyleSchemeManagerGetDefault,
                                       sourceStyleSchemeManagerGetScheme,
                                       sourceStyleSchemeManagerSetSearchPath)
-import System.FilePath               (FilePath (..), (</>))
+import System.FilePath               ((</>))
 
 data StyleContext = StyleContext {
     contextDataPath     :: FilePath,

@@ -9,9 +9,6 @@ module Hob.Ui (loadGui,
                editNewFile,
                saveCurrentEditorTab,
                toggleFocusOnCommandEntry,
-               searchPreview,
-               searchReset,
-               searchExecute,
                getActiveEditor) where
 
 import           Control.Monad                        (filterM, unless, when,
@@ -19,8 +16,7 @@ import           Control.Monad                        (filterM, unless, when,
 import           Control.Monad.Trans                  (liftIO)
 import           Data.Maybe                           (fromJust, isJust,
                                                        isNothing, mapMaybe)
-import           Data.Text                            (Text (..), pack, unpack)
-import           Data.Tree
+import           Data.Text                            (Text, pack, unpack)
 import           Filesystem.Path.CurrentOS            (decodeString,
                                                        encodeString, filename)
 import           Graphics.UI.Gtk
@@ -28,12 +24,10 @@ import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           Graphics.UI.Gtk.ModelView            as Mv
 import           Graphics.UI.Gtk.SourceView           (SourceDrawSpacesFlags (..),
-                                                       SourceLanguageManager,
                                                        SourceView,
                                                        castToSourceView, sourceBufferBeginNotUndoableAction, sourceBufferEndNotUndoableAction,
                                                        sourceBufferNew, sourceBufferSetHighlightSyntax,
-                                                       sourceBufferSetLanguage, sourceBufferSetStyleScheme, sourceLanguageManagerGetLanguage, sourceLanguageManagerGetSearchPath, sourceLanguageManagerGuessLanguage,
-                                                       sourceLanguageManagerNew, sourceStyleSchemeManagerGetDefault, sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath,
+                                                       sourceBufferSetLanguage, sourceBufferSetStyleScheme,
                                                        sourceViewNewWithBuffer,
                                                        sourceViewSetAutoIndent,
                                                        sourceViewSetDrawSpaces, sourceViewSetHighlightCurrentLine,
@@ -46,10 +40,10 @@ import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
 import Hob.DirectoryTree
-import System.FilePath
 import System.Glib.GObject
 
 import Data.IORef
+import Hob.Command.FindText
 
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
@@ -74,11 +68,11 @@ commandPreviewPreviewState = do
 
 
 loadGui :: FileContext -> StyleContext -> IO Context
-loadGui fileContext styleContext = do
+loadGui fileCtx styleCtx = do
         _ <- initGUI
 
         builder <- loadUiBuilder
-        setGtkStyle styleContext
+        setGtkStyle styleCtx
         let commands = [
                            (([Control], "w"), CommandHandler Nothing closeCurrentEditorTab),
                            (([Control], "s"), CommandHandler Nothing (runWith saveCurrentEditorTab fileChooser)),
@@ -99,49 +93,48 @@ loadGui fileContext styleContext = do
     where
         loadUiBuilder = do
             builder <- builderNew
-            builderAddFromFile builder $ uiFile styleContext
+            builderAddFromFile builder $ uiFile styleCtx
             return builder
         initSidebar ctx builder = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree fileContext sidebarTree $ launchNewFileEditor ctx mainEditNotebook
+            initSideBarFileTree fileCtx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
         initCommandEntry ctx builder cmdMatcher = do
-            commandEntry <- builderGetObject builder castToEntry "command"
-            widgetSetName commandEntry "commandEntry"
-            styleContext <- widgetGetStyleContext commandEntry
-            mainWindow <- builderGetObject builder castToWindow "mainWindow"
+            cmdEntry <- builderGetObject builder castToEntry "command"
+            widgetSetName cmdEntry "commandEntry"
+            cmdEntryStyleContext <- widgetGetStyleContext cmdEntry
             (setLastPreviewCmd, dispatchLastPreviewReset) <- commandPreviewPreviewState
-            commandEntry `on` editableChanged $ do
-                text <- entryGetText commandEntry
+            _ <- cmdEntry `on` editableChanged $ do
+                text <- entryGetText cmdEntry
                 dispatchLastPreviewReset ctx
                 if text == "" then
-                    GtkSc.styleContextRemoveClass styleContext "error"
+                    GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"
                 else do
                     let command = matchCommand cmdMatcher text
                     if isNothing command then
-                        GtkSc.styleContextAddClass styleContext "error"
+                        GtkSc.styleContextAddClass cmdEntryStyleContext "error"
                     else do
-                        GtkSc.styleContextRemoveClass styleContext "error"
+                        GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"
                         let prev = commandPreview $ fromJust command
                         when (isJust prev) $ do
                             setLastPreviewCmd $ fromJust prev
                             previewExecute (fromJust prev) ctx
 
-            _ <- commandEntry `on` keyPressEvent $ do
+            _ <- cmdEntry `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
                 case (modifier, unpack key) of
                     ([], "Return") -> liftIO $ do
-                        text <- entryGetText commandEntry
+                        text <- entryGetText cmdEntry
                         if text == "" then
-                            GtkSc.styleContextRemoveClass styleContext "error"
+                            GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"
                         else do
                             let command = matchCommand cmdMatcher text
                             if isNothing command then
-                                GtkSc.styleContextAddClass styleContext "error"
+                                GtkSc.styleContextAddClass cmdEntryStyleContext "error"
                             else do
-                                GtkSc.styleContextRemoveClass styleContext "error"
+                                GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"
                                 commandExecute (fromJust command) ctx
 
                         return True
@@ -150,32 +143,32 @@ loadGui fileContext styleContext = do
 
             return ()
         initMainWindow builder cmdMatcher = do
-            mainWindow <- builderGetObject builder castToWindow "mainWindow"
-            mainNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            commandEntry <- builderGetObject builder castToEntry "command"
-            let ctx = Context styleContext fileContext mainWindow mainNotebook commandEntry
-            widgetSetName mainWindow "mainWindow"
-            _ <- mainWindow `on` keyPressEvent $ do
+            window <- builderGetObject builder castToWindow "mainWindow"
+            notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
+            cmdEntry <- builderGetObject builder castToEntry "command"
+            let ctx = Context styleCtx fileCtx window notebook cmdEntry
+            widgetSetName window "mainWindow"
+            _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
                       (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ctx
-        findCommandByShortCut [] shortCut = Nothing
+        findCommandByShortCut [] _ = Nothing
         findCommandByShortCut ((s, cmd):xs) shortCut = if s == shortCut then Just cmd else findCommandByShortCut xs shortCut
         fileChooser ctx = do
             dialog <- fileChooserDialogNew Nothing (Just $ mainWindow ctx) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
-            response <- dialogRun dialog
-            file <- if response == ResponseOk then fileChooserGetFilename dialog else return Nothing
+            resp <- dialogRun dialog
+            file <- if resp == ResponseOk then fileChooserGetFilename dialog else return Nothing
             widgetDestroy dialog
             return file
         runWith a b ctx = a (b ctx) ctx
 
 setGtkStyle :: StyleContext -> IO ()
-setGtkStyle styleContext = do
+setGtkStyle styleCtx = do
     cssProvider <- cssProviderNew
-    cssProviderLoadFromPath cssProvider $ uiTheme styleContext
+    cssProviderLoadFromPath cssProvider $ uiTheme styleCtx
     maybe (return()) (\screen -> GtkSc.styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
 
@@ -222,7 +215,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
     where launchEditor text = do
-              editor <- launchNewEditorForText ctx targetNotebook (Just filePath) text
+              _ <- launchNewEditorForText ctx targetNotebook (Just filePath) text
               return ()
           isEditorFileMatching editor = do
               quark <- fileNameQuark
@@ -263,7 +256,7 @@ launchNewEditorForText ctx targetNotebook filePath text = do
     notebookSetCurrentPage targetNotebook tabNr
     notebookSetShowTabs targetNotebook True
 
-    buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
+    _ <- buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
 
     setEditorFilePath editor filePath
 
@@ -271,7 +264,7 @@ launchNewEditorForText ctx targetNotebook filePath text = do
     where
         title = tabTitle filePath
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
-        setBufferLanguage buffer Nothing = return()
+        setBufferLanguage _ Nothing = return()
 
 
 closeCurrentEditorTab :: Context -> IO ()
@@ -322,58 +315,6 @@ toggleFocusOnCommandEntry ctx = do
     else
         widgetGrabFocus cmdEntry
     where cmdEntry = commandEntry ctx
-
-searchPreview :: Context -> String -> IO ()
-searchPreview ctx text =
-    maybeDo updateSearchPreview =<< getActiveEditor ctx
-    where
-        updateSearchPreview editor = do
-            buffer <- textViewGetBuffer editor
-            tagTable <- textBufferGetTagTable buffer
-            tag <- maybe (addNewSearchTag tagTable) return =<< textTagTableLookup tagTable "search"
-            (start, end) <- textBufferGetBounds buffer
-            addNewSearchTags buffer tag start end
-        addNewSearchTag tagTable = do
-            tag <- textTagNew $ Just $ pack "search"
-            tag `set` [textTagBackground := "#707550"]
-            textTagTableAdd tagTable tag
-            return tag
-        addNewSearchTags buffer tag start end = do
-            result <- textIterForwardSearch start text [TextSearchTextOnly] (Just end)
-            case result of
-                Just (matchStart, matchEnd) -> do
-                    textBufferApplyTag buffer tag matchStart matchEnd
-                    addNewSearchTags buffer tag matchEnd end
-                Nothing -> return()
-
-searchReset :: Context -> IO ()
-searchReset ctx =
-    maybeDo resetSearchPreview =<< getActiveEditor ctx
-    where
-        resetSearchPreview editor = do
-            buffer <- textViewGetBuffer editor
-            tagTable <- textBufferGetTagTable buffer
-            maybeDo (removeEditorTag buffer) =<< textTagTableLookup tagTable "search"
-        removeEditorTag buffer tag = do
-            (start, end) <- textBufferGetBounds buffer
-            textBufferRemoveTag buffer tag start end
-
-searchExecute :: Context -> String -> IO ()
-searchExecute ctx text =
-    maybeDo doSearch =<< getActiveEditor ctx
-    where
-        doSearch editor = do
-            buffer <- textViewGetBuffer editor
-            (_, start) <- textBufferGetSelectionBounds buffer
-            maybe (retryFromStart editor buffer) (selectMatch editor buffer) =<< findNextResult start
-        findNextResult start = textIterForwardSearch start text [TextSearchTextOnly] Nothing
-        selectMatch editor buffer (start, end) = do
-            textBufferSelectRange buffer start end
-            caretMark <- textBufferGetInsert buffer
-            textViewScrollToMark editor caretMark 0.1 Nothing
-        retryFromStart editor buffer = do
-            (start, _) <- textBufferGetBounds buffer
-            maybeDo (selectMatch editor buffer) =<< findNextResult start
 
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"
@@ -436,7 +377,7 @@ setEditorFilePath editor filePath = do
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)
-liftTupledMaybe (x, Nothing) = Nothing
+liftTupledMaybe (_, Nothing) = Nothing
 
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
