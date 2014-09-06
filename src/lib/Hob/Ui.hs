@@ -48,12 +48,6 @@ import Hob.Command.FindText
 type NewFileEditorLauncher = FilePath -> IO ()
 type NewFileNameChooser = IO (Maybe FilePath)
 
-searchPreview' :: String -> Context -> IO ()
-searchPreview' text ctx = searchPreview ctx text
-
-searchExecute' :: String -> Context -> IO ()
-searchExecute' text ctx = searchExecute ctx text
-
 -- add command, dispatch and clear
 commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
 commandPreviewPreviewState = do
@@ -82,7 +76,7 @@ loadGui fileCtx styleCtx = do
         let cmdMatcher = CommandMatcher {
             matchKeyBinding = findCommandByShortCut commands,
             matchCommand = \text -> (case text of
-                                         '/':searchText -> Just $ CommandHandler (Just $ PreviewCommandHandler (searchPreview' searchText) searchReset) (searchExecute' searchText);
+                                         '/':searchText -> Just $ searchCommandHandler searchText;
                                           _ -> Nothing)
         }
 

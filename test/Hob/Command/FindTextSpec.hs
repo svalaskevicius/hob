@@ -3,7 +3,8 @@ module Hob.Command.FindTextSpec (main, spec) where
 import Control.Monad (replicateM_)
 import Test.Hspec
 
-import Hob.Command.FindText (searchExecute, searchPreview, searchReset)
+import Hob.Command
+import Hob.Command.FindText
 import Hob.Ui               (launchNewEditorForText, loadGui)
 
 import           Data.Maybe
@@ -34,7 +35,7 @@ spec =
 
     it "removes all search tags on reset" $ do
       (ctx, buffer) <- loadGuiAndPreviewSearch
-      searchReset ctx
+      (previewReset . fromJust . commandPreview) (searchCommandHandler "") ctx
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
@@ -45,14 +46,14 @@ spec =
 
     it "highlights the next match from cursor on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      searchExecute ctx "text"
+      commandExecute (searchCommandHandler "text") ctx
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (15, 19)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      searchExecute ctx "text"
-      searchExecute ctx "text"
+      commandExecute (searchCommandHandler "text") ctx
+      commandExecute (searchCommandHandler "text") ctx
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
@@ -62,7 +63,7 @@ spec =
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
       editor <- launchNewEditorForText ctx notebook Nothing $ pack editorText
       processGtkEvents
-      searchExecute ctx "customised search string at the end"
+      commandExecute (searchCommandHandler "customised search string at the end") ctx
       processGtkEvents
       buffer <- textViewGetBuffer editor
       visible <- textViewGetVisibleRect editor
@@ -91,7 +92,7 @@ loadGuiAndPreviewSearch = do
     ctx <- loadDefaultGui
     let notebook = HC.mainNotebook ctx
     editor <- launchNewEditorForText ctx notebook Nothing $ pack "text - initial text!"
-    searchPreview ctx "text"
+    (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") $ ctx
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
@@ -100,7 +101,7 @@ loadGuiAndExecuteSearch = do
     (ctx, buffer) <- loadGuiAndPreviewSearch
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
-    searchExecute ctx "text"
+    commandExecute (searchCommandHandler "text") ctx
     return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)

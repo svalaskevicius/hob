@@ -1,18 +1,18 @@
-module Hob.Command.FindText (
-               searchPreview,
-               searchReset,
-               searchExecute) where
+module Hob.Command.FindText (searchCommandHandler) where
 
 import Control.Monad              ((<=<))
 import Data.Text                  (pack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView, castToSourceView)
 
---import Hob.Command
+import Hob.Command
 import Hob.Context
 
-searchPreview :: Context -> String -> IO ()
-searchPreview ctx text =
+searchCommandHandler :: String -> CommandHandler
+searchCommandHandler searchText = CommandHandler (Just $ PreviewCommandHandler (searchPreview searchText) searchReset) (searchExecute searchText)
+
+searchPreview :: String -> Context -> IO ()
+searchPreview text ctx =
     maybeDo updateSearchPreview =<< getActiveEditor ctx
     where
         updateSearchPreview editor = do
@@ -46,8 +46,8 @@ searchReset ctx =
             (start, end) <- textBufferGetBounds buffer
             textBufferRemoveTag buffer tag start end
 
-searchExecute :: Context -> String -> IO ()
-searchExecute ctx text =
+searchExecute :: String -> Context -> IO ()
+searchExecute  text ctx =
     maybeDo doSearch =<< getActiveEditor ctx
     where
         doSearch editor = do
