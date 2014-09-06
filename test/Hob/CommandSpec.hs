@@ -1,6 +1,7 @@
 module Hob.CommandSpec (main, spec) where
 
 import Data.Maybe      (isNothing)
+import Data.Monoid
 import Graphics.UI.Gtk (Modifier (..))
 import Hob.Command
 import Test.Hspec

@@ -2,8 +2,7 @@ module Hob.Command (
     PreviewCommandHandler(..),
     CommandHandler(..),
     CommandMatcher(..),
-    KeyboardBinding(..),
-    mempty, mappend
+    KeyboardBinding(..)
 ) where
 
 import Data.Maybe      (isJust)
