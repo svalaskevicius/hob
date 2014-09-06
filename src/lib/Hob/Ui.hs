@@ -1,5 +1,4 @@
 module Hob.Ui (loadGui,
-               NewFileNameChooser,
                getActiveEditorText,
                getActiveEditorTab,
                launchNewEditorForText,
@@ -46,9 +45,9 @@ import Data.IORef
 import Data.Monoid                 (mconcat)
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
+import Hob.Command.SaveCurrentTab
 
 type NewFileEditorLauncher = FilePath -> IO ()
-type NewFileNameChooser = IO (Maybe FilePath)
 
 -- add command, dispatch and clear
 commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
@@ -71,7 +70,7 @@ loadGui fileCtx styleCtx = do
         setGtkStyle styleCtx
         let commands = [
                            (([Control], "w"), closeCurrentEditorTab),
-                           (([Control], "s"), CommandHandler Nothing (runWith saveCurrentEditorTab fileChooser)),
+                           (([Control], "s"), saveCurrentEditorTab),
                            (([Control], "n"), CommandHandler Nothing editNewFile),
                            (([], "Escape"), CommandHandler Nothing toggleFocusOnCommandEntry)
                        ]
@@ -154,13 +153,6 @@ loadGui fileCtx styleCtx = do
             return ctx
         findCommandByShortCut [] _ = Nothing
         findCommandByShortCut ((s, cmd):xs) shortCut = if s == shortCut then Just cmd else findCommandByShortCut xs shortCut
-        fileChooser ctx = do
-            dialog <- fileChooserDialogNew Nothing (Just $ mainWindow ctx) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
-            resp <- dialogRun dialog
-            file <- if resp == ResponseOk then fileChooserGetFilename dialog else return Nothing
-            widgetDestroy dialog
-            return file
-        runWith a b ctx = a (b ctx) ctx
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do
@@ -270,29 +262,6 @@ editNewFile ctx = do
     return ()
     where tabbed = mainNotebook ctx
 
-saveCurrentEditorTab :: NewFileNameChooser -> Context -> IO ()
-saveCurrentEditorTab newFileNameChooser ctx =
-    maybeDo saveEditor =<< getActiveEditor ctx
-    where fileWriter = contextFileWriter . fileContext $ ctx
-          saveEditor editor = do
-              quark <- fileNameQuark
-              path <- objectGetAttributeUnsafe quark editor
-              case path of
-                  Just filePath -> saveEditorContents editor filePath
-                  Nothing -> askForFile $ saveAsNewFile editor
-          askForFile onSuccess = newFileNameChooser >>= maybe (return()) onSuccess
-          saveAsNewFile editor filePath = do
-              saveEditorContents editor filePath
-              setEditorFilePath editor $ Just filePath
-              updateEditorTitle editor
-
-          saveEditorContents editor filePath = do
-              textBuf <- textViewGetBuffer editor
-              text <- get textBuf textBufferText
-              fileWriter filePath text
-              textBuf `set` [textBufferModified := False]
-              return ()
-
 toggleFocusOnCommandEntry :: Context -> IO ()
 toggleFocusOnCommandEntry ctx = do
     isFocused <- widgetGetIsFocus cmdEntry
@@ -348,13 +317,6 @@ tabTitleForEditor editor = do
     buffer <- textViewGetBuffer editor
     modified <- buffer `get` textBufferModified
     return $ if modified then tabTitle filePath ++ "*" else tabTitle filePath
-
-updateEditorTitle :: SourceView -> IO ()
-updateEditorTitle editor = do
-    Just scrolledW <- widgetGetParent editor
-    Just notebookW <- widgetGetParent scrolledW
-    let notebook = castToNotebook notebookW
-    notebookSetTabLabelText notebook scrolledW =<< tabTitleForEditor editor
 
 setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
 setEditorFilePath editor filePath = do

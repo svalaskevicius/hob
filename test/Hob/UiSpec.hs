@@ -1,9 +1,8 @@
 module Hob.UiSpec (main, spec) where
 
 import Control.Monad.Error                  (throwError)
-import Data.IORef
 import Data.Maybe
-import Data.Text                            (Text, pack, unpack)
+import Data.Text                            (pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
@@ -141,74 +140,18 @@ spec = do
       pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
       currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
 
-  describe "editor commands" $ do
-    it "saves the currently active file" $ do
-      (mockedWriter, mockReader) <- mockedFileWriter
-      sc <- HSC.defaultStyleContext "app-data"
-      fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
-      ctx <- launchFileInContext fc sc "/xxx/testName.hs"
-      saveCurrentEditorTab emptyFileChooser ctx
-      savedFile <- mockReader
-      savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
-
-    it "skips save when there is no active file" $ do
-      sc <- HSC.defaultStyleContext "app-data"
-      fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
-      ctx <- loadGui fc sc
-      saveCurrentEditorTab emptyFileChooser ctx
-
-    it "marks buffer as unmodified on save" $ do
-      sc <- HSC.defaultStyleContext "app-data"
-      fc <- HFC.defaultFileContext stubbedFileLoader blackholeFileWriter emptyFileTree
-      ctx <- launchFileInContext fc sc "/xxx/testName.hs"
-      buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
-      textBufferSetModified buffer True
-      saveCurrentEditorTab emptyFileChooser ctx
-      stateAfterSave <- textBufferGetModified buffer
-      stateAfterSave `shouldBe` False
-
+  describe "editor commands" $
     it "creates a new unnamed file" $ do
       ctx <- launchNewFile
       pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
       pagesAfterActivatingDirectory `shouldBe` 1
 
-    it "requests filename for a new file" $ do
-      (mockedWriter, mockReader) <- mockedFileWriter
-      sc <- HSC.defaultStyleContext "app-data"
-      fc <- HFC.defaultFileContext emptyFileLoader mockedWriter emptyFileTree
-      ctx <- launchNewFileInContextAndSaveAs fc sc "/xxx/fileResponded.hs"
-      savedFile <- mockReader
-      savedFile `shouldBe` Just ("/xxx/fileResponded.hs", pack "")
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "fileResponded.hs"
-
-    it "updates the tab title from the newly got filepath" $ do
-      sc <- HSC.defaultStyleContext "app-data"
-      fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-      ctx <- launchNewFileInContextAndSaveAs fc sc "/xxx/fileResponded.hs"
-      buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
-      textBufferSetModified buffer True
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "fileResponded.hs*"
 
 launchNewFile :: IO HC.Context
 launchNewFile = do
     ctx <- loadDefaultGui
     editNewFile ctx
     return ctx
-
-launchFileInContext :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
-launchFileInContext fileCtx styleCtx filename = do
-      ctx <- loadGui fileCtx styleCtx
-      launchEditorTab ctx filename
-      return ctx
-
-launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
-launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
-      ctx <- loadGui fileCtx styleCtx
-      editNewFile ctx
-      saveCurrentEditorTab (stubbedFileChooser $ Just filename) ctx
-      return ctx
 
 launchNewFileAndSetModified :: IO HC.Context
 launchNewFileAndSetModified = do
@@ -258,22 +201,11 @@ fileTreeStub = return [
 failingFileWriter :: HFC.FileWriter
 failingFileWriter _ _ = throwError $ userError "cannot write files stub"
 
-mockedFileWriter :: IO (HFC.FileWriter, IO (Maybe (String, Text)))
-mockedFileWriter = do
-    recorder <- newIORef Nothing
-    return (curry $ writeIORef recorder . Just, readIORef recorder)
-
 stubbedFileLoader :: HFC.FileLoader
 stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
 stubbedFileLoader "/xxx/cannotRead" = return Nothing
 stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
 stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
-
-stubbedFileChooser :: Maybe FilePath -> NewFileNameChooser
-stubbedFileChooser = return
-
-emptyFileChooser :: NewFileNameChooser
-emptyFileChooser = stubbedFileChooser Nothing
 
 blackholeFileWriter :: HFC.FileWriter
 blackholeFileWriter _ _ = return ()
