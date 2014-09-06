@@ -43,6 +43,7 @@ import Hob.DirectoryTree
 import System.Glib.GObject
 
 import Data.IORef
+import Data.Monoid          (mconcat)
 import Hob.Command.FindText
 
 type NewFileEditorLauncher = FilePath -> IO ()
@@ -73,12 +74,13 @@ loadGui fileCtx styleCtx = do
                            (([Control], "n"), CommandHandler Nothing editNewFile),
                            (([], "Escape"), CommandHandler Nothing toggleFocusOnCommandEntry)
                        ]
-        let cmdMatcher = CommandMatcher {
-            matchKeyBinding = findCommandByShortCut commands,
-            matchCommand = \text -> (case text of
-                                         '/':searchText -> Just $ searchCommandHandler searchText;
-                                          _ -> Nothing)
-        }
+        let cmdMatcher = mconcat [
+                            CommandMatcher {
+                                matchKeyBinding = findCommandByShortCut commands,
+                                matchCommand = const Nothing
+                            },
+                            createMatcherForPrefix "/" searchCommandHandler
+                        ]
 
         ctx <- initMainWindow builder cmdMatcher
         initSidebar ctx builder

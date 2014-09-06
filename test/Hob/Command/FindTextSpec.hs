@@ -14,7 +14,6 @@ import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
 
-
 main :: IO ()
 main = hspec spec
 
@@ -92,7 +91,7 @@ loadGuiAndPreviewSearch = do
     ctx <- loadDefaultGui
     let notebook = HC.mainNotebook ctx
     editor <- launchNewEditorForText ctx notebook Nothing $ pack "text - initial text!"
-    (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") $ ctx
+    (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") ctx
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
