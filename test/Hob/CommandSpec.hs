@@ -53,3 +53,22 @@ spec = do
             let cmd = matchKeyBinding combinedMatcher ([Control], "S")
             isNothing cmd `shouldBe` False
             
+        it "combines command matchers assiciatively" $ do
+            let testCommand1 "test1" = Just $ CommandHandler Nothing (\_ -> return())
+                testCommand1 _ = Nothing
+            let testCommand2 "test2" = Just $ CommandHandler Nothing (\_ -> return())
+                testCommand2 _ = Nothing
+            let testCommand3 "test3" = Just $ CommandHandler Nothing (\_ -> return())
+                testCommand3 _ = Nothing
+            let matcher1 = CommandMatcher (\_->Nothing) testCommand1
+            let matcher2 = CommandMatcher (\_->Nothing) testCommand2
+            let matcher3 = CommandMatcher (\_->Nothing) testCommand3
+            let combinedMatcher1 = (matcher1 `mappend` matcher2) `mappend` matcher3
+            let combinedMatcher2 = matcher1 `mappend` (matcher2 `mappend` matcher3)
+            isNothing (matchCommand combinedMatcher1 "test1") `shouldBe` False
+            isNothing (matchCommand combinedMatcher1 "test2") `shouldBe` False
+            isNothing (matchCommand combinedMatcher1 "test3") `shouldBe` False
+            isNothing (matchCommand combinedMatcher2 "test1") `shouldBe` False
+            isNothing (matchCommand combinedMatcher2 "test2") `shouldBe` False
+            isNothing (matchCommand combinedMatcher2 "test3") `shouldBe` False
+

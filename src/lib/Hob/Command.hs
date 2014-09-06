@@ -33,12 +33,12 @@ instance Monoid CommandMatcher where
     mappend l r = CommandMatcher (combineMatchKeyBinding l r) (combineMatchCommand l r)
 
 combineMatchKeyBinding :: CommandMatcher -> CommandMatcher -> KeyboardBinding -> Maybe (CommandHandler)
-combineMatchKeyBinding l r cmd = if isJust rightResult then rightResult else leftResult
-    where leftResult = matchKeyBinding l cmd
-          rightResult = matchKeyBinding r cmd
+combineMatchKeyBinding = combineMatcher matchKeyBinding
           
 combineMatchCommand :: CommandMatcher -> CommandMatcher -> String -> Maybe (CommandHandler)
-combineMatchCommand l r cmd = if isJust rightResult then rightResult else leftResult
-    where leftResult = matchCommand l cmd
-          rightResult = matchCommand r cmd
+combineMatchCommand = combineMatcher matchCommand
           
+combineMatcher :: (CommandMatcher -> a -> Maybe (CommandHandler)) -> CommandMatcher -> CommandMatcher -> a -> Maybe (CommandHandler)
+combineMatcher combiner l r cmd = if isJust rightResult then rightResult else leftResult
+    where leftResult = combiner l cmd
+          rightResult = combiner r cmd
