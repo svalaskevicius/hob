@@ -69,7 +69,7 @@ searchExecute' :: String -> Context -> IO ()
 searchExecute' text ctx = searchExecute ctx text
 
 -- add command, dispatch and clear
-commandPreviewPreviewState :: IO (PreviewCommand -> IO(), Context -> IO())
+commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
 commandPreviewPreviewState = do
     state <- newIORef Nothing
     return (
@@ -88,15 +88,15 @@ loadGui fileContext styleContext = do
         builder <- loadUiBuilder
         setGtkStyle styleContext
         let commands = [
-                           (([Control], "w"), Command Nothing closeCurrentEditorTab),
-                           (([Control], "s"), Command Nothing (runWith saveCurrentEditorTab fileChooser)),
-                           (([Control], "n"), Command Nothing editNewFile),
-                           (([], "Escape"), Command Nothing toggleFocusOnCommandEntry)
+                           (([Control], "w"), CommandHandler Nothing closeCurrentEditorTab),
+                           (([Control], "s"), CommandHandler Nothing (runWith saveCurrentEditorTab fileChooser)),
+                           (([Control], "n"), CommandHandler Nothing editNewFile),
+                           (([], "Escape"), CommandHandler Nothing toggleFocusOnCommandEntry)
                        ]
         let cmdMatcher = CommandMatcher {
             matchKeyBinding = findCommandByShortCut commands,
             matchCommand = (\text -> (case text of
-                                         '/':searchText -> Just $ Command (Just $ PreviewCommand (searchPreview' searchText) searchReset) (searchExecute' searchText);
+                                         '/':searchText -> Just $ CommandHandler (Just $ PreviewCommandHandler (searchPreview' searchText) searchReset) (searchExecute' searchText);
                                           _ -> Nothing))
         }
 

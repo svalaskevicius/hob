@@ -55,5 +55,5 @@ test-suite spec
       Spec.hs
   other-modules:
   build-depends:
-      base    >= 4.2 && <5, containers -any, mtl >=2.1.0 && <2.2.0
-    , hspec   >= 1.11, gtk3 >=0.13.0.0, hob, text >= 1.1.1.0 && < 1.1.2.0, gtksourceview3 >=0.13.0.0
+      base    >= 4.2 && <5, containers -any, mtl >=2.1.0 && <2.2.0,
+      hspec   >= 1.11, gtk3 >=0.13.0.0, hob, text >= 1.1.1.0 && < 1.1.2.0, gtksourceview3 >=0.13.0.0
