@@ -11,13 +11,13 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
+spec =
     describe "command matcher" $ do
         describe "mempty" $ do
-            it "does not return any commands on matching a command" $ do
+            it "does not return any commands on matching a command" $
                 expectNoCommandHandler $ matchCommand mempty "/asd"
 
-            it "does not return any commands on matching a key binding" $ do
+            it "does not return any commands on matching a key binding" $
                 expectNoCommandHandler $ matchKeyBinding mempty ([Control], "S")
 
         it "combines command matchers on mappend with the identity on the left" $ do
@@ -62,11 +62,11 @@ expectNoCommandHandler :: Maybe CommandHandler -> Expectation
 expectNoCommandHandler cmdHandler = isNothing cmdHandler `shouldBe` True
 
 matcherForCommand :: String -> CommandMatcher
-matcherForCommand command = CommandMatcher (\_->Nothing) $ emptyCommandHandlerForCommand command
-    where emptyCommandHandlerForCommand cmd = \x -> if x == cmd then emptyHandler else Nothing
-          emptyHandler = Just $ CommandHandler Nothing (\_ -> return())
+matcherForCommand command = CommandMatcher (const Nothing) $ emptyCommandHandlerForCommand command
+    where emptyCommandHandlerForCommand cmd x = if x == cmd then emptyHandler else Nothing
+          emptyHandler = Just $ CommandHandler Nothing (\ _ -> return())
 
 matcherForKeyBinding :: KeyboardBinding -> CommandMatcher
-matcherForKeyBinding key = CommandMatcher (emptyCommandHandlerForKey key) (\_->Nothing)
-    where emptyCommandHandlerForKey k = \x -> if x == k then emptyHandler else Nothing
-          emptyHandler = Just $ CommandHandler Nothing (\_ -> return())
+matcherForKeyBinding key = CommandMatcher (emptyCommandHandlerForKey key) (const Nothing)
+    where emptyCommandHandlerForKey k x = if x == k then emptyHandler else Nothing
+          emptyHandler = Just $ CommandHandler Nothing (\ _ -> return())

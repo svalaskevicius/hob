@@ -9,8 +9,7 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
-
+spec =
   describe "sourceLanguage" $
     it "guesses language based on the file ending" $ do
       ctx <- stubbedCtx

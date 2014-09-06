@@ -2,7 +2,9 @@ module Hob.Command (
     PreviewCommandHandler(..),
     CommandHandler(..),
     CommandMatcher(..),
-    KeyboardBinding(..)
+    KeyboardBinding(..),
+    KeyCommandMatcher(..),
+    TextCommandMatcher(..)
 ) where
 
 import Data.Maybe      (isJust)
@@ -16,28 +18,30 @@ data PreviewCommandHandler = PreviewCommandHandler {
                 }
 
 data CommandHandler = CommandHandler {
-                    commandPreview :: Maybe (PreviewCommandHandler),
+                    commandPreview :: Maybe PreviewCommandHandler,
                     commandExecute :: Context -> IO ()
                 }
 
 type KeyboardBinding = ([Modifier], String)
+type KeyCommandMatcher = KeyboardBinding -> Maybe CommandHandler
+type TextCommandMatcher = String -> Maybe CommandHandler
 
 data CommandMatcher = CommandMatcher {
-                    matchKeyBinding :: KeyboardBinding -> Maybe (CommandHandler),
-                    matchCommand    :: String -> Maybe (CommandHandler)
+                    matchKeyBinding :: KeyCommandMatcher,
+                    matchCommand    :: TextCommandMatcher
                 }
 
 instance Monoid CommandMatcher where
-    mempty = CommandMatcher (\_->Nothing) (\_->Nothing)
+    mempty = CommandMatcher (const Nothing) (const Nothing)
     mappend l r = CommandMatcher (combineMatchKeyBinding l r) (combineMatchCommand l r)
 
-combineMatchKeyBinding :: CommandMatcher -> CommandMatcher -> KeyboardBinding -> Maybe (CommandHandler)
+combineMatchKeyBinding :: CommandMatcher -> CommandMatcher -> KeyCommandMatcher
 combineMatchKeyBinding = combineMatcher matchKeyBinding
 
-combineMatchCommand :: CommandMatcher -> CommandMatcher -> String -> Maybe (CommandHandler)
+combineMatchCommand :: CommandMatcher -> CommandMatcher -> TextCommandMatcher
 combineMatchCommand = combineMatcher matchCommand
 
-combineMatcher :: (CommandMatcher -> a -> Maybe (CommandHandler)) -> CommandMatcher -> CommandMatcher -> a -> Maybe (CommandHandler)
+combineMatcher :: (CommandMatcher -> a -> Maybe CommandHandler) -> CommandMatcher -> CommandMatcher -> a -> Maybe CommandHandler
 combineMatcher combiner l r cmd = if isJust rightResult then rightResult else leftResult
     where leftResult = combiner l cmd
           rightResult = combiner r cmd

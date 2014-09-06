@@ -14,7 +14,8 @@ module Hob.Ui (loadGui,
                searchExecute,
                getActiveEditor) where
 
-import           Control.Monad                        (filterM, unless, (<=<))
+import           Control.Monad                        (filterM, unless, when,
+                                                       (<=<))
 import           Control.Monad.Trans                  (liftIO)
 import           Data.Maybe                           (fromJust, isJust,
                                                        isNothing, mapMaybe)
@@ -67,7 +68,7 @@ commandPreviewPreviewState = do
                 writeIORef state . Just,
                 \ctx -> do
                     resetCommand <- readIORef state
-                    maybeDo (\cmd -> previewReset cmd $ ctx) resetCommand
+                    maybeDo (`previewReset` ctx) resetCommand
                     writeIORef state Nothing
             )
 
@@ -86,9 +87,9 @@ loadGui fileContext styleContext = do
                        ]
         let cmdMatcher = CommandMatcher {
             matchKeyBinding = findCommandByShortCut commands,
-            matchCommand = (\text -> (case text of
+            matchCommand = \text -> (case text of
                                          '/':searchText -> Just $ CommandHandler (Just $ PreviewCommandHandler (searchPreview' searchText) searchReset) (searchExecute' searchText);
-                                          _ -> Nothing))
+                                          _ -> Nothing)
         }
 
         ctx <- initMainWindow builder cmdMatcher
@@ -114,19 +115,18 @@ loadGui fileContext styleContext = do
             commandEntry `on` editableChanged $ do
                 text <- entryGetText commandEntry
                 dispatchLastPreviewReset ctx
-                if text == "" then do
+                if text == "" then
                     GtkSc.styleContextRemoveClass styleContext "error"
                 else do
                     let command = matchCommand cmdMatcher text
-                    if isNothing command then do
+                    if isNothing command then
                         GtkSc.styleContextAddClass styleContext "error"
                     else do
                         GtkSc.styleContextRemoveClass styleContext "error"
                         let prev = commandPreview $ fromJust command
-                        if isJust prev then do
+                        when (isJust prev) $ do
                             setLastPreviewCmd $ fromJust prev
                             previewExecute (fromJust prev) ctx
-                        else return()
 
             _ <- commandEntry `on` keyPressEvent $ do
                 modifier <- eventModifier
@@ -134,11 +134,11 @@ loadGui fileContext styleContext = do
                 case (modifier, unpack key) of
                     ([], "Return") -> liftIO $ do
                         text <- entryGetText commandEntry
-                        if text == "" then do
+                        if text == "" then
                             GtkSc.styleContextRemoveClass styleContext "error"
                         else do
                             let command = matchCommand cmdMatcher text
-                            if isNothing command then do
+                            if isNothing command then
                                 GtkSc.styleContextAddClass styleContext "error"
                             else do
                                 GtkSc.styleContextRemoveClass styleContext "error"
@@ -170,8 +170,7 @@ loadGui fileContext styleContext = do
             file <- if response == ResponseOk then fileChooserGetFilename dialog else return Nothing
             widgetDestroy dialog
             return file
-        runWith a b ctx = do
-            a (b ctx) ctx
+        runWith a b ctx = a (b ctx) ctx
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleContext = do

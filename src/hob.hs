@@ -26,7 +26,7 @@ main = do
     fileContext <- getFileContext
     styleContext <- getStyleContext
     ctx <- loadGui fileContext styleContext
-    _ <- (mainWindow ctx) `on` deleteEvent $ liftIO mainQuit >> return False
+    _ <- mainWindow ctx `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll $ mainWindow ctx
     mainGUI
     where
