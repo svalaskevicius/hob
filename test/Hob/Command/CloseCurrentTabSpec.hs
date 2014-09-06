@@ -12,8 +12,9 @@ import qualified Hob.Context.StyleContext as HSC
 
 import Hob.Command
 import Hob.Command.CloseCurrentTab
+import Hob.Command.NewTab          (launchNewFileEditor)
 import Hob.DirectoryTree
-import Hob.Ui
+import Hob.Ui                      (loadGui)
 
 main :: IO ()
 main = hspec spec

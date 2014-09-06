@@ -6,13 +6,12 @@ import Data.Text                            (pack, unpack)
 import Data.Tree
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
-import Graphics.UI.Gtk.SourceView           (castToSourceBuffer,
-                                             sourceBufferUndo)
 
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
 
+import Hob.Command.NewTab
 import Hob.DirectoryTree
 import Hob.Ui
 import Test.Hspec
@@ -106,65 +105,11 @@ spec = do
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
 
-  describe "edit area" $ do
-    it "does not allow to undo the intial loaded source" $ do
-      ctx <- loadDefaultGui
-      let notebook = HC.mainNotebook ctx
-      editor <- launchNewEditorForText ctx notebook Nothing $ pack "initial text"
-      buffer <- textViewGetBuffer editor
-      sourceBufferUndo $ castToSourceBuffer buffer
-      editorText <- getEditorText editor
-      unpack editorText `shouldBe` "initial text"
-
-    it "sets the tab title when opening a file" $ do
-      ctx <- loadStubbedGui
-      launchEditorTab ctx "/xxx/testName.hs"
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "testName.hs"
-
-    it "updates the tab title to reflect if buffer is modified" $ do
-      ctx <- launchNewFileAndSetModified
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "testName.hs*"
-
-    it "focuses the tab with the open file if requested to open an already loaded file" $ do
-      ctx <- loadStubbedGui
-      let notebook = HC.mainNotebook ctx
-      launchEditorTab ctx "/xxx/testName.hs"
-      currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
-      launchEditorTab ctx "/xxx/c"
-      pagesBeforeOpeningExistingFile <- notebookGetNPages notebook
-      launchEditorTab ctx "/xxx/testName.hs"
-      currentPageAfterLoadingTheFirstLoadedFile <- notebookGetCurrentPage notebook
-      pagesAfterOpeningExistingFile <- notebookGetNPages notebook
-      pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
-      currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
-
-  describe "editor commands" $
-    it "creates a new unnamed file" $ do
-      ctx <- launchNewFile
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
-      pagesAfterActivatingDirectory `shouldBe` 1
-
-
 launchNewFile :: IO HC.Context
 launchNewFile = do
     ctx <- loadDefaultGui
     editNewFile ctx
     return ctx
-
-launchNewFileAndSetModified :: IO HC.Context
-launchNewFileAndSetModified = do
-    ctx <- loadStubbedGui
-    launchEditorTab ctx "/xxx/testName.hs"
-    buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
-    textBufferSetModified buffer True
-    return ctx
-
-launchEditorTab :: HC.Context -> String -> IO ()
-launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook ctx
-    launchNewFileEditor ctx notebook file
 
 activateDirectoryPath :: HC.Context -> TreePath -> IO ()
 activateDirectoryPath ctx path = do
@@ -179,13 +124,6 @@ getDirectoryListingSidebar ctx = do
     scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
     sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
     return (castToTreeView $ fromJust sidebar)
-
-getActiveEditorTabText :: HC.Context  -> IO String
-getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook ctx
-    currentlyActiveEditor <- getActiveEditorTab ctx
-    text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
-    return $ fromJust text
 
 getNumberOfEditorPages :: HC.Context -> IO Int
 getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook

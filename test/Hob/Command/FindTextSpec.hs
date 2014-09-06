@@ -5,7 +5,8 @@ import Test.Hspec
 
 import Hob.Command
 import Hob.Command.FindText
-import Hob.Ui               (launchNewEditorForText, loadGui)
+import Hob.Command.NewTab   (launchNewEditorForText)
+import Hob.Ui               (loadGui)
 
 import           Data.Maybe
 import           Data.Text                (pack)

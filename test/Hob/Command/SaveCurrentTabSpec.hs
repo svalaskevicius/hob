@@ -10,6 +10,7 @@ import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
 
+import Hob.Command.NewTab
 import Hob.Command.SaveCurrentTab
 import Hob.Ui
 import Test.Hspec
