@@ -11,7 +11,6 @@ import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
 
-import Hob.Command.NewTab
 import Hob.DirectoryTree
 import Hob.Ui
 import Test.Hspec
@@ -57,25 +56,6 @@ spec = do
       name <- widgetGetName $ HC.commandEntry ctx
       name `shouldBe` "commandEntry"
 
-    it "can be focused" $ do
-      ctx <- loadDefaultGui
-      focused <- toggleFocusOnCommandEntryAndReturnState ctx
-      focused `shouldBe` True
-
-    it "focus stays on toggle if there is no editor to focus to" $ do
-      ctx <- loadDefaultGui
-      toggleFocusOnCommandEntry ctx
-      focused <- toggleFocusOnCommandEntryAndReturnState ctx
-      focused `shouldBe` True
-
-    it "focus moves to editor on toggle" $ do
-      ctx <- launchNewFile
-      toggleFocusOnCommandEntry ctx
-      commandFocused <- toggleFocusOnCommandEntryAndReturnState ctx
-      editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
-      commandFocused `shouldBe` False
-      editorFocused `shouldBe` True
-
     it "initially there is no error class applied" $ do
       ctx <- loadDefaultGui
       styleContext <- widgetGetStyleContext $ HC.commandEntry ctx
@@ -104,12 +84,6 @@ spec = do
       entrySetText commandEntry "/asd"
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
-
-launchNewFile :: IO HC.Context
-launchNewFile = do
-    ctx <- loadDefaultGui
-    editNewFile ctx
-    return ctx
 
 activateDirectoryPath :: HC.Context -> TreePath -> IO ()
 activateDirectoryPath ctx path = do
@@ -172,8 +146,3 @@ loadDefaultGuiWithCommandAndItsStyleContext = do
     let commandEntry = HC.commandEntry ctx
     styleContext <- widgetGetStyleContext commandEntry
     return (ctx, commandEntry, styleContext)
-
-toggleFocusOnCommandEntryAndReturnState :: HC.Context -> IO Bool
-toggleFocusOnCommandEntryAndReturnState ctx = do
-    toggleFocusOnCommandEntry ctx
-    widgetGetIsFocus $ HC.commandEntry ctx

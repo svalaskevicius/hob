@@ -2,8 +2,6 @@ module Hob.Ui (loadGui,
                getActiveEditorText,
                getActiveEditorTab,
                getEditorText,
-               saveCurrentEditorTab,
-               toggleFocusOnCommandEntry,
                getActiveEditor) where
 
 import           Control.Monad                        (unless, when, (<=<))
@@ -25,9 +23,10 @@ import Hob.Context.StyleContext
 import Hob.DirectoryTree
 
 import Data.IORef
-import Data.Monoid                 (mconcat)
+import Data.Monoid                   (mconcat)
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
+import Hob.Command.FocusCommandEntry
 import Hob.Command.NewTab
 import Hob.Command.SaveCurrentTab
 
@@ -54,7 +53,7 @@ loadGui fileCtx styleCtx = do
                            (([Control], "w"), closeCurrentEditorTab),
                            (([Control], "s"), saveCurrentEditorTab),
                            (([Control], "n"), editNewFileCommandHandler),
-                           (([], "Escape"), CommandHandler Nothing toggleFocusOnCommandEntry)
+                           (([], "Escape"), toggleFocusOnCommandEntryCommandHandler)
                        ]
         let cmdMatcher = mconcat [
                             CommandMatcher {
@@ -174,16 +173,6 @@ initSideBarFileTree fileCtx treeView launchFile = do
 
         activateRow :: DirectoryTreeElement -> IO ()
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
-
-
-toggleFocusOnCommandEntry :: Context -> IO ()
-toggleFocusOnCommandEntry ctx = do
-    isFocused <- widgetGetIsFocus cmdEntry
-    if isFocused then
-        maybeDo widgetGrabFocus =<< getActiveEditor ctx
-    else
-        widgetGrabFocus cmdEntry
-    where cmdEntry = commandEntry ctx
 
 getActiveEditorText :: Context -> IO (Maybe Text)
 getActiveEditorText ctx = do
