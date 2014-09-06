@@ -43,7 +43,8 @@ import Hob.DirectoryTree
 import System.Glib.GObject
 
 import Data.IORef
-import Data.Monoid          (mconcat)
+import Data.Monoid                 (mconcat)
+import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 
 type NewFileEditorLauncher = FilePath -> IO ()
@@ -69,7 +70,7 @@ loadGui fileCtx styleCtx = do
         builder <- loadUiBuilder
         setGtkStyle styleCtx
         let commands = [
-                           (([Control], "w"), CommandHandler Nothing closeCurrentEditorTab),
+                           (([Control], "w"), closeCurrentEditorTab),
                            (([Control], "s"), CommandHandler Nothing (runWith saveCurrentEditorTab fileChooser)),
                            (([Control], "n"), CommandHandler Nothing editNewFile),
                            (([], "Escape"), CommandHandler Nothing toggleFocusOnCommandEntry)
@@ -262,17 +263,6 @@ launchNewEditorForText ctx targetNotebook filePath text = do
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
         setBufferLanguage _ Nothing = return()
 
-
-closeCurrentEditorTab :: Context -> IO ()
-closeCurrentEditorTab ctx = do
-    currentPage <- notebookGetCurrentPage tabbed
-    nthPage <- notebookGetNthPage tabbed currentPage
-    case nthPage of
-        Just pageContents -> do
-            notebookRemovePage tabbed currentPage
-            widgetDestroy pageContents
-        Nothing -> return ()
-    where tabbed = mainNotebook ctx
 
 editNewFile :: Context -> IO ()
 editNewFile ctx = do

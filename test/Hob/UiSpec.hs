@@ -142,13 +142,6 @@ spec = do
       currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
 
   describe "editor commands" $ do
-    it "closes the currently active editor tab" $ do
-      ctx <- loadStubbedGui
-      launchEditorTab ctx "/xxx/testName.hs"
-      closeCurrentEditorTab ctx
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
-      pagesAfterActivatingDirectory `shouldBe` 0
-
     it "saves the currently active file" $ do
       (mockedWriter, mockReader) <- mockedFileWriter
       sc <- HSC.defaultStyleContext "app-data"
