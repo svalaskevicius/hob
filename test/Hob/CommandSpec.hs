@@ -72,6 +72,21 @@ spec =
                 handledText <- executeMockedMatcher "/" "/"
                 handledText `shouldBe` Just ""
 
+        describe "command matcher for key binding" $ do
+            it "does not match unknown key binding" $ do
+                let matcher = createMatcherForKeyBinding ([Control], "S") emptyHandler
+                let matchedHandler = matchKeyBinding matcher ([Control], "X")
+                isNothing matchedHandler `shouldBe` True
+
+            it "matches known key binding" $ do
+                ctx <- loadDefaultContext
+                (handler, readHandledText) <- recordingHandler
+                let matcher = createMatcherForKeyBinding ([Control], "S") $ handler "test"
+                let matchedHandler = matchKeyBinding matcher ([Control], "S")
+                commandExecute (fromJust matchedHandler) ctx
+                handledText <- readHandledText
+                handledText `shouldBe` Just "test"
+
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
     ctx <- loadDefaultContext

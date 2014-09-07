@@ -47,17 +47,11 @@ loadGui fileCtx styleCtx = do
 
         builder <- loadUiBuilder
         setGtkStyle styleCtx
-        let commands = [
-                           (([Control], "w"), closeCurrentEditorTab),
-                           (([Control], "s"), saveCurrentEditorTab),
-                           (([Control], "n"), editNewFileCommandHandler),
-                           (([], "Escape"), toggleFocusOnCommandEntryCommandHandler)
-                       ]
         let cmdMatcher = mconcat [
-                            CommandMatcher {
-                                matchKeyBinding = findCommandByShortCut commands,
-                                matchCommand = const Nothing
-                            },
+                            createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
+                            createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
+                            createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
+                            createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                             createMatcherForPrefix "/" searchCommandHandler
                         ]
 
@@ -130,8 +124,6 @@ loadGui fileCtx styleCtx = do
                       (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ctx
-        findCommandByShortCut [] _ = Nothing
-        findCommandByShortCut ((s, cmd):xs) shortCut = if s == shortCut then Just cmd else findCommandByShortCut xs shortCut
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

@@ -5,7 +5,8 @@ module Hob.Command (
     KeyboardBinding,
     KeyCommandMatcher,
     TextCommandMatcher,
-    createMatcherForPrefix
+    createMatcherForPrefix,
+    createMatcherForKeyBinding
 ) where
 
 import Data.Maybe      (isJust)
@@ -49,10 +50,16 @@ combineMatcher combiner l r cmd = if isJust rightResult then rightResult else le
           rightResult = combiner r cmd
 
 createMatcherForPrefix :: String -> (String -> CommandHandler) -> CommandMatcher
-createMatcherForPrefix prefix handler = CommandMatcher (const Nothing) (matchHandler prefix handler)
+createMatcherForPrefix prefix handler = CommandMatcher (const Nothing) (matchHandler prefix)
     where
-        matchHandler :: String -> (String -> CommandHandler) -> String -> Maybe CommandHandler
-        matchHandler (p:xs) h (t:xt) = if p == t then matchHandler xs h xt else Nothing
-        matchHandler "" h params = Just $ h params
-        matchHandler _ _ "" = Nothing
+        matchHandler :: String -> String -> Maybe CommandHandler
+        matchHandler (p:xs) (t:xt) = if p == t then matchHandler xs xt else Nothing
+        matchHandler "" params = Just $ handler params
+        matchHandler _ "" = Nothing
+
+createMatcherForKeyBinding :: KeyboardBinding -> CommandHandler -> CommandMatcher
+createMatcherForKeyBinding keyBinding handler = CommandMatcher (matchHandler keyBinding) (const Nothing)
+    where
+        matchHandler :: KeyboardBinding -> KeyboardBinding -> Maybe CommandHandler
+        matchHandler boundKey matchedKey = if boundKey == matchedKey then Just handler else Nothing
 

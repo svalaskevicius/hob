@@ -17,7 +17,7 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
+spec =
   describe "sidebar" $ do
     it "is named" $ do
       ctx <- loadDefaultContext
