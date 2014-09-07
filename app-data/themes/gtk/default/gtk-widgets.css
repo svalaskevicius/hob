@@ -41,7 +41,7 @@
     -GtkWidget-focus-padding: 0;
     -GtkWidget-focus-line-width: 0;
 
-    -GtkWidget-cursor-color: @theme_selected_bg_color;
+    -GtkWidget-cursor-color: white;
 
     outline-offset: -3px;
     /* outline-radius: 4px; unsupported by older gtk */
