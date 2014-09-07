@@ -7,12 +7,8 @@ import Hob.Command
 import Test.Hspec
 
 import Data.IORef
-import Data.Text  (pack)
-import Hob.Ui     (loadGui)
 
-import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HFC
-import qualified Hob.Context.StyleContext as HSC
+import HobTest.Context.Default
 
 main :: IO ()
 main = hspec spec
@@ -78,7 +74,7 @@ spec =
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
-    ctx <- loadDefaultGui
+    ctx <- loadDefaultContext
     (handler, readHandledText) <- recordingHandler
     let matcher = createMatcherForPrefix prefix handler
     let matchedHandler = matchCommand matcher text
@@ -109,18 +105,3 @@ recordingHandler = do
                 \params -> CommandHandler Nothing (\_ -> writeIORef state $ Just params),
                 readIORef state
             )
-
-blackholeFileWriter :: HFC.FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: HFC.FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: HFC.FileLoader
-emptyFileLoader _ = return $ Just $ pack ""
-
-loadDefaultGui :: IO HC.Context
-loadDefaultGui = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-    loadGui fc sc

@@ -1,9 +1,8 @@
 module Hob.Command.SaveCurrentTabSpec (main, spec) where
 
-import Control.Monad.Error (throwError)
 import Data.IORef
 import Data.Maybe
-import Data.Text           (Text, pack)
+import Data.Text       (Text, pack)
 import Graphics.UI.Gtk
 
 import qualified Hob.Context              as HC
@@ -14,6 +13,9 @@ import Hob.Command.NewTab
 import Hob.Command.SaveCurrentTab
 import Hob.Ui
 import Test.Hspec
+
+import HobTest.Context.Default
+import HobTest.Context.Stubbed
 
 main :: IO ()
 main = hspec spec
@@ -67,16 +69,16 @@ spec =
 
 launchFileInContext :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
 launchFileInContext fileCtx styleCtx filename = do
-      ctx <- loadGui fileCtx styleCtx
-      launchEditorTab ctx filename
-      return ctx
+    ctx <- loadGui fileCtx styleCtx
+    launchEditorTab ctx filename
+    return ctx
 
 launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
 launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
-      ctx <- loadGui fileCtx styleCtx
-      editNewFile ctx
-      saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename) ctx
-      return ctx
+    ctx <- loadGui fileCtx styleCtx
+    editNewFile ctx
+    saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename) ctx
+    return ctx
 
 launchEditorTab :: HC.Context -> String -> IO ()
 launchEditorTab ctx file = do
@@ -90,31 +92,13 @@ getActiveEditorTabText ctx = do
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text
 
-failingFileWriter :: HFC.FileWriter
-failingFileWriter _ _ = throwError $ userError "cannot write files stub"
-
 mockedFileWriter :: IO (HFC.FileWriter, IO (Maybe (String, Text)))
 mockedFileWriter = do
     recorder <- newIORef Nothing
     return (curry $ writeIORef recorder . Just, readIORef recorder)
-
-stubbedFileLoader :: HFC.FileLoader
-stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
-stubbedFileLoader "/xxx/cannotRead" = return Nothing
-stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
-stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
 
 stubbedFileChooser :: Maybe FilePath -> NewFileNameChooser
 stubbedFileChooser = return
 
 emptyFileChooser :: NewFileNameChooser
 emptyFileChooser = stubbedFileChooser Nothing
-
-blackholeFileWriter :: HFC.FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: HFC.FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: HFC.FileLoader
-emptyFileLoader _ = return $ Just $ pack ""

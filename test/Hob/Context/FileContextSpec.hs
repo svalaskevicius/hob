@@ -1,9 +1,10 @@
 module Hob.Context.FileContextSpec (main, spec) where
 
-import Data.Text                  (pack)
 import Graphics.UI.Gtk.SourceView (sourceLanguageGetName)
 import Hob.Context.FileContext
 import Test.Hspec
+
+import HobTest.Context.Default
 
 main :: IO ()
 main = hspec spec
@@ -20,11 +21,3 @@ spec =
 stubbedCtx :: IO FileContext
 stubbedCtx = defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
 
-blackholeFileWriter :: FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: FileLoader
-emptyFileLoader _ = return $ Just $ pack ""

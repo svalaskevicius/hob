@@ -5,15 +5,14 @@ import Test.Hspec
 
 import Hob.Command
 import Hob.Command.FindText
-import Hob.Ui               (loadGui)
 import Hob.Ui.Editor        (newEditorForText)
 
 import           Data.Maybe
-import           Data.Text                (pack)
+import           Data.Text       (pack)
 import           Graphics.UI.Gtk
-import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HFC
-import qualified Hob.Context.StyleContext as HSC
+import qualified Hob.Context     as HC
+
+import HobTest.Context.Default
 
 main :: IO ()
 main = hspec spec
@@ -58,7 +57,7 @@ spec =
       (start, end) `shouldBe` (0, 4)
 
     it "scrolls to the current match on execute" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       let notebook = HC.mainNotebook ctx
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
       editor <- newEditorForText ctx notebook Nothing $ pack editorText
@@ -72,24 +71,9 @@ spec =
       isRectangleInside visible cursor `shouldBe` True
 
 
-blackholeFileWriter :: HFC.FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: HFC.FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: HFC.FileLoader
-emptyFileLoader _ = return $ Just $ pack ""
-
-loadDefaultGui :: IO HC.Context
-loadDefaultGui = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-    loadGui fc sc
-
 loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndPreviewSearch = do
-    ctx <- loadDefaultGui
+    ctx <- loadDefaultContext
     let notebook = HC.mainNotebook ctx
     editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text!"
     (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") ctx

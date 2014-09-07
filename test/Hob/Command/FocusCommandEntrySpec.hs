@@ -1,18 +1,17 @@
 module Hob.Command.FocusCommandEntrySpec (main, spec) where
 
 import Data.Maybe
-import Data.Text       (pack)
 import Graphics.UI.Gtk
 
-import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HFC
-import qualified Hob.Context.StyleContext as HSC
+import qualified Hob.Context as HC
 
 import Hob.Command
 import Hob.Command.FocusCommandEntry
 import Hob.Command.NewTab
 import Hob.Ui
 import Test.Hspec
+
+import HobTest.Context.Default
 
 main :: IO ()
 main = hspec spec
@@ -21,12 +20,12 @@ spec :: Spec
 spec =
   describe "focus command entry command" $ do
     it "focuses the command entry" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       focused <- toggleFocusOnCommandEntryAndReturnState ctx
       focused `shouldBe` True
 
     it "focus stays on toggle if there is no editor to focus to" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       commandExecute toggleFocusOnCommandEntryCommandHandler ctx
       focused <- toggleFocusOnCommandEntryAndReturnState ctx
       focused `shouldBe` True
@@ -41,24 +40,9 @@ spec =
 
 launchNewFile :: IO HC.Context
 launchNewFile = do
-    ctx <- loadDefaultGui
+    ctx <- loadDefaultContext
     editNewFile ctx
     return ctx
-
-blackholeFileWriter :: HFC.FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: HFC.FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: HFC.FileLoader
-emptyFileLoader _ = return $ Just $ pack ""
-
-loadDefaultGui :: IO HC.Context
-loadDefaultGui = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-    loadGui fc sc
 
 toggleFocusOnCommandEntryAndReturnState :: HC.Context -> IO Bool
 toggleFocusOnCommandEntryAndReturnState ctx = do

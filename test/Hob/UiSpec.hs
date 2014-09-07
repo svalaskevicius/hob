@@ -1,19 +1,17 @@
 module Hob.UiSpec (main, spec) where
 
-import Control.Monad.Error                  (throwError)
 import Data.Maybe
-import Data.Text                            (pack, unpack)
-import Data.Tree
+import Data.Text                            (unpack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
 
-import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HFC
-import qualified Hob.Context.StyleContext as HSC
+import qualified Hob.Context as HC
 
-import Hob.DirectoryTree
 import Hob.Ui
 import Test.Hspec
+
+import HobTest.Context.Default
+import HobTest.Context.Stubbed
 
 main :: IO ()
 main = hspec spec
@@ -22,48 +20,48 @@ spec :: Spec
 spec = do
   describe "mainWindow" $
     it "is named" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       name <- widgetGetName $ HC.mainWindow ctx
       name `shouldBe` "mainWindow"
 
   describe "sidebar" $ do
     it "is named" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       name <- widgetGetName =<< getDirectoryListingSidebar ctx
       name `shouldBe` "directoryListing"
 
     it "opens a file editor" $ do
-      ctx <- loadStubbedGui
+      ctx <- loadStubbedContext
       activateDirectoryPath ctx [1]
       editorText <- getActiveEditorText ctx
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 
     it "does not open a file editor for directory" $ do
-      ctx <- loadStubbedGui
+      ctx <- loadStubbedContext
       activateDirectoryPath ctx [0]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 
     it "does not open a file editor for files it cannot read" $ do
-      ctx <- loadStubbedGui
+      ctx <- loadStubbedContext
       activateDirectoryPath ctx [2]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 
   describe "command entry" $ do
     it "is named" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       name <- widgetGetName $ HC.commandEntry ctx
       name `shouldBe` "commandEntry"
 
     it "initially there is no error class applied" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       styleContext <- widgetGetStyleContext $ HC.commandEntry ctx
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
 
     it "applies error style class if the command is unknown" $ do
-      ctx <- loadDefaultGui
+      ctx <- loadDefaultContext
       let commandEntry = HC.commandEntry ctx
       entrySetText commandEntry "qweqwe"
       styleContext <- widgetGetStyleContext commandEntry
@@ -102,47 +100,9 @@ getDirectoryListingSidebar ctx = do
 getNumberOfEditorPages :: HC.Context -> IO Int
 getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook
 
-
-fileTreeStub :: IO (Forest DirectoryTreeElement)
-fileTreeStub = return [
-    Node (DirectoryTreeElement "a" "/xxx/a" True) [
-        Node (DirectoryTreeElement "b" "/xxx/a/b" False) []],
-    Node (DirectoryTreeElement "c" "/xxx/c" False) [],
-    Node (DirectoryTreeElement "-" "/xxx/cannotRead" False) []]
-
-failingFileWriter :: HFC.FileWriter
-failingFileWriter _ _ = throwError $ userError "cannot write files stub"
-
-stubbedFileLoader :: HFC.FileLoader
-stubbedFileLoader "/xxx/c" = return $ Just $ pack "file contents for /xxx/c"
-stubbedFileLoader "/xxx/cannotRead" = return Nothing
-stubbedFileLoader "/xxx/testName.hs" = return $ Just $ pack "file contents for /xxx/testName.hs"
-stubbedFileLoader path = throwError $ userError $ "cannot open unknown file: "++path
-
-blackholeFileWriter :: HFC.FileWriter
-blackholeFileWriter _ _ = return ()
-
-emptyFileTree :: HFC.FileTreeLoader
-emptyFileTree = return []
-
-emptyFileLoader :: HFC.FileLoader
-emptyFileLoader _ = return $ Just $ pack ""
-
-loadDefaultGui :: IO HC.Context
-loadDefaultGui = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext emptyFileLoader blackholeFileWriter emptyFileTree
-    loadGui fc sc
-
-loadStubbedGui :: IO HC.Context
-loadStubbedGui = do
-    sc <- HSC.defaultStyleContext "app-data"
-    fc <- HFC.defaultFileContext stubbedFileLoader failingFileWriter fileTreeStub
-    loadGui fc sc
-
 loadDefaultGuiWithCommandAndItsStyleContext :: IO (HC.Context, Entry, StyleContext)
 loadDefaultGuiWithCommandAndItsStyleContext = do
-    ctx <- loadDefaultGui
+    ctx <- loadDefaultContext
     let commandEntry = HC.commandEntry ctx
     styleContext <- widgetGetStyleContext commandEntry
     return (ctx, commandEntry, styleContext)
