@@ -1,36 +1,18 @@
 module Hob.Command.NewTab (
-            launchNewEditorForText,
             launchNewFileEditor,
             editNewFile,
             editNewFileCommandHandler,
             NewFileEditorLauncher) where
 
 
-import Control.Monad              (filterM, (<=<))
-import Data.Maybe                 (mapMaybe)
-import Data.Text                  (Text, pack)
+import Control.Monad   (filterM, (<=<))
+import Data.Maybe      (mapMaybe)
+import Data.Text       (pack)
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
-                                   sourceBufferBeginNotUndoableAction,
-                                   sourceBufferEndNotUndoableAction,
-                                   sourceBufferNew,
-                                   sourceBufferSetHighlightSyntax,
-                                   sourceBufferSetLanguage,
-                                   sourceBufferSetStyleScheme,
-                                   sourceViewNewWithBuffer,
-                                   sourceViewSetAutoIndent,
-                                   sourceViewSetDrawSpaces,
-                                   sourceViewSetHighlightCurrentLine,
-                                   sourceViewSetIndentOnTab,
-                                   sourceViewSetIndentWidth,
-                                   sourceViewSetInsertSpacesInsteadOfTabs,
-                                   sourceViewSetShowLineNumbers,
-                                   sourceViewSetTabWidth)
 
 import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
-import Hob.Context.StyleContext
 import Hob.Control
 import Hob.Ui.Editor
 
@@ -49,7 +31,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
     where launchEditor text = do
-              _ <- launchNewEditorForText ctx targetNotebook (Just filePath) text
+              _ <- newEditorForText ctx targetNotebook (Just filePath) text
               return ()
           isEditorFileMatching editor = do
               f <- getEditorFilePath editor
@@ -57,52 +39,9 @@ launchNewFileEditor ctx targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-launchNewEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
-launchNewEditorForText ctx targetNotebook filePath text = do
-    buffer <- sourceBufferNew Nothing
-    maybeDo (setBufferLanguage buffer <=< sourceLanguage (fileContext ctx)) filePath
-
-    sourceBufferBeginNotUndoableAction buffer
-    textBufferSetText buffer text
-    textBufferSetModified buffer False
-    sourceBufferEndNotUndoableAction buffer
-
-    sourceBufferSetStyleScheme buffer =<< sourceStyleScheme (styleContext ctx) filePath
-
-    editor <- sourceViewNewWithBuffer buffer
-    sourceViewSetShowLineNumbers editor True
-    sourceViewSetAutoIndent editor True
-    sourceViewSetIndentOnTab editor True
-    sourceViewSetIndentWidth editor 4
-    sourceViewSetTabWidth editor 4
-    sourceViewSetInsertSpacesInsteadOfTabs editor True
-    sourceViewSetHighlightCurrentLine editor True
-    sourceViewSetDrawSpaces editor SourceDrawSpacesTrailing
-
-    scrolledWindow <- scrolledWindowNew Nothing Nothing
-    scrolledWindow `containerAdd` editor
-
-    widgetModifyFont editor =<< sourceStyleFont (styleContext ctx) filePath
-
-    widgetShowAll scrolledWindow
-    tabNr <- notebookAppendPage targetNotebook scrolledWindow title
-    notebookSetCurrentPage targetNotebook tabNr
-    notebookSetShowTabs targetNotebook True
-
-    _ <- buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
-
-    setEditorFilePath editor filePath
-
-    return editor
-    where
-        title = tabTitle filePath
-        setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
-        setBufferLanguage _ Nothing = return()
-
-
 editNewFile :: Context -> IO ()
 editNewFile ctx = do
-    _ <- launchNewEditorForText ctx tabbed Nothing $ pack ""
+    _ <- newEditorForText ctx tabbed Nothing $ pack ""
     return ()
     where tabbed = mainNotebook ctx
 

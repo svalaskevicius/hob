@@ -5,8 +5,8 @@ import Test.Hspec
 
 import Hob.Command
 import Hob.Command.FindText
-import Hob.Command.NewTab   (launchNewEditorForText)
 import Hob.Ui               (loadGui)
+import Hob.Ui.Editor        (newEditorForText)
 
 import           Data.Maybe
 import           Data.Text                (pack)
@@ -61,7 +61,7 @@ spec =
       ctx <- loadDefaultGui
       let notebook = HC.mainNotebook ctx
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
-      editor <- launchNewEditorForText ctx notebook Nothing $ pack editorText
+      editor <- newEditorForText ctx notebook Nothing $ pack editorText
       processGtkEvents
       commandExecute (searchCommandHandler "customised search string at the end") ctx
       processGtkEvents
@@ -91,7 +91,7 @@ loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultGui
     let notebook = HC.mainNotebook ctx
-    editor <- launchNewEditorForText ctx notebook Nothing $ pack "text - initial text!"
+    editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text!"
     (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") ctx
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)

@@ -1,23 +1,84 @@
 module Hob.Ui.Editor (
+               newEditorForText,
                getActiveEditorText,
                getActiveEditorTab,
-               getEditorText,
                getActiveEditor,
-               updateEditorTitle,
+               getEditorText,
+               getEditorFilePath,
                setEditorFilePath,
                getEditorFromNotebookTab,
-               tabTitleForEditor,
-               getEditorFilePath,
-               tabTitle) where
+               updateEditorTitle
+               ) where
 
 import Control.Monad              ((<=<))
 import Data.Text                  (Text)
 import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView, castToSourceView)
+import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
+                                   castToSourceView,
+                                   sourceBufferBeginNotUndoableAction,
+                                   sourceBufferEndNotUndoableAction,
+                                   sourceBufferNew,
+                                   sourceBufferSetHighlightSyntax,
+                                   sourceBufferSetLanguage,
+                                   sourceBufferSetStyleScheme,
+                                   sourceViewNewWithBuffer,
+                                   sourceViewSetAutoIndent,
+                                   sourceViewSetDrawSpaces,
+                                   sourceViewSetHighlightCurrentLine,
+                                   sourceViewSetIndentOnTab,
+                                   sourceViewSetIndentWidth,
+                                   sourceViewSetInsertSpacesInsteadOfTabs,
+                                   sourceViewSetShowLineNumbers,
+                                   sourceViewSetTabWidth)
 import System.Glib.GObject
 
 import Hob.Context
+import Hob.Context.FileContext
+import Hob.Context.StyleContext
+import Hob.Control
+
+newEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
+newEditorForText ctx targetNotebook filePath text = do
+    buffer <- sourceBufferNew Nothing
+    maybeDo (setBufferLanguage buffer <=< sourceLanguage (fileContext ctx)) filePath
+
+    sourceBufferBeginNotUndoableAction buffer
+    textBufferSetText buffer text
+    textBufferSetModified buffer False
+    sourceBufferEndNotUndoableAction buffer
+
+    sourceBufferSetStyleScheme buffer =<< sourceStyleScheme (styleContext ctx) filePath
+
+    editor <- sourceViewNewWithBuffer buffer
+    sourceViewSetShowLineNumbers editor True
+    sourceViewSetAutoIndent editor True
+    sourceViewSetIndentOnTab editor True
+    sourceViewSetIndentWidth editor 4
+    sourceViewSetTabWidth editor 4
+    sourceViewSetInsertSpacesInsteadOfTabs editor True
+    sourceViewSetHighlightCurrentLine editor True
+    sourceViewSetDrawSpaces editor SourceDrawSpacesTrailing
+
+    scrolledWindow <- scrolledWindowNew Nothing Nothing
+    scrolledWindow `containerAdd` editor
+
+    widgetModifyFont editor =<< sourceStyleFont (styleContext ctx) filePath
+
+    widgetShowAll scrolledWindow
+    tabNr <- notebookAppendPage targetNotebook scrolledWindow title
+    notebookSetCurrentPage targetNotebook tabNr
+    notebookSetShowTabs targetNotebook True
+
+    _ <- buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
+
+    setEditorFilePath editor filePath
+
+    return editor
+    where
+        title = tabTitleForFile filePath
+        setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
+        setBufferLanguage _ Nothing = return()
 
 
 getActiveEditorText :: Context -> IO (Maybe Text)
@@ -51,13 +112,10 @@ getActiveEditorTab ctx = do
         return $ Just $ tabs!!pageNum
     where tabbed = mainNotebook ctx
 
-fileNameQuark :: IO Quark
-fileNameQuark = quarkFromString "fileName"
-
-tabTitle :: Maybe FilePath -> String
-tabTitle (Just filePath) = filename' filePath
+tabTitleForFile :: Maybe FilePath -> String
+tabTitleForFile (Just filePath) = filename' filePath
     where filename' = encodeString . filename . decodeString
-tabTitle Nothing = "(new file)"
+tabTitleForFile Nothing = "(new file)"
 
 tabTitleForEditor :: SourceView -> IO String
 tabTitleForEditor editor = do
@@ -65,7 +123,7 @@ tabTitleForEditor editor = do
     filePath <- objectGetAttributeUnsafe quark editor
     buffer <- textViewGetBuffer editor
     modified <- buffer `get` textBufferModified
-    return $ if modified then tabTitle filePath ++ "*" else tabTitle filePath
+    return $ if modified then tabTitleForFile filePath ++ "*" else tabTitleForFile filePath
 
 setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
 setEditorFilePath editor filePath = do
@@ -83,3 +141,7 @@ updateEditorTitle editor = do
     Just notebookW <- widgetGetParent scrolledW
     let notebook = castToNotebook notebookW
     notebookSetTabLabelText notebook scrolledW =<< tabTitleForEditor editor
+
+fileNameQuark :: IO Quark
+fileNameQuark = quarkFromString "fileName"
+

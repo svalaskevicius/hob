@@ -2,12 +2,10 @@ module Hob.Command.NewTabSpec (main, spec) where
 
 import Test.Hspec
 
-import Control.Monad.Error        (throwError)
-import Data.Maybe
-import Data.Text                  (pack, unpack)
+import Control.Monad.Error (throwError)
+import Data.Text           (pack)
 import Data.Tree
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (castToSourceBuffer, sourceBufferUndo)
 
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
@@ -24,25 +22,10 @@ main = hspec spec
 spec :: Spec
 spec =
   describe "new tab command" $ do
-    it "does not allow to undo the intial loaded source" $ do
-      ctx <- loadDefaultGui
-      let notebook = HC.mainNotebook ctx
-      editor <- launchNewEditorForText ctx notebook Nothing $ pack "initial text"
-      buffer <- textViewGetBuffer editor
-      sourceBufferUndo $ castToSourceBuffer buffer
-      editorText <- getEditorText editor
-      unpack editorText `shouldBe` "initial text"
-
-    it "sets the tab title when opening a file" $ do
-      ctx <- loadStubbedGui
-      launchEditorTab ctx "/xxx/testName.hs"
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "testName.hs"
-
-    it "updates the tab title to reflect if buffer is modified" $ do
-      ctx <- launchNewFileAndSetModified
-      tabText <- getActiveEditorTabText ctx
-      tabText `shouldBe` "testName.hs*"
+    it "creates a new unnamed file" $ do
+      ctx <- launchNewFile
+      pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
+      pagesAfterActivatingDirectory `shouldBe` 1
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
       ctx <- loadStubbedGui
@@ -57,11 +40,6 @@ spec =
       pagesAfterOpeningExistingFile `shouldBe` pagesBeforeOpeningExistingFile
       currentPageAfterLoadingTheFirstLoadedFile `shouldBe` currentPageOfFirstLoadedFile
 
-    it "creates a new unnamed file" $ do
-      ctx <- launchNewFile
-      pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
-      pagesAfterActivatingDirectory `shouldBe` 1
-
 
 launchNewFile :: IO HC.Context
 launchNewFile = do
@@ -69,25 +47,10 @@ launchNewFile = do
     commandExecute editNewFileCommandHandler ctx
     return ctx
 
-launchNewFileAndSetModified :: IO HC.Context
-launchNewFileAndSetModified = do
-    ctx <- loadStubbedGui
-    launchEditorTab ctx "/xxx/testName.hs"
-    buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
-    textBufferSetModified buffer True
-    return ctx
-
 launchEditorTab :: HC.Context -> String -> IO ()
 launchEditorTab ctx file = do
     let notebook = HC.mainNotebook ctx
     launchNewFileEditor ctx notebook file
-
-getActiveEditorTabText :: HC.Context  -> IO String
-getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook ctx
-    currentlyActiveEditor <- getActiveEditorTab ctx
-    text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
-    return $ fromJust text
 
 getNumberOfEditorPages :: HC.Context -> IO Int
 getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook
