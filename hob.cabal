@@ -35,7 +35,7 @@ executable hob
     hs-source-dirs: src
 
 library
-    Exposed-modules:     Hob.Ui, Hob.DirectoryTree,
+    Exposed-modules:     Hob.Ui, Hob.DirectoryTree, Hob.Control,
                          Hob.Command, Hob.Command.FindText, Hob.Command.CloseCurrentTab,
                          Hob.Command.SaveCurrentTab, Hob.Command.NewTab, Hob.Command.FocusCommandEntry,
                          Hob.Context, Hob.Context.StyleContext, Hob.Context.FileContext

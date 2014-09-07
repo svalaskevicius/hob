@@ -11,6 +11,7 @@ module Hob.Command (
 import Data.Maybe      (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk (Modifier)
+
 import Hob.Context
 
 data PreviewCommandHandler = PreviewCommandHandler {

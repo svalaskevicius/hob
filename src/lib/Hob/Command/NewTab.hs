@@ -28,13 +28,13 @@ import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
                                    sourceViewSetInsertSpacesInsteadOfTabs,
                                    sourceViewSetShowLineNumbers,
                                    sourceViewSetTabWidth)
+import System.Glib.GObject
 
 import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
-import System.Glib.GObject
-
+import Hob.Control
 
 type NewFileEditorLauncher = FilePath -> IO ()
 
@@ -146,6 +146,3 @@ liftTupledMaybe (_, Nothing) = Nothing
 
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
-
-maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
-maybeDo = maybe (return())

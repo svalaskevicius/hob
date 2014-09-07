@@ -4,18 +4,17 @@ module Hob.Command.SaveCurrentTab (
         saveCurrentEditorTabHandler) where
 
 
+import Control.Monad              ((<=<))
+import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView, castToSourceView)
+import System.Glib.GObject
 
 import Hob.Command
 import Hob.Context
-
-
-import Control.Monad              ((<=<))
-import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
-import Graphics.UI.Gtk.SourceView (SourceView, castToSourceView)
-
 import Hob.Context.FileContext
-import System.Glib.GObject
+import Hob.Control
+
 
 type NewFileNameChooser = IO (Maybe FilePath)
 
@@ -102,6 +101,3 @@ setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
 setEditorFilePath editor filePath = do
     quark <- fileNameQuark
     objectSetAttribute quark editor filePath
-
-maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
-maybeDo = maybe (return())

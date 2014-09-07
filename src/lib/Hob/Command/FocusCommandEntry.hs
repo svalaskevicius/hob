@@ -7,7 +7,7 @@ import Graphics.UI.Gtk.SourceView (SourceView, castToSourceView)
 
 import Hob.Command
 import Hob.Context
-
+import Hob.Control
 
 toggleFocusOnCommandEntryCommandHandler :: CommandHandler
 toggleFocusOnCommandEntryCommandHandler = CommandHandler Nothing toggleFocusOnCommandEntry
@@ -41,6 +41,3 @@ getActiveEditorTab ctx = do
         tabs <- containerGetChildren tabbed
         return $ Just $ tabs!!pageNum
     where tabbed = mainNotebook ctx
-
-maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
-maybeDo = maybe (return())

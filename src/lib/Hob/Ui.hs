@@ -6,8 +6,10 @@ module Hob.Ui (loadGui,
 
 import           Control.Monad                        (unless, when, (<=<))
 import           Control.Monad.Trans                  (liftIO)
+import           Data.IORef
 import           Data.Maybe                           (fromJust, isJust,
                                                        isNothing)
+import           Data.Monoid                          (mconcat)
 import           Data.Text                            (Text, unpack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
@@ -17,18 +19,16 @@ import           Graphics.UI.Gtk.SourceView           (SourceView,
                                                        castToSourceView)
 
 import Hob.Command
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.DirectoryTree
-
-import Data.IORef
-import Data.Monoid                   (mconcat)
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
 import Hob.Command.NewTab
 import Hob.Command.SaveCurrentTab
+import Hob.Context
+import Hob.Context.FileContext
+import Hob.Context.StyleContext
+import Hob.Control
+import Hob.DirectoryTree
 
 -- add command, dispatch and clear
 commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
@@ -204,6 +204,3 @@ getActiveEditorTab ctx = do
         tabs <- containerGetChildren tabbed
         return $ Just $ tabs!!pageNum
     where tabbed = mainNotebook ctx
-
-maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
-maybeDo = maybe (return())
