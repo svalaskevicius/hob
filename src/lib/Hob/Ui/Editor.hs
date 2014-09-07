@@ -119,8 +119,7 @@ tabTitleForFile Nothing = "(new file)"
 
 tabTitleForEditor :: SourceView -> IO String
 tabTitleForEditor editor = do
-    quark <- fileNameQuark
-    filePath <- objectGetAttributeUnsafe quark editor
+    filePath <- getEditorFilePath editor
     buffer <- textViewGetBuffer editor
     modified <- buffer `get` textBufferModified
     return $ if modified then tabTitleForFile filePath ++ "*" else tabTitleForFile filePath
