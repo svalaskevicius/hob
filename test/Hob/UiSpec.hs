@@ -12,7 +12,7 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
+spec =
   describe "mainWindow" $
     it "is named" $ do
       ctx <- loadDefaultContext

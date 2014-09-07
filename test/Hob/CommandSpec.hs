@@ -1,12 +1,11 @@
 module Hob.CommandSpec (main, spec) where
 
+import Data.IORef
 import Data.Maybe      (fromJust, isNothing)
 import Data.Monoid
 import Graphics.UI.Gtk (Modifier (..))
 import Hob.Command
 import Test.Hspec
-
-import Data.IORef
 
 import HobTest.Context.Default
 
