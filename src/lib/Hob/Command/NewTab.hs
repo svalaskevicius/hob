@@ -9,10 +9,8 @@ module Hob.Command.NewTab (
 import Control.Monad              (filterM, (<=<))
 import Data.Maybe                 (mapMaybe)
 import Data.Text                  (Text, pack)
-import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
-                                   castToSourceView,
                                    sourceBufferBeginNotUndoableAction,
                                    sourceBufferEndNotUndoableAction,
                                    sourceBufferNew,
@@ -28,13 +26,13 @@ import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
                                    sourceViewSetInsertSpacesInsteadOfTabs,
                                    sourceViewSetShowLineNumbers,
                                    sourceViewSetTabWidth)
-import System.Glib.GObject
 
 import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
 import Hob.Control
+import Hob.Ui.Editor
 
 type NewFileEditorLauncher = FilePath -> IO ()
 
@@ -54,8 +52,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
               _ <- launchNewEditorForText ctx targetNotebook (Just filePath) text
               return ()
           isEditorFileMatching editor = do
-              quark <- fileNameQuark
-              f <- objectGetAttributeUnsafe quark editor
+              f <- getEditorFilePath editor
               return $ maybe False (filePath ==) f
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
@@ -108,37 +105,6 @@ editNewFile ctx = do
     _ <- launchNewEditorForText ctx tabbed Nothing $ pack ""
     return ()
     where tabbed = mainNotebook ctx
-
-
-
-fileNameQuark :: IO Quark
-fileNameQuark = quarkFromString "fileName"
-
-getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
-getEditorFromNotebookTab currentlyActiveEditor =
-    if currentlyActiveEditor `isA` gTypeScrolledWindow then do
-        let textEditScroller = castToScrolledWindow currentlyActiveEditor
-        textEdit <- binGetChild textEditScroller
-        return $ fmap castToSourceView textEdit
-    else return Nothing
-
-tabTitle :: Maybe FilePath -> String
-tabTitle (Just filePath) = filename' filePath
-    where filename' = encodeString . filename . decodeString
-tabTitle Nothing = "(new file)"
-
-tabTitleForEditor :: SourceView -> IO String
-tabTitleForEditor editor = do
-    quark <- fileNameQuark
-    filePath <- objectGetAttributeUnsafe quark editor
-    buffer <- textViewGetBuffer editor
-    modified <- buffer `get` textBufferModified
-    return $ if modified then tabTitle filePath ++ "*" else tabTitle filePath
-
-setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
-setEditorFilePath editor filePath = do
-    quark <- fileNameQuark
-    objectSetAttribute quark editor filePath
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)

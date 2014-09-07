@@ -4,19 +4,17 @@ module Hob.Ui (loadGui,
                getEditorText,
                getActiveEditor) where
 
-import           Control.Monad                        (unless, when, (<=<))
+import           Control.Monad                        (unless, when)
 import           Control.Monad.Trans                  (liftIO)
 import           Data.IORef
 import           Data.Maybe                           (fromJust, isJust,
                                                        isNothing)
 import           Data.Monoid                          (mconcat)
-import           Data.Text                            (Text, unpack)
+import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           Graphics.UI.Gtk.ModelView            as Mv
-import           Graphics.UI.Gtk.SourceView           (SourceView,
-                                                       castToSourceView)
 
 import Hob.Command
 import Hob.Command.CloseCurrentTab
@@ -29,6 +27,7 @@ import Hob.Context.FileContext
 import Hob.Context.StyleContext
 import Hob.Control
 import Hob.DirectoryTree
+import Hob.Ui.Editor
 
 -- add command, dispatch and clear
 commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
@@ -173,34 +172,3 @@ initSideBarFileTree fileCtx treeView launchFile = do
 
         activateRow :: DirectoryTreeElement -> IO ()
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
-
-getActiveEditorText :: Context -> IO (Maybe Text)
-getActiveEditorText ctx = do
-    editor <- getActiveEditor ctx
-    maybe (return Nothing) ((return . Just) <=< getEditorText) editor
-
-getEditorText :: TextViewClass a => a -> IO Text
-getEditorText textEdit = do
-    textBuf <- textViewGetBuffer textEdit
-    get textBuf textBufferText
-
-getActiveEditor :: Context -> IO (Maybe SourceView)
-getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
-
-getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
-getEditorFromNotebookTab currentlyActiveEditor =
-    if currentlyActiveEditor `isA` gTypeScrolledWindow then do
-        let textEditScroller = castToScrolledWindow currentlyActiveEditor
-        textEdit <- binGetChild textEditScroller
-        return $ fmap castToSourceView textEdit
-    else return Nothing
-
-getActiveEditorTab :: Context -> IO (Maybe Widget)
-getActiveEditorTab ctx = do
-    pageNum <- notebookGetCurrentPage tabbed
-    if pageNum < 0 then
-        return Nothing
-    else do
-        tabs <- containerGetChildren tabbed
-        return $ Just $ tabs!!pageNum
-    where tabbed = mainNotebook ctx
