@@ -4,7 +4,7 @@ module Hob.Ui (loadGui,
                getEditorText,
                getActiveEditor) where
 
-import           Control.Monad                        (unless, when)
+import           Control.Monad                        (when)
 import           Control.Monad.Trans                  (liftIO)
 import           Data.IORef
 import           Data.Maybe                           (fromJust, isJust,
@@ -14,7 +14,6 @@ import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
-import           Graphics.UI.Gtk.ModelView            as Mv
 
 import Hob.Command
 import Hob.Command.CloseCurrentTab
@@ -26,8 +25,8 @@ import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
 import Hob.Control
-import Hob.DirectoryTree
 import Hob.Ui.Editor
+import Hob.Ui.Sidebar
 
 -- add command, dispatch and clear
 commandPreviewPreviewState :: IO (PreviewCommandHandler -> IO(), Context -> IO())
@@ -75,7 +74,7 @@ loadGui fileCtx styleCtx = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            initSideBarFileTree fileCtx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
+            newSideBarFileTree fileCtx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
         initCommandEntry ctx builder cmdMatcher = do
             cmdEntry <- builderGetObject builder castToEntry "command"
             widgetSetName cmdEntry "commandEntry"
@@ -140,35 +139,3 @@ setGtkStyle styleCtx = do
     cssProviderLoadFromPath cssProvider $ uiTheme styleCtx
     maybe (return()) (\screen -> GtkSc.styleContextAddProviderForScreen screen cssProvider 800) =<< screenGetDefault
 
-
-initSideBarFileTree :: FileContext -> TreeView -> NewFileEditorLauncher -> IO ()
-initSideBarFileTree fileCtx treeView launchFile = do
-    let fileTreeLoader = contextFileTreeLoader fileCtx
-    treeModel <- treeStoreNew =<< fileTreeLoader
-    customStoreSetColumn treeModel (makeColumnIdString 0) elementLabel
-
-    col <- treeViewColumnNew
-
-    rend <- Mv.cellRendererTextNew
-    Mv.cellLayoutPackStart col rend True
-    Mv.cellLayoutSetAttributes col rend treeModel (\v -> [Mv.cellText := elementLabel v])
-
-    _ <- treeViewAppendColumn treeView col
-
-    treeViewSetHeadersVisible treeView False
-    treeViewSetModel treeView treeModel
-
-    treeViewSetSearchColumn treeView searchCol
-
-
-    _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
-    _ <- treeView `on` rowActivated $ \ path _ -> activateRow =<< treeStoreGetValue treeModel path
-
-    return ()
-
-    where
-        searchCol :: ColumnId row String
-        searchCol = makeColumnIdString 0
-
-        activateRow :: DirectoryTreeElement -> IO ()
-        activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
