@@ -1,20 +1,16 @@
 module Main (main) where
 
-import           Control.Monad       (forM)
 import           Control.Monad.Trans (liftIO)
 import qualified Data.ByteString     as BS
-import           Data.Text           (Text (..))
 import qualified Data.Text.Encoding  as E
-import           Data.Tree
 import           Graphics.UI.Gtk
 import           System.Directory
 import           System.Environment  (getArgs)
-import           System.FilePath
 import           System.IO           (hPutStr, stderr)
 
 import Hob.Context
-import Hob.Context.FileContext  (FileLoader (..), FileTreeLoader (..),
-                                 FileWriter (..), defaultFileContext)
+import Hob.Context.FileContext  (FileLoader, FileTreeLoader, FileWriter,
+                                 defaultFileContext)
 import Hob.Context.StyleContext (defaultStyleContext)
 import Hob.DirectoryTree
 import Hob.Ui
@@ -23,10 +19,10 @@ import Paths_hob
 
 main :: IO ()
 main = do
-    fileContext <- getFileContext
-    styleContext <- getStyleContext
-    ctx <- loadGui fileContext styleContext
-    _ <- (mainWindow ctx) `on` deleteEvent $ liftIO mainQuit >> return False
+    fileCtx <- getFileContext
+    styleCtx <- getStyleContext
+    ctx <- loadGui fileCtx styleCtx
+    _ <- mainWindow ctx `on` deleteEvent $ liftIO mainQuit >> return False
     widgetShowAll $ mainWindow ctx
     mainGUI
     where

@@ -2,9 +2,7 @@ module Hob.Context (
     Context(..)
 ) where
 
-import Control.Monad   (liftM)
-import System.FilePath (FilePath (..), (</>))
-import Graphics.UI.Gtk (Window, Notebook, Entry)
+import Graphics.UI.Gtk (Entry, Notebook, Window)
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext

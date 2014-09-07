@@ -7,13 +7,11 @@ module Hob.Context.FileContext (
     sourceLanguage
 ) where
 
-import Control.Monad              (liftM)
 import Data.Text                  (Text)
 import Data.Tree                  (Forest)
 import Graphics.UI.Gtk.SourceView (SourceLanguage, SourceLanguageManager,
                                    sourceLanguageManagerGuessLanguage,
                                    sourceLanguageManagerNew)
-import System.FilePath            (FilePath (..), (</>))
 
 import Hob.DirectoryTree
 

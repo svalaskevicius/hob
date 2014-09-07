@@ -1,0 +1,99 @@
+module Hob.Ui.EditorSpec (main, spec) where
+
+import Test.Hspec
+
+import Data.Maybe
+import Data.Text                  (pack, unpack)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
+                                   sourceBufferUndo)
+
+import qualified Hob.Context   as HC
+import           Hob.Ui
+import           Hob.Ui.Editor
+
+import HobTest.Context.Default
+
+main :: IO ()
+main = hspec spec
+
+spec :: Spec
+spec =
+  describe "editor ui" $ do
+    it "does not allow to undo the intial loaded source" $ do
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      buffer <- textViewGetBuffer editor
+      sourceBufferUndo $ castToSourceBuffer buffer
+      editorText <- getEditorText editor
+      unpack editorText `shouldBe` "initial text"
+
+    it "sets the tab title when opening a file" $ do
+      ctx <- loadDefaultContext
+      _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      tabText <- getActiveEditorTabText ctx
+      tabText `shouldBe` "testName.hs"
+
+    it "updates the tab title to reflect if buffer is modified" $ do
+      ctx <- launchNewFileAndSetModified
+      tabText <- getActiveEditorTabText ctx
+      tabText `shouldBe` "testName.hs*"
+
+    it "retrieves active editor" $ do
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      activeEditor <- getActiveEditor ctx
+      fromJust activeEditor == editor `shouldBe` True
+
+    it "retrieves editor text" $ do
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      text <- getEditorText editor
+      text `shouldBe` pack "initial text"
+
+    it "retrieves active editor text" $ do
+      ctx <- loadDefaultContext
+      _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      text <- getActiveEditorText ctx
+      fromJust text `shouldBe` pack "initial text"
+
+    it "retrieves Nothing for active editor text if there is no active editor" $ do
+      ctx <- loadDefaultContext
+      text <- getActiveEditorText ctx
+      text `shouldBe` Nothing
+
+    it "retrieves current editor from notebook" $ do
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      tab <- getActiveEditorTab ctx
+      activeEditor <- getEditorFromNotebookTab $ fromJust tab
+      fromJust activeEditor == editor `shouldBe` True
+
+    it "retrieves the set filepath for an editor" $ do
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      filePath1 <- getEditorFilePath editor
+      setEditorFilePath editor $ Just "/tmp/xxx"
+      filePath2 <- getEditorFilePath editor
+      filePath1 `shouldBe` Just "/xxx/testName.hs"
+      filePath2 `shouldBe` Just "/tmp/xxx"
+
+launchNewFileAndSetModified :: IO HC.Context
+launchNewFileAndSetModified = do
+    ctx <- loadDefaultContext
+    _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+    buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
+    textBufferSetModified buffer True
+    return ctx
+
+launchEditorTab :: HC.Context -> Maybe FilePath -> IO SourceView
+launchEditorTab ctx file = do
+    let notebook = HC.mainNotebook ctx
+    newEditorForText ctx notebook file $ pack "initial text"
+
+getActiveEditorTabText :: HC.Context  -> IO String
+getActiveEditorTabText ctx = do
+    let notebook = HC.mainNotebook ctx
+    currentlyActiveEditor <- getActiveEditorTab ctx
+    text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
+    return $ fromJust text
