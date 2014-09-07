@@ -7,10 +7,10 @@ license-file: LICENSE
 copyright: (c) Sarunas Valaskevicius
 maintainer: Sarunas Valaskevicius <rakatan@gmail.com>
 synopsis: A source code editor aiming for the convenience of use
+description: A simple, command based code editor, being developed for the mouse-free workflow.
 homepage: http://svalaskevicius.github.io/hob/
 stability: alpha
 bug-reports: http://github.com/svalaskevicius/hob/issues
-description:
 category: IDE
 author: Sarunas Valaskevicius
 data-dir: app-data
@@ -32,7 +32,7 @@ executable hob
     buildable: True
     default-language: Haskell2010
     ghc-options:
-        -Wall -Werror
+        -Wall
     hs-source-dirs: src
 
 library
@@ -43,7 +43,7 @@ library
                          Hob.Context, Hob.Context.StyleContext, Hob.Context.FileContext
     default-language:    Haskell2010
     ghc-options:
-        -Wall -Werror
+        -Wall
     hs-source-dirs:      src/lib
     build-depends: base >=4.2 && <5, containers -any,
                    filepath -any, glib >=0.13.0.0, gtk3 >=0.13.0.0, pango >= 0.13.0.0,
