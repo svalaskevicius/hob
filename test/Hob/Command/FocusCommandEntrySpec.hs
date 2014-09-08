@@ -3,12 +3,12 @@ module Hob.Command.FocusCommandEntrySpec (main, spec) where
 import Data.Maybe
 import Graphics.UI.Gtk
 
-import qualified Hob.Context as HC
+import           Hob.Command
+import           Hob.Command.FocusCommandEntry
+import           Hob.Command.NewTab
+import qualified Hob.Context                   as HC
+import           Hob.Ui
 
-import Hob.Command
-import Hob.Command.FocusCommandEntry
-import Hob.Command.NewTab
-import Hob.Ui
 import Test.Hspec
 
 import HobTest.Context.Default
