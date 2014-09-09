@@ -5,13 +5,12 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 
 import Hob.Command.NewTab
-import Hob.Context.FileContext
+import Hob.Context
 import Hob.DirectoryTree
 
-newSideBarFileTree :: FileContext -> TreeView -> NewFileEditorLauncher -> IO ()
-newSideBarFileTree fileCtx treeView launchFile = do
-    let fileTreeLoader = contextFileTreeLoader fileCtx
-    treeModel <- treeStoreNew =<< fileTreeLoader
+newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
+newSideBarFileTree ctx treeView launchFile = do
+    let treeModel = fileTreeStore ctx
     customStoreSetColumn treeModel (makeColumnIdString 0) elementLabel
 
     col <- treeViewColumnNew

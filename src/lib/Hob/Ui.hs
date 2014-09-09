@@ -17,6 +17,7 @@ import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
 import Hob.Command.FocusNextTab
 import Hob.Command.NewTab
+import Hob.Command.ReloadSidebarTree
 import Hob.Command.SaveCurrentTab
 import Hob.Context
 import Hob.Context.FileContext
@@ -32,10 +33,12 @@ loadGui fileCtx styleCtx = do
 
         builder <- loadUiBuilder
         setGtkStyle styleCtx
+
         let cmdMatcher = mconcat [
                             createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
                             createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
                             createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
+                            createMatcherForKeyBinding ([Control], "r") reloadSidebarTreeCommandHandler,
                             createMatcherForKeyBinding ([Control], "Tab") focusNextTabCommandHandler,
                             createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                             createMatcherForPrefix "/" searchCommandHandler
@@ -54,7 +57,7 @@ loadGui fileCtx styleCtx = do
             sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
             widgetSetName sidebarTree "directoryListing"
             mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            newSideBarFileTree fileCtx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
+            newSideBarFileTree ctx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
         initCommandEntry ctx builder cmdMatcher = do
             cmdEntry <- builderGetObject builder castToEntry "command"
             widgetSetName cmdEntry "commandEntry"
@@ -63,7 +66,8 @@ loadGui fileCtx styleCtx = do
             window <- builderGetObject builder castToWindow "mainWindow"
             notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             cmdEntry <- builderGetObject builder castToEntry "command"
-            let ctx = Context styleCtx fileCtx window notebook cmdEntry
+            treeModel <- treeStoreNew =<< contextFileTreeLoader fileCtx
+            let ctx = Context styleCtx fileCtx window notebook cmdEntry treeModel
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier
