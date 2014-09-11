@@ -18,27 +18,29 @@ startSidebarSearch treeView searchString = do
             maybeFirstIter <- treeModelGetIterFirst model
             maybeDo (selectMatch model) maybeFirstIter
         selectMatch model iter = do
-            maybePath <- findMatchingPath model iter
+            maybePath <- findMatchingPath model searchString iter
             maybeDo updateMatchingPath maybePath
         updateMatchingPath path = do
             treeViewExpandToPath treeView path
             treeViewSetCursor treeView path Nothing
-        findMatchingPath model iter = do
+        findMatchingPath model search iter = do
             firstChildIter <- treeModelIterChildren model iter
+            value <- treeModelGetValue model iter nameColumn
+            let newSearchString = search `eatMatcherFrom` value
             if isJust firstChildIter then do
-                ret <- findMatchingPath model $ fromJust firstChildIter
-                maybe (findMatchingSibling model iter) (return.Just) ret
+                ret <- findMatchingPath model newSearchString $ fromJust firstChildIter
+                maybe (findMatchingSibling model search iter) (return.Just) ret
             else do
-                value <- treeModelGetValue model iter nameColumn
-                if searchString `isMatching` value then do
+                if newSearchString == "" then do
                     path <- treeModelGetPath model iter
                     return $ Just path
-                else findMatchingSibling model iter
-        findMatchingSibling model iter =
-            maybe (return Nothing) (findMatchingPath model) =<< treeModelIterNext model iter
-        isMatching [] _ = True
-        isMatching _ [] = False
-        isMatching (s:search) (v:value)
-            | s == v = isMatching search value
-            | otherwise = isMatching (s:search) value
+                else findMatchingSibling model search iter
+        findMatchingSibling model search iter =
+            maybe (return Nothing) (findMatchingPath model search) =<< treeModelIterNext model iter
+
+        eatMatcherFrom [] _ = []
+        eatMatcherFrom search [] = search
+        eatMatcherFrom (s:search) (v:value)
+            | s == v = eatMatcherFrom search value
+            | otherwise = eatMatcherFrom (s:search) value
             

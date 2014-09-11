@@ -52,10 +52,18 @@ spec =
       path `shouldBe` [0, 0]
       isNothing column `shouldBe` True
 
-    it "uses fuzzy matching" $ do
+    it "uses fuzzy matching on file name" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "rde"
+      (path, column) <- treeViewGetCursor sideBar
+      path `shouldBe` [0, 0]
+      isNothing column `shouldBe` True
+
+    it "uses fuzzy matching on path" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      _ <- startSidebarSearch sideBar "rdDrrde"
       (path, column) <- treeViewGetCursor sideBar
       path `shouldBe` [0, 0]
       isNothing column `shouldBe` True
@@ -70,7 +78,7 @@ getDirectoryListingSidebar ctx = do
 sideBarSearchFileTreeStub :: IO (Forest DirectoryTreeElement)
 sideBarSearchFileTreeStub = return [
     Node (DirectoryTreeElement "redDir" "/xxx/redDir" True) [
-        Node (DirectoryTreeElement "redFile" "/xxx/firstDir/redFile" False) []],
+        Node (DirectoryTreeElement "redFile" "/xxx/redDir/redFile" False) []],
     Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
     Node (DirectoryTreeElement "redFile" "/xxx/redFile" False) []]
 
