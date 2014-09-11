@@ -1,15 +1,15 @@
 module Hob.Ui.SidebarSearchSpec (main, spec) where
 
 import Data.Maybe
-import Graphics.UI.Gtk
 import Data.Tree
+import Graphics.UI.Gtk
 
-import Hob.Ui.SidebarSearch
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
-import Hob.Ui
-import Hob.DirectoryTree
+import           Hob.DirectoryTree
+import           Hob.Ui
+import           Hob.Ui.SidebarSearch
 
 import Test.Hspec
 
@@ -27,54 +27,48 @@ spec =
       searchEntry <- startSidebarSearch sideBar ""
       name <- widgetGetName searchEntry
       name `shouldBe` "sidebarSearchEntry"
-      
+
     it "places the cursor on the first match on the search start" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "greenFile"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [1]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [1]
 
     it "places the cursor on the first nested match on the search start" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "redFile"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [0, 0]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [0, 0]
 
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "red"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [0, 0]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [0, 0]
 
     it "uses fuzzy matching on file name" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "rde"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [0, 0]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [0, 0]
 
     it "uses fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "rdDrrde"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [0, 0]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [0, 0]
 
     it "allows path separator while fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       _ <- startSidebarSearch sideBar "r/rde"
-      (path, column) <- treeViewGetCursor sideBar
-      path `shouldBe` [0, 0]
-      isNothing column `shouldBe` True
+      sideBar `cursorShouldBeOn` [0, 0]
+
+cursorShouldBeOn :: TreeViewClass self => self -> TreePath -> IO ()
+cursorShouldBeOn sideBar expectedPath = do
+    (path, column) <- treeViewGetCursor sideBar
+    path `shouldBe` expectedPath
+    isNothing column `shouldBe` True
 
 getDirectoryListingSidebar :: HC.Context -> IO TreeView
 getDirectoryListingSidebar ctx = do

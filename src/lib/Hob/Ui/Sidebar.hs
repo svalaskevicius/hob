@@ -41,7 +41,7 @@ newSideBarFileTree ctx treeView launchFile = do
         activateRow :: DirectoryTreeElement -> IO ()
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
 
-    
+
 nameColumn :: ColumnId row String
 nameColumn = makeColumnIdString 0
 

@@ -1,10 +1,10 @@
 module Hob.Ui.SidebarSearch (startSidebarSearch) where
 
+import Data.Maybe      (fromJust, isJust)
 import Graphics.UI.Gtk
-import Data.Maybe (fromJust, isJust)
 
-import Hob.Ui.Sidebar (nameColumn)
 import Hob.Control
+import Hob.Ui.Sidebar (nameColumn)
 
 startSidebarSearch :: TreeView -> String -> IO Entry
 startSidebarSearch treeView searchString = do
@@ -30,7 +30,7 @@ startSidebarSearch treeView searchString = do
             if isJust firstChildIter then do
                 ret <- findMatchingPath model newSearchString $ fromJust firstChildIter
                 maybe (findMatchingSibling model search iter) (return.Just) ret
-            else do
+            else
                 if newSearchString == "" then do
                     path <- treeModelGetPath model iter
                     return $ Just path
@@ -43,4 +43,4 @@ startSidebarSearch treeView searchString = do
         eatMatcherFrom (s:search) (v:value)
             | s == v = eatMatcherFrom search value
             | otherwise = eatMatcherFrom (s:search) value
-            
+
