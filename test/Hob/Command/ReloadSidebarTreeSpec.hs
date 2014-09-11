@@ -8,9 +8,7 @@ import           Hob.Command
 import           Hob.Command.ReloadSidebarTree
 import qualified Hob.Context                   as HC
 import qualified Hob.Context.FileContext       as HFC
---import           Hob.Ui
-import Hob.DirectoryTree
-
+import           Hob.DirectoryTree
 
 import Test.Hspec
 

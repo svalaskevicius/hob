@@ -1,6 +1,7 @@
 module Hob.DirectoryTree where
 
 import Control.Monad   (forM)
+import Data.List       (sortBy)
 import Data.Tree
 import System.FilePath
 
@@ -20,16 +21,26 @@ type IsDirectoryCheck = FilePath -> IO Bool
 
 fileTreeGenerator :: DirectoryReader -> IsDirectoryCheck -> DirectoryTreeLoader
 fileTreeGenerator getDirectoryContents doesDirectoryExist root = do
-    directoryContents <- getFilteredDirectoryContents
-    forM directoryContents $ \ child -> do
-        let childPath = root </> child
-        isDir <- doesDirectoryExist childPath
-        childrenForest <- if isDir then callSelf childPath else return []
-        return $ Node (DirectoryTreeElement child childPath isDir) childrenForest
+    directoryContents <- retrieveDirectoryContents
+    forM directoryContents $ \ (name, path, isDir) -> do
+        childrenForest <- if isDir then callSelf path else return []
+        return $ Node (DirectoryTreeElement name path isDir) childrenForest
     where
         callSelf = fileTreeGenerator getDirectoryContents doesDirectoryExist
         removeBannedDirectories = filter (`notElem` bannedDirectories)
-        getFilteredDirectoryContents = do
+        addFileInfo contents =
+            forM contents $ \ child -> do
+                let childPath = root </> child
+                isDir <- doesDirectoryExist childPath
+                return (child, childPath, isDir)
+        retrieveDirectoryContents = do
             contents <- getDirectoryContents root
-            return (removeBannedDirectories contents)
+            let filteredContents = removeBannedDirectories contents
+            filteredFileInfo <- addFileInfo filteredContents
+            return $ sortBy contentsSortCriteria filteredFileInfo
         bannedDirectories = [".", "..", ".git"]
+        contentsSortCriteria (name1, _, isDir1) (name2, _, isDir2)
+            | isDir1 && not isDir2 = LT
+            | isDir2 && not isDir1 = GT
+            | otherwise = compare name1 name2
+
