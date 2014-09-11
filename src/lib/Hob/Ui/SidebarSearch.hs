@@ -1,7 +1,6 @@
 module Hob.Ui.SidebarSearch (startSidebarSearch) where
 
 import Graphics.UI.Gtk
-import Data.List (isInfixOf)
 import Data.Maybe (fromJust, isJust)
 
 import Hob.Ui.Sidebar (nameColumn)
@@ -31,9 +30,15 @@ startSidebarSearch treeView searchString = do
                 maybe (findMatchingSibling model iter) (return.Just) ret
             else do
                 value <- treeModelGetValue model iter nameColumn
-                if searchString `isInfixOf` value then do
+                if searchString `isMatching` value then do
                     path <- treeModelGetPath model iter
                     return $ Just path
                 else findMatchingSibling model iter
         findMatchingSibling model iter =
             maybe (return Nothing) (findMatchingPath model) =<< treeModelIterNext model iter
+        isMatching [] _ = True
+        isMatching _ [] = False
+        isMatching (s:search) (v:value)
+            | s == v = isMatching search value
+            | otherwise = isMatching (s:search) value
+            
