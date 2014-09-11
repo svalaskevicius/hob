@@ -26,7 +26,7 @@ startSidebarSearch treeView searchString = do
         findMatchingPath model search iter = do
             firstChildIter <- treeModelIterChildren model iter
             value <- treeModelGetValue model iter nameColumn
-            let newSearchString = search `eatMatcherFrom` value
+            let newSearchString = search `eatMatcherFrom` ('/':value)
             if isJust firstChildIter then do
                 ret <- findMatchingPath model newSearchString $ fromJust firstChildIter
                 maybe (findMatchingSibling model search iter) (return.Just) ret

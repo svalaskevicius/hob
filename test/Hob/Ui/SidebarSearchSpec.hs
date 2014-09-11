@@ -68,6 +68,14 @@ spec =
       path `shouldBe` [0, 0]
       isNothing column `shouldBe` True
 
+    it "allows path separator while fuzzy matching on path" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      _ <- startSidebarSearch sideBar "r/rde"
+      (path, column) <- treeViewGetCursor sideBar
+      path `shouldBe` [0, 0]
+      isNothing column `shouldBe` True
+
 getDirectoryListingSidebar :: HC.Context -> IO TreeView
 getDirectoryListingSidebar ctx = do
     paned <- binGetChild $ HC.mainWindow ctx
