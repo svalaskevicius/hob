@@ -66,7 +66,7 @@ loadGui fileCtx styleCtx = do
             window <- builderGetObject builder castToWindow "mainWindow"
             notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             cmdEntry <- builderGetObject builder castToEntry "command"
-            treeModel <- treeStoreNew =<< contextFileTreeLoader fileCtx
+            treeModel <- treeStoreNew []
             let ctx = Context styleCtx fileCtx window notebook cmdEntry treeModel
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
