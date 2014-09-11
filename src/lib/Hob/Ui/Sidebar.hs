@@ -13,21 +13,12 @@ newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do
     let treeStore = fileTreeStore ctx
     reloadSidebarTree ctx
-    customStoreSetColumn treeStore (makeColumnIdString 0) elementLabel
-
-    col <- treeViewColumnNew
-
-    rend <- Mv.cellRendererTextNew
-    Mv.cellLayoutPackStart col rend True
-    Mv.cellLayoutSetAttributes col rend treeStore (\v -> [Mv.cellText := elementLabel v])
-
-    _ <- treeViewAppendColumn treeView col
+    initNameColumn treeStore
 
     treeViewSetHeadersVisible treeView False
     treeViewSetModel treeView treeStore
 
-    treeViewSetSearchColumn treeView searchCol
-
+    treeViewSetSearchColumn treeView nameCol
 
     _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
     _ <- treeView `on` rowActivated $ \ path _ -> activateRow =<< treeStoreGetValue treeStore path
@@ -35,8 +26,20 @@ newSideBarFileTree ctx treeView launchFile = do
     return ()
 
     where
-        searchCol :: ColumnId row String
-        searchCol = makeColumnIdString 0
+        initNameColumn treeStore = do
+            customStoreSetColumn treeStore nameCol elementLabel
+
+            col <- treeViewColumnNew
+
+            rend <- Mv.cellRendererTextNew
+            Mv.cellLayoutPackStart col rend True
+            Mv.cellLayoutSetAttributes col rend treeStore (\v -> [Mv.cellText := elementLabel v])
+
+            _ <- treeViewAppendColumn treeView col
+            return ()
+    
+        nameCol :: ColumnId row String
+        nameCol = makeColumnIdString 0
 
         activateRow :: DirectoryTreeElement -> IO ()
         activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
