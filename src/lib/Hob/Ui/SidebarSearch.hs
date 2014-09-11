@@ -2,7 +2,7 @@ module Hob.Ui.SidebarSearch (startSidebarSearch) where
 
 import Graphics.UI.Gtk
 import Data.List (isInfixOf)
-import Data.Maybe (isNothing, fromJust)
+import Data.Maybe (fromJust, isJust)
 
 import Hob.Ui.Sidebar (nameColumn)
 import Hob.Control
@@ -19,16 +19,21 @@ startSidebarSearch treeView searchString = do
             maybeFirstIter <- treeModelGetIterFirst model
             maybeDo (selectMatch model) maybeFirstIter
         selectMatch model iter = do
+            maybePath <- findMatchingPath model iter
+            maybeDo updateMatchingPath maybePath
+        updateMatchingPath path = do
+            treeViewExpandToPath treeView path
+            treeViewSetCursor treeView path Nothing
+        findMatchingPath model iter = do
             firstChildIter <- treeModelIterChildren model iter
-            if isNothing firstChildIter then
-                checkLeafMatch model iter
+            if isJust firstChildIter then do
+                ret <- findMatchingPath model $ fromJust firstChildIter
+                maybe (findMatchingSibling model iter) (return.Just) ret
             else do
-                selectMatch model $ fromJust firstChildIter
-            maybeDo (selectMatch model) =<< treeModelIterNext model iter
-        checkLeafMatch model iter = do
-            value <- treeModelGetValue model iter nameColumn
-            if searchString `isInfixOf` value then do
-                path <- treeModelGetPath model iter
-                treeViewExpandToPath treeView path
-                treeViewSetCursor treeView path Nothing
-            else return()
+                value <- treeModelGetValue model iter nameColumn
+                if searchString `isInfixOf` value then do
+                    path <- treeModelGetPath model iter
+                    return $ Just path
+                else findMatchingSibling model iter
+        findMatchingSibling model iter =
+            maybe (return Nothing) (findMatchingPath model) =<< treeModelIterNext model iter

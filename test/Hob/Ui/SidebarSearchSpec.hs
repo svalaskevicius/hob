@@ -63,7 +63,8 @@ sideBarSearchFileTreeStub :: IO (Forest DirectoryTreeElement)
 sideBarSearchFileTreeStub = return [
     Node (DirectoryTreeElement "redDir" "/xxx/redDir" True) [
         Node (DirectoryTreeElement "redFile" "/xxx/firstDir/redFile" False) []],
-    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) []]
+    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
+    Node (DirectoryTreeElement "redFile" "/xxx/redFile" False) []]
 
 sideBarSearchContext :: IO HC.Context
 sideBarSearchContext = do
