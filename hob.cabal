@@ -37,11 +37,12 @@ executable hob
 
 library
     Exposed-modules:     Hob.Ui, Hob.Ui.Editor, Hob.Ui.Sidebar, Hob.Ui.CommandEntry,
-                         Hob.DirectoryTree, Hob.Control,
+                         Hob.Ui.SidebarSearch,
                          Hob.Command, Hob.Command.FindText, Hob.Command.CloseCurrentTab,
                          Hob.Command.SaveCurrentTab, Hob.Command.NewTab, Hob.Command.FocusCommandEntry,
                          Hob.Command.FocusNextTab, Hob.Command.ReloadSidebarTree,
-                         Hob.Context, Hob.Context.StyleContext, Hob.Context.FileContext
+                         Hob.Context, Hob.Context.StyleContext, Hob.Context.FileContext,
+                         Hob.DirectoryTree, Hob.Control
     default-language:    Haskell2010
     ghc-options:
         -Wall
