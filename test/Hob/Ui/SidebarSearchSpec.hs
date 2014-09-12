@@ -31,38 +31,59 @@ spec =
     it "places the cursor on the first match on the search start" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "greenFile"
-      sideBar `cursorShouldBeOn` [1]
+      cursorShouldBeOnAfterSearch sideBar "greenFile" [1]
 
     it "places the cursor on the first nested match on the search start" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "redFile"
-      sideBar `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch sideBar "redFile" [0, 0]
 
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "red"
-      sideBar `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch sideBar "red" [0, 0]
 
     it "uses fuzzy matching on file name" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "rde"
-      sideBar `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch sideBar "rde" [0, 0]
 
     it "uses fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "rdDrrde"
-      sideBar `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch sideBar "rdDrrde" [0, 0]
 
     it "allows path separator while fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      _ <- startSidebarSearch sideBar "r/rde"
-      sideBar `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch sideBar "r/rde" [0, 0]
+
+    it "focuses next file match when requested" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      cursorShouldBeOnAfterSearchAndContinue sideBar "rde" [0, 0] [0, 1]
+
+    it "focuses next path match when requested" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      cursorShouldBeOnAfterSearchAndContinue sideBar "r/rde" [0, 0] [0, 1]
+
+    it "focuses next multilevel path match when requested" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      cursorShouldBeOnAfterSearchAndContinue sideBar "/Dir//rde" [3, 0, 0, 0] [4, 1, 0, 0]
+
+cursorShouldBeOnAfterSearch :: TreeView -> String -> TreePath -> IO ()
+cursorShouldBeOnAfterSearch sideBar search expectedPath = do
+      _ <- startSidebarSearch sideBar search
+      sideBar `cursorShouldBeOn` expectedPath
+
+cursorShouldBeOnAfterSearchAndContinue :: TreeView -> String -> TreePath -> TreePath -> IO ()
+cursorShouldBeOnAfterSearchAndContinue sideBar search expectedPath expectedPathAfterContinue = do
+      searchEntry <- startSidebarSearch sideBar search
+      sideBar `cursorShouldBeOn` expectedPath
+      continueSidebarSearch sideBar searchEntry
+      sideBar `cursorShouldBeOn` expectedPathAfterContinue
 
 cursorShouldBeOn :: TreeViewClass self => self -> TreePath -> IO ()
 cursorShouldBeOn sideBar expectedPath = do
@@ -80,9 +101,21 @@ getDirectoryListingSidebar ctx = do
 sideBarSearchFileTreeStub :: IO (Forest DirectoryTreeElement)
 sideBarSearchFileTreeStub = return [
     Node (DirectoryTreeElement "redDir" "/xxx/redDir" True) [
-        Node (DirectoryTreeElement "redFile" "/xxx/redDir/redFile" False) []],
+        Node (DirectoryTreeElement "redFile1" "/xxx/redDir/redFile1" False) [],
+        Node (DirectoryTreeElement "redFile2" "/xxx/redDir/redFile2" False) []],
     Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
-    Node (DirectoryTreeElement "redFile" "/xxx/redFile" False) []]
+    Node (DirectoryTreeElement "redFile" "/xxx/redFile" False) [],
+    Node (DirectoryTreeElement "greenDir" "/xxx/greenDir" True) [
+        Node (DirectoryTreeElement "greenDir" "/xxx/greenDir/greenDir" True) [
+            Node (DirectoryTreeElement "greenDir" "/xxx/greenDir/greenDir/greenDir" True) [
+                Node (DirectoryTreeElement "redFile" "/xxx/greenDir/greenDir/greenDir/redFile" False) []]]],
+    Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder" True) [
+        Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder" True) [
+            Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder/blueFolder" True) [
+                Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueFolder/blueFolder/redFile" False) []]],
+        Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir" True) [
+            Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir/blueDir" True) [
+                Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]]]
 
 sideBarSearchContext :: IO HC.Context
 sideBarSearchContext = do
