@@ -61,29 +61,40 @@ spec =
     it "focuses next file match when requested" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "rde" [0, 0] [0, 1]
+      cursorShouldBeOnAfterSearchAndContinue sideBar "rde" [[0, 0], [0, 1]]
 
     it "focuses next path match when requested" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "r/rde" [0, 0] [0, 1]
+      cursorShouldBeOnAfterSearchAndContinue sideBar "r/rde" [[0, 0], [0, 1]]
 
-    it "focuses next multilevel path match when requested" $ do
+    it "focuses next multi-level path match when requested" $ do
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "/Dir//rde" [3, 0, 0, 0] [4, 1, 0, 0]
+      cursorShouldBeOnAfterSearchAndContinue sideBar "/Dir//rde" [[3, 0, 0, 0], [4, 1, 0, 0]]
+
+    it "finds next top-level file" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      cursorShouldBeOnAfterSearchAndContinue sideBar "greenFile" [[1], [3,0,0,0], [5]]
 
 cursorShouldBeOnAfterSearch :: TreeView -> String -> TreePath -> IO ()
 cursorShouldBeOnAfterSearch sideBar search expectedPath = do
       _ <- startSidebarSearch sideBar search
       sideBar `cursorShouldBeOn` expectedPath
 
-cursorShouldBeOnAfterSearchAndContinue :: TreeView -> String -> TreePath -> TreePath -> IO ()
-cursorShouldBeOnAfterSearchAndContinue sideBar search expectedPath expectedPathAfterContinue = do
+cursorShouldBeOnAfterSearchAndContinue :: TreeView -> String -> [TreePath] -> IO ()
+cursorShouldBeOnAfterSearchAndContinue sideBar search expectedPaths = do
       searchEntry <- startSidebarSearch sideBar search
-      sideBar `cursorShouldBeOn` expectedPath
-      continueSidebarSearch sideBar searchEntry
-      sideBar `cursorShouldBeOn` expectedPathAfterContinue
+      sideBar `cursorShouldBeOn` head expectedPaths
+      mapM_ (\path -> do
+              continueSidebarSearch sideBar searchEntry
+              sideBar `cursorShouldBeOn` path)
+            $ tail expectedPaths
+      mapM_ (\path -> do
+              continueSidebarSearchBackwards sideBar searchEntry
+              sideBar `cursorShouldBeOn` path)
+            $ reverse $ init expectedPaths
 
 cursorShouldBeOn :: TreeViewClass self => self -> TreePath -> IO ()
 cursorShouldBeOn sideBar expectedPath = do
@@ -115,7 +126,8 @@ sideBarSearchFileTreeStub = return [
                 Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueFolder/blueFolder/redFile" False) []]],
         Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir" True) [
             Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir/blueDir" True) [
-                Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]]]
+                Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]],
+    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) []]
 
 sideBarSearchContext :: IO HC.Context
 sideBarSearchContext = do
