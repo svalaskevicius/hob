@@ -21,7 +21,7 @@ spec =
   describe "sidebar" $ do
     it "is named" $ do
       ctx <- loadDefaultContext
-      name <- widgetGetName =<< getDirectoryListingSidebar ctx
+      name <- widgetGetName $ HC.sidebarTree ctx
       name `shouldBe` "directoryListing"
 
     it "opens a file editor" $ do
@@ -44,17 +44,10 @@ spec =
 
 activateDirectoryPath :: HC.Context -> TreePath -> IO ()
 activateDirectoryPath ctx path = do
-    treeView <- getDirectoryListingSidebar ctx
+    let treeView = HC.sidebarTree ctx
     firstColumn <- treeViewGetColumn treeView 0
     treeViewRowActivated treeView path $ fromJust firstColumn
 
-
-getDirectoryListingSidebar :: HC.Context -> IO TreeView
-getDirectoryListingSidebar ctx = do
-    paned <- binGetChild $ HC.mainWindow ctx
-    scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
-    sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
-    return (castToTreeView $ fromJust sidebar)
 
 getNumberOfEditorPages :: HC.Context -> IO Int
 getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook

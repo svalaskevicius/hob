@@ -23,109 +23,90 @@ spec =
   describe "sidebar search" $ do
     it "shows the named search box" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      searchEntry <- startSidebarSearch sideBar ""
-      name <- widgetGetName searchEntry
+      startSidebarSearch ctx ""
+      name <- widgetGetName $ HC.sidebarTreeSearch ctx
       name `shouldBe` "sidebarSearchEntry"
 
     it "places the cursor on the first match on the search start" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "greenFile" [1]
+      cursorShouldBeOnAfterSearch ctx "greenFile" [1]
 
     it "places the cursor on the first nested match on the search start" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "redFile" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
 
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "red" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "red" [0, 0]
 
     it "uses fuzzy matching on file name" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "rde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "rde" [0, 0]
 
     it "uses fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "rdDrrde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "rdDrrde" [0, 0]
 
     it "allows path separator while fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearch sideBar "r/rde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r/rde" [0, 0]
       
     it "stays on the same path when search is refined" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      searchEntry <- startSidebarSearch sideBar "r/rd"
-      sideBar `cursorShouldBeOn` [0, 0]
-      entrySetText searchEntry "r/rde"
-      updateSidebarSearch sideBar searchEntry
-      sideBar `cursorShouldBeOn` [0, 0]
+      startSidebarSearch ctx "r/rd"
+      ctx `cursorShouldBeOn` [0, 0]
+      entrySetText (HC.sidebarTreeSearch ctx) "r/rde"
+      updateSidebarSearch ctx
+      ctx `cursorShouldBeOn` [0, 0]
 
     it "moves to the new match when search is refined" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      searchEntry <- startSidebarSearch sideBar "r/rd"
-      sideBar `cursorShouldBeOn` [0, 0]
-      entrySetText searchEntry "r/rde2"
-      updateSidebarSearch sideBar searchEntry
-      sideBar `cursorShouldBeOn` [0, 1]
+      startSidebarSearch ctx "r/rd"
+      ctx `cursorShouldBeOn` [0, 0]
+      entrySetText (HC.sidebarTreeSearch ctx) "r/rde2"
+      updateSidebarSearch ctx
+      ctx `cursorShouldBeOn` [0, 1]
 
     it "focuses next file match when requested" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "rde" [[0, 0], [0, 1]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "rde" [[0, 0], [0, 1]]
 
     it "focuses next path match when requested" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "r/rde" [[0, 0], [0, 1]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "r/rde" [[0, 0], [0, 1]]
 
     it "focuses next multi-level path match when requested" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "/Dir//rde" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//rde" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
-      sideBar <- getDirectoryListingSidebar ctx
-      cursorShouldBeOnAfterSearchAndContinue sideBar "greenFile" [[1], [3,0,0,0], [5]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
 
-cursorShouldBeOnAfterSearch :: TreeView -> String -> TreePath -> IO ()
-cursorShouldBeOnAfterSearch sideBar search expectedPath = do
-      _ <- startSidebarSearch sideBar search
-      sideBar `cursorShouldBeOn` expectedPath
+cursorShouldBeOnAfterSearch :: HC.Context -> String -> TreePath -> IO ()
+cursorShouldBeOnAfterSearch ctx search expectedPath = do
+      startSidebarSearch ctx search
+      ctx `cursorShouldBeOn` expectedPath
 
-cursorShouldBeOnAfterSearchAndContinue :: TreeView -> String -> [TreePath] -> IO ()
-cursorShouldBeOnAfterSearchAndContinue sideBar search expectedPaths = do
-      searchEntry <- startSidebarSearch sideBar search
-      sideBar `cursorShouldBeOn` head expectedPaths
+cursorShouldBeOnAfterSearchAndContinue :: HC.Context -> String -> [TreePath] -> IO ()
+cursorShouldBeOnAfterSearchAndContinue ctx search expectedPaths = do
+      startSidebarSearch ctx search
+      ctx `cursorShouldBeOn` head expectedPaths
       mapM_ (\path -> do
-              continueSidebarSearch sideBar searchEntry
-              sideBar `cursorShouldBeOn` path)
+              continueSidebarSearch ctx
+              ctx `cursorShouldBeOn` path)
             $ tail expectedPaths
       mapM_ (\path -> do
-              continueSidebarSearchBackwards sideBar searchEntry
-              sideBar `cursorShouldBeOn` path)
+              continueSidebarSearchBackwards ctx
+              ctx `cursorShouldBeOn` path)
             $ reverse $ init expectedPaths
 
-cursorShouldBeOn :: TreeViewClass self => self -> TreePath -> IO ()
-cursorShouldBeOn sideBar expectedPath = do
+cursorShouldBeOn :: HC.Context -> TreePath -> IO ()
+cursorShouldBeOn ctx expectedPath = do
+    let sideBar = HC.sidebarTree ctx
     (path, column) <- treeViewGetCursor sideBar
     path `shouldBe` expectedPath
     isNothing column `shouldBe` True
-
-getDirectoryListingSidebar :: HC.Context -> IO TreeView
-getDirectoryListingSidebar ctx = do
-    paned <- binGetChild $ HC.mainWindow ctx
-    scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
-    sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
-    return (castToTreeView $ fromJust sidebar)
 
 sideBarSearchFileTreeStub :: IO (Forest DirectoryTreeElement)
 sideBarSearchFileTreeStub = return [

@@ -45,29 +45,31 @@ loadGui fileCtx styleCtx = do
                         ]
 
         ctx <- initMainWindow builder cmdMatcher
-        initSidebar ctx builder
-        initCommandEntry ctx builder cmdMatcher
+        initSidebar ctx
+        initCommandEntry ctx cmdMatcher
         return ctx
     where
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx
             return builder
-        initSidebar ctx builder = do
-            sidebarTree <- builderGetObject builder castToTreeView "directoryListing"
-            widgetSetName sidebarTree "directoryListing"
-            mainEditNotebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            newSideBarFileTree ctx sidebarTree $ launchNewFileEditor ctx mainEditNotebook
-        initCommandEntry ctx builder cmdMatcher = do
-            cmdEntry <- builderGetObject builder castToEntry "command"
+        initSidebar ctx = do
+            let treeView = sidebarTree ctx
+            widgetSetName treeView "directoryListing"
+            let mainEditNotebook = mainNotebook ctx
+            newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
+        initCommandEntry ctx cmdMatcher = do
+            let cmdEntry = commandEntry ctx
             widgetSetName cmdEntry "commandEntry"
             newCommandEntry ctx cmdEntry cmdMatcher
         initMainWindow builder cmdMatcher = do
             window <- builderGetObject builder castToWindow "mainWindow"
             notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             cmdEntry <- builderGetObject builder castToEntry "command"
+            treeView <- builderGetObject builder castToTreeView "directoryListing"
+            treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
             treeModel <- treeStoreNew []
-            let ctx = Context styleCtx fileCtx window notebook cmdEntry treeModel
+            let ctx = Context styleCtx fileCtx window notebook cmdEntry treeView treeViewSearch treeModel
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier

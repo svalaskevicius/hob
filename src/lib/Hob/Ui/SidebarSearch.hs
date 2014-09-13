@@ -10,61 +10,67 @@ import Data.Maybe      (fromJust, isJust)
 import Graphics.UI.Gtk
 
 import Hob.Control
-import Hob.Ui.Sidebar (nameColumn)
+import Hob.Context
 
-startSidebarSearch :: TreeView -> String -> IO Entry
-startSidebarSearch treeView searchString = do
-    entry <- entryNew
+startSidebarSearch :: Context -> String -> IO ()
+startSidebarSearch ctx searchString = do
+    let treeView = sidebarTree ctx
+    let entry = sidebarTreeSearch ctx
     widgetSetName entry "sidebarSearchEntry"
     entrySetText entry searchString
     model <- treeViewGetModel treeView
-    maybeDo startSearch model
-    return entry
+    maybeDo (startSearch treeView) model
     where
-        startSearch model = do
+        startSearch treeView model = do
             maybeFirstIter <- treeModelGetIterFirst model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
 
-updateSidebarSearch :: TreeView -> Entry -> IO ()
-updateSidebarSearch treeView searchEntry = do
+updateSidebarSearch :: Context -> IO ()
+updateSidebarSearch ctx = do
+    let treeView = sidebarTree ctx
     model <- treeViewGetModel treeView
-    maybeDo continueSearch model
+    maybeDo (continueSearch treeView) model
     where
-        continueSearch model = do
+        continueSearch treeView model = do
+            let searchEntry = sidebarTreeSearch ctx
             searchString <- entryGetText searchEntry
-            maybeFirstIter <- iterOnSelection model
+            maybeFirstIter <- iterOnSelection treeView model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
 
-        iterOnSelection model = do
+        iterOnSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
             treeModelGetIter model path
 
-continueSidebarSearch :: TreeView -> Entry -> IO ()
-continueSidebarSearch treeView searchEntry = do
+continueSidebarSearch :: Context -> IO ()
+continueSidebarSearch ctx = do
+    let treeView = sidebarTree ctx
     model <- treeViewGetModel treeView
-    maybeDo continueSearch model
+    maybeDo (continueSearch treeView) model
     where
-        continueSearch model = do
+        continueSearch treeView model = do
+            let searchEntry = sidebarTreeSearch ctx
             searchString <- entryGetText searchEntry
-            maybeFirstIter <- iterAfterSelection model
+            maybeFirstIter <- iterAfterSelection treeView model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
 
-        iterAfterSelection model = do
+        iterAfterSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
             currentIter <- treeModelGetIter model path
             maybe (return Nothing) (findNextSubtree model) currentIter
 
-continueSidebarSearchBackwards :: TreeView -> Entry -> IO ()
-continueSidebarSearchBackwards treeView searchEntry = do
+continueSidebarSearchBackwards :: Context -> IO ()
+continueSidebarSearchBackwards ctx = do
+    let treeView = sidebarTree ctx
     model <- treeViewGetModel treeView
-    maybeDo continueSearch model
+    maybeDo (continueSearch treeView) model
     where
-        continueSearch model = do
+        continueSearch treeView model = do
+            let searchEntry = sidebarTreeSearch ctx
             searchString <- entryGetText searchEntry
-            maybeFirstIter <- iterBeforeSelection model
+            maybeFirstIter <- iterBeforeSelection treeView model
             maybeDo (selectPreviousMatch treeView model searchString) maybeFirstIter
 
-        iterBeforeSelection model = do
+        iterBeforeSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
             currentIter <- treeModelGetIter model path
             maybe (return Nothing) (findPreviousSubtree model) currentIter
@@ -159,3 +165,6 @@ treeModelIterLastChild :: TreeModelClass treeModel => treeModel -> TreeIter -> I
 treeModelIterLastChild model iter = do
     childrenCount <- treeModelIterNChildren model $ Just iter
     treeModelIterNthChild model (Just iter) (childrenCount - 1)
+
+nameColumn :: ColumnId row String
+nameColumn = makeColumnIdString 0

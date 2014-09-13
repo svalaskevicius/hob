@@ -2,7 +2,7 @@ module Hob.Context (
     Context(..)
 ) where
 
-import Graphics.UI.Gtk (Entry, Notebook, TreeStore, Window)
+import Graphics.UI.Gtk (Entry, Notebook, TreeStore, Window, TreeView)
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -14,5 +14,7 @@ data Context = Context {
     mainWindow    :: Window,
     mainNotebook  :: Notebook,
     commandEntry  :: Entry,
+    sidebarTree   :: TreeView,
+    sidebarTreeSearch :: Entry,
     fileTreeStore :: TreeStore DirectoryTreeElement
 }

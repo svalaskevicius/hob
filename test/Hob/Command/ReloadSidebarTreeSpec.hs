@@ -40,18 +40,11 @@ altFileTreeStub = return [
 
 getDirectoryListingSidebarRootItems :: HC.Context -> IO [String]
 getDirectoryListingSidebarRootItems ctx = do
-    treeView <- getDirectoryListingSidebar ctx
+    let treeView = HC.sidebarTree ctx
     maybeTreeModel <- treeViewGetModel treeView
     let treeModel = fromJust maybeTreeModel
     maybeRoot <- treeModelGetIter treeModel [0]
     getSiblingItems treeModel maybeRoot
-
-getDirectoryListingSidebar :: HC.Context -> IO TreeView
-getDirectoryListingSidebar ctx = do
-    paned <- binGetChild $ HC.mainWindow ctx
-    scrollbar <- panedGetChild1 $ castToPaned $ fromJust paned
-    sidebar <- binGetChild $ castToScrolledWindow $ fromJust scrollbar
-    return (castToTreeView $ fromJust sidebar)
 
 getSiblingItems :: TreeModel -> Maybe TreeIter -> IO [String]
 getSiblingItems _ Nothing = return []
