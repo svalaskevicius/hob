@@ -4,10 +4,12 @@ import Control.Monad             (unless)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 
+
 import Hob.Command.NewTab
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.DirectoryTree
+import Hob.Ui.SidebarSearch
 
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do
@@ -16,9 +18,8 @@ newSideBarFileTree ctx treeView launchFile = do
     initNameColumn treeStore
 
     treeViewSetHeadersVisible treeView False
+    treeViewSetEnableSearch treeView False
     treeViewSetModel treeView treeStore
-
-    treeViewSetSearchColumn treeView nameColumn
 
     _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
     _ <- treeView `on` rowActivated $ \ path _ -> activateRow =<< treeStoreGetValue treeStore path

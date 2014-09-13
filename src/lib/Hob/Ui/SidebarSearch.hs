@@ -1,35 +1,70 @@
 module Hob.Ui.SidebarSearch (
+        newSideBarFileTreeSearch,
         startSidebarSearch,
         updateSidebarSearch,
         continueSidebarSearch,
         continueSidebarSearchBackwards
     ) where
 
-import Data.List       (intercalate)
-import Data.Maybe      (fromJust, isJust)
+import Control.Monad.Trans (liftIO)
+import Data.List           (intercalate)
+import Data.Maybe          (fromJust, isJust)
+import Data.Text           (unpack)
 import Graphics.UI.Gtk
 
-import Hob.Control
 import Hob.Context
+import Hob.Control
+
+newSideBarFileTreeSearch :: Context -> IO ()
+newSideBarFileTreeSearch ctx = do
+    let treeView = sidebarTree ctx
+    let searchEntry = sidebarTreeSearch ctx
+    _ <- treeView `on` keyPressEvent $ do
+        modifier <- eventModifier
+        if null modifier then do
+            key <- eventKeyVal
+            maybe (return False) (startSearch searchEntry) $ keyToChar key
+        else return False
+    _ <- searchEntry `on` editableChanged $ updateSidebarSearch ctx
+    _ <- searchEntry `on` focusOutEvent $ liftIO $ widgetHide searchEntry >> return False
+    _ <- searchEntry `on` keyPressEvent $ do
+        modifier <- eventModifier
+        if null modifier then do
+            key <- eventKeyName
+            case unpack key of
+                "Down" -> liftIO $ continueSidebarSearch ctx >> return True
+                "Up" -> liftIO $ continueSidebarSearchBackwards ctx >> return True
+                "Return" -> stopSearchAndActivateResult treeView searchEntry
+                _ -> return False
+        else return False
+    return ()
+    where
+        startSearch searchEntry firstChar = liftIO $ do
+            startSidebarSearch ctx [firstChar]
+            widgetShow searchEntry
+            widgetGrabFocus searchEntry
+            editableSelectRegion searchEntry 1 1
+            return True
+        stopSearchAndActivateResult treeView searchEntry = liftIO $ do
+            widgetGrabFocus treeView
+            widgetHide searchEntry
+            (path, _) <- treeViewGetCursor treeView
+            column <- treeViewGetColumn treeView 0
+            maybeDo (treeViewRowActivated treeView path) column
+            return True
 
 startSidebarSearch :: Context -> String -> IO ()
 startSidebarSearch ctx searchString = do
-    let treeView = sidebarTree ctx
     let entry = sidebarTreeSearch ctx
-    widgetSetName entry "sidebarSearchEntry"
     entrySetText entry searchString
-    model <- treeViewGetModel treeView
-    maybeDo (startSearch treeView) model
+    invokeOnTreeViewAndModel startSearch ctx
     where
         startSearch treeView model = do
             maybeFirstIter <- treeModelGetIterFirst model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
 
 updateSidebarSearch :: Context -> IO ()
-updateSidebarSearch ctx = do
-    let treeView = sidebarTree ctx
-    model <- treeViewGetModel treeView
-    maybeDo (continueSearch treeView) model
+updateSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
             let searchEntry = sidebarTreeSearch ctx
@@ -42,10 +77,7 @@ updateSidebarSearch ctx = do
             treeModelGetIter model path
 
 continueSidebarSearch :: Context -> IO ()
-continueSidebarSearch ctx = do
-    let treeView = sidebarTree ctx
-    model <- treeViewGetModel treeView
-    maybeDo (continueSearch treeView) model
+continueSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
             let searchEntry = sidebarTreeSearch ctx
@@ -59,10 +91,7 @@ continueSidebarSearch ctx = do
             maybe (return Nothing) (findNextSubtree model) currentIter
 
 continueSidebarSearchBackwards :: Context -> IO ()
-continueSidebarSearchBackwards ctx = do
-    let treeView = sidebarTree ctx
-    model <- treeViewGetModel treeView
-    maybeDo (continueSearch treeView) model
+continueSidebarSearchBackwards ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
             let searchEntry = sidebarTreeSearch ctx
@@ -75,6 +104,12 @@ continueSidebarSearchBackwards ctx = do
             currentIter <- treeModelGetIter model path
             maybe (return Nothing) (findPreviousSubtree model) currentIter
 
+invokeOnTreeViewAndModel :: (TreeView -> TreeModel -> IO ()) -> Context -> IO ()
+invokeOnTreeViewAndModel fnc ctx = do
+    let treeView = sidebarTree ctx
+    model <- treeViewGetModel treeView
+    maybeDo (fnc treeView) model
+
 selectNextMatch :: (TreeViewClass tv, TreeModelClass tm) => tv -> tm -> String -> TreeIter -> IO ()
 selectNextMatch treeView treeModel =
     selectMatch (findNextSubtree treeModel) (treeModelIterChildren treeModel) (treeModelIterNext treeModel) treeView treeModel
@@ -83,7 +118,7 @@ selectPreviousMatch :: (TreeViewClass tv, TreeModelClass tm) => tv -> tm -> Stri
 selectPreviousMatch treeView treeModel =
     selectMatch (findPreviousSubtree treeModel) (treeModelIterLastChild treeModel) (treeModelIterPrevious treeModel) treeView treeModel
 
-selectMatch :: (TreeViewClass tv, TreeModelClass tm) => 
+selectMatch :: (TreeViewClass tv, TreeModelClass tm) =>
                 (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) ->
                 tv -> tm -> String -> TreeIter -> IO ()
 selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
@@ -159,12 +194,14 @@ treeModelIterPrevious model iter = do
     parent <- treeModelIterParent model iter
     currentPath <- treeModelGetPath model iter
     let nth = last currentPath
-    treeModelIterNthChild model parent (nth-1)
+    if nth > 0 then treeModelIterNthChild model parent (nth-1)
+    else return Nothing
 
 treeModelIterLastChild :: TreeModelClass treeModel => treeModel -> TreeIter -> IO (Maybe TreeIter)
 treeModelIterLastChild model iter = do
     childrenCount <- treeModelIterNChildren model $ Just iter
-    treeModelIterNthChild model (Just iter) (childrenCount - 1)
+    if childrenCount > 0 then treeModelIterNthChild model (Just iter) (childrenCount - 1)
+    else return Nothing
 
 nameColumn :: ColumnId row String
 nameColumn = makeColumnIdString 0

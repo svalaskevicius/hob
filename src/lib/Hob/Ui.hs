@@ -25,6 +25,7 @@ import Hob.Context.StyleContext
 import Hob.Ui.CommandEntry
 import Hob.Ui.Editor
 import Hob.Ui.Sidebar
+import Hob.Ui.SidebarSearch
 
 
 loadGui :: FileContext -> StyleContext -> IO Context
@@ -55,9 +56,12 @@ loadGui fileCtx styleCtx = do
             return builder
         initSidebar ctx = do
             let treeView = sidebarTree ctx
+            let treeViewSearch = sidebarTreeSearch ctx
             widgetSetName treeView "directoryListing"
+            widgetSetName treeViewSearch "sidebarSearchEntry"
             let mainEditNotebook = mainNotebook ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
+            newSideBarFileTreeSearch ctx
         initCommandEntry ctx cmdMatcher = do
             let cmdEntry = commandEntry ctx
             widgetSetName cmdEntry "commandEntry"

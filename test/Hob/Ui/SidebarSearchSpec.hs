@@ -50,22 +50,16 @@ spec =
     it "allows path separator while fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "r/rde" [0, 0]
-      
+
     it "stays on the same path when search is refined" $ do
       ctx <- sideBarSearchContext
-      startSidebarSearch ctx "r/rd"
-      ctx `cursorShouldBeOn` [0, 0]
-      entrySetText (HC.sidebarTreeSearch ctx) "r/rde"
-      updateSidebarSearch ctx
-      ctx `cursorShouldBeOn` [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r/rd" [0, 0]
+      cursorShouldBeOnAfterRefine ctx "r/rde" [0, 0]
 
     it "moves to the new match when search is refined" $ do
       ctx <- sideBarSearchContext
-      startSidebarSearch ctx "r/rd"
-      ctx `cursorShouldBeOn` [0, 0]
-      entrySetText (HC.sidebarTreeSearch ctx) "r/rde2"
-      updateSidebarSearch ctx
-      ctx `cursorShouldBeOn` [0, 1]
+      cursorShouldBeOnAfterSearch ctx "r/rd" [0, 0]
+      cursorShouldBeOnAfterRefine ctx "r/rde2" [0, 1]
 
     it "focuses next file match when requested" $ do
       ctx <- sideBarSearchContext
@@ -86,6 +80,12 @@ spec =
 cursorShouldBeOnAfterSearch :: HC.Context -> String -> TreePath -> IO ()
 cursorShouldBeOnAfterSearch ctx search expectedPath = do
       startSidebarSearch ctx search
+      ctx `cursorShouldBeOn` expectedPath
+
+cursorShouldBeOnAfterRefine :: HC.Context -> String -> TreePath -> IO ()
+cursorShouldBeOnAfterRefine ctx search expectedPath = do
+      entrySetText (HC.sidebarTreeSearch ctx) search
+      updateSidebarSearch ctx
       ctx `cursorShouldBeOn` expectedPath
 
 cursorShouldBeOnAfterSearchAndContinue :: HC.Context -> String -> [TreePath] -> IO ()
