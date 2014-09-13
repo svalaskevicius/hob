@@ -23,7 +23,7 @@ main = do
     styleCtx <- getStyleContext
     ctx <- loadGui fileCtx styleCtx
     _ <- mainWindow ctx `on` deleteEvent $ liftIO mainQuit >> return False
-    widgetShowAll $ mainWindow ctx
+    widgetShow $ mainWindow ctx
     mainGUI
     where
          getFileContext = do

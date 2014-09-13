@@ -7,6 +7,7 @@ module Hob.Ui.SidebarSearch (
     ) where
 
 import Control.Monad.Trans (liftIO)
+import Data.Char           (isPrint)
 import Data.List           (intercalate)
 import Data.Maybe          (fromJust, isJust)
 import Data.Text           (unpack)
@@ -39,12 +40,14 @@ newSideBarFileTreeSearch ctx = do
         else return False
     return ()
     where
-        startSearch searchEntry firstChar = liftIO $ do
-            startSidebarSearch ctx [firstChar]
-            widgetShow searchEntry
-            widgetGrabFocus searchEntry
-            editableSelectRegion searchEntry 1 1
-            return True
+        startSearch searchEntry firstChar
+            | isPrint firstChar = liftIO $ do
+                startSidebarSearch ctx [firstChar]
+                widgetShow searchEntry
+                widgetGrabFocus searchEntry
+                editableSelectRegion searchEntry 1 1
+                return True
+            | otherwise = return False
         stopSearchAndActivateResult treeView searchEntry = liftIO $ do
             widgetGrabFocus treeView
             widgetHide searchEntry

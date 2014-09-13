@@ -9,12 +9,12 @@
         <property name="can_focus">False</property>
         <child>
           <object class="GtkBox" id="box2">
+            <property name="width_request">170</property>
             <property name="visible">True</property>
             <property name="can_focus">False</property>
             <property name="orientation">vertical</property>
             <child>
               <object class="GtkScrolledWindow" id="sidebarScroller">
-                <property name="width_request">170</property>
                 <property name="visible">True</property>
                 <property name="can_focus">False</property>
                 <child>
@@ -35,7 +35,6 @@
             </child>
             <child>
               <object class="GtkEntry" id="directoryListingSearch">
-                <property name="visible">True</property>
                 <property name="can_focus">True</property>
                 <property name="hexpand">True</property>
                 <property name="invisible_char">●</property>
@@ -48,7 +47,7 @@
             </child>
           </object>
           <packing>
-            <property name="resize">True</property>
+            <property name="resize">False</property>
             <property name="shrink">True</property>
           </packing>
         </child>
