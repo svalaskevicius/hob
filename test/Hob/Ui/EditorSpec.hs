@@ -8,7 +8,8 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
                                    sourceBufferUndo)
 
-import qualified Hob.Context   as HC
+import qualified Hob.Context           as HC
+import qualified Hob.Context.UiContext as HC
 import           Hob.Ui
 import           Hob.Ui.Editor
 
@@ -88,12 +89,12 @@ launchNewFileAndSetModified = do
 
 launchEditorTab :: HC.Context -> Maybe FilePath -> IO SourceView
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     newEditorForText ctx notebook file $ pack "initial text"
 
 getActiveEditorTabText :: HC.Context  -> IO String
 getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text

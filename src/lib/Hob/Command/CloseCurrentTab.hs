@@ -5,6 +5,7 @@ import Graphics.UI.Gtk
 
 import Hob.Command
 import Hob.Context
+import Hob.Context.UiContext
 
 closeCurrentEditorTab :: CommandHandler
 closeCurrentEditorTab = CommandHandler Nothing closeCurrentEditorTabHandler
@@ -18,6 +19,6 @@ closeCurrentEditorTabHandler ctx = do
             notebookRemovePage tabbed currentPage
             widgetDestroy pageContents
         Nothing -> return ()
-    where tabbed = mainNotebook ctx
+    where tabbed = mainNotebook.uiContext $ ctx
 
 

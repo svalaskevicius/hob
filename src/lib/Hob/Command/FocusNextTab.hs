@@ -4,13 +4,14 @@ import Graphics.UI.Gtk
 
 import Hob.Command
 import Hob.Context
+import Hob.Context.UiContext
 
 focusNextTabCommandHandler :: CommandHandler
 focusNextTabCommandHandler = CommandHandler Nothing focusNextTab
 
 focusNextTab :: Context -> IO ()
 focusNextTab ctx = do
-    let notebook = mainNotebook ctx
+    let notebook = mainNotebook.uiContext $ ctx
     pages <- notebookGetNPages notebook
     currentPage <- notebookGetCurrentPage notebook
     notebookSetCurrentPage notebook (nextpage currentPage pages)

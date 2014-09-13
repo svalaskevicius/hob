@@ -8,6 +8,7 @@ import           Hob.Command
 import           Hob.Command.ReloadSidebarTree
 import qualified Hob.Context                   as HC
 import qualified Hob.Context.FileContext       as HFC
+import qualified Hob.Context.UiContext         as HC
 import           Hob.DirectoryTree
 
 import Test.Hspec
@@ -40,7 +41,7 @@ altFileTreeStub = return [
 
 getDirectoryListingSidebarRootItems :: HC.Context -> IO [String]
 getDirectoryListingSidebarRootItems ctx = do
-    let treeView = HC.sidebarTree ctx
+    let treeView = HC.sidebarTree . HC.uiContext $ ctx
     maybeTreeModel <- treeViewGetModel treeView
     let treeModel = fromJust maybeTreeModel
     maybeRoot <- treeModelGetIter treeModel [0]

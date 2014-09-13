@@ -7,6 +7,7 @@ import Graphics.UI.Gtk
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
 import qualified Hob.Context.StyleContext as HSC
+import qualified Hob.Context.UiContext    as HC
 import           Hob.DirectoryTree
 import           Hob.Ui
 import           Hob.Ui.SidebarSearch
@@ -24,7 +25,7 @@ spec =
     it "shows the named search box" $ do
       ctx <- sideBarSearchContext
       startSidebarSearch ctx ""
-      name <- widgetGetName $ HC.sidebarTreeSearch ctx
+      name <- widgetGetName $ HC.sidebarTreeSearch . HC.uiContext $ ctx
       name `shouldBe` "sidebarSearchEntry"
 
     it "places the cursor on the first match on the search start" $ do
@@ -84,7 +85,7 @@ cursorShouldBeOnAfterSearch ctx search expectedPath = do
 
 cursorShouldBeOnAfterRefine :: HC.Context -> String -> TreePath -> IO ()
 cursorShouldBeOnAfterRefine ctx search expectedPath = do
-      entrySetText (HC.sidebarTreeSearch ctx) search
+      entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) search
       updateSidebarSearch ctx
       ctx `cursorShouldBeOn` expectedPath
 
@@ -103,7 +104,7 @@ cursorShouldBeOnAfterSearchAndContinue ctx search expectedPaths = do
 
 cursorShouldBeOn :: HC.Context -> TreePath -> IO ()
 cursorShouldBeOn ctx expectedPath = do
-    let sideBar = HC.sidebarTree ctx
+    let sideBar = HC.sidebarTree . HC.uiContext $ ctx
     (path, column) <- treeViewGetCursor sideBar
     path `shouldBe` expectedPath
     isNothing column `shouldBe` True

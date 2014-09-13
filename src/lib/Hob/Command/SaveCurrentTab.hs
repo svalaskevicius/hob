@@ -8,9 +8,9 @@ import Graphics.UI.Gtk
 import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
+import Hob.Context.UiContext
 import Hob.Control
 import Hob.Ui.Editor
-
 
 type NewFileNameChooser = IO (Maybe FilePath)
 
@@ -18,7 +18,7 @@ saveCurrentEditorTab :: CommandHandler
 saveCurrentEditorTab = CommandHandler Nothing (runWith saveCurrentEditorTabHandler fileChooser)
     where
         fileChooser ctx = do
-            dialog <- fileChooserDialogNew Nothing (Just $ mainWindow ctx) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
+            dialog <- fileChooserDialogNew Nothing (Just $ mainWindow.uiContext $ ctx) FileChooserActionSave [("Cancel", ResponseCancel), ("Save", ResponseOk)]
             resp <- dialogRun dialog
             file <- if resp == ResponseOk then fileChooserGetFilename dialog else return Nothing
             widgetDestroy dialog

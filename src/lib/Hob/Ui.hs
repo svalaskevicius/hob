@@ -22,11 +22,11 @@ import Hob.Command.SaveCurrentTab
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
+import Hob.Context.UiContext
 import Hob.Ui.CommandEntry
 import Hob.Ui.Editor
 import Hob.Ui.Sidebar
 import Hob.Ui.SidebarSearch
-
 
 loadGui :: FileContext -> StyleContext -> IO Context
 loadGui fileCtx styleCtx = do
@@ -55,15 +55,15 @@ loadGui fileCtx styleCtx = do
             builderAddFromFile builder $ uiFile styleCtx
             return builder
         initSidebar ctx = do
-            let treeView = sidebarTree ctx
-            let treeViewSearch = sidebarTreeSearch ctx
+            let treeView = sidebarTree . uiContext $ ctx
+            let treeViewSearch = sidebarTreeSearch . uiContext $ ctx
             widgetSetName treeView "directoryListing"
             widgetSetName treeViewSearch "sidebarSearchEntry"
-            let mainEditNotebook = mainNotebook ctx
+            let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
         initCommandEntry ctx cmdMatcher = do
-            let cmdEntry = commandEntry ctx
+            let cmdEntry = commandEntry . uiContext $ ctx
             widgetSetName cmdEntry "commandEntry"
             newCommandEntry ctx cmdEntry cmdMatcher
         initMainWindow builder cmdMatcher = do
@@ -73,7 +73,8 @@ loadGui fileCtx styleCtx = do
             treeView <- builderGetObject builder castToTreeView "directoryListing"
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
             treeModel <- treeStoreNew []
-            let ctx = Context styleCtx fileCtx window notebook cmdEntry treeView treeViewSearch treeModel
+            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
+            let ctx = Context styleCtx fileCtx uiCtx treeModel
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier

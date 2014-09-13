@@ -3,9 +3,10 @@ module Hob.Command.FindTextSpec (main, spec) where
 import Control.Monad (replicateM_)
 import Test.Hspec
 
-import Hob.Command
-import Hob.Command.FindText
-import Hob.Ui.Editor        (newEditorForText)
+import           Hob.Command
+import           Hob.Command.FindText
+import qualified Hob.Context.UiContext as HC
+import           Hob.Ui.Editor         (newEditorForText)
 
 import           Data.Maybe
 import           Data.Text       (pack)
@@ -58,7 +59,7 @@ spec =
 
     it "scrolls to the current match on execute" $ do
       ctx <- loadDefaultContext
-      let notebook = HC.mainNotebook ctx
+      let notebook = HC.mainNotebook . HC.uiContext $ ctx
       let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
       editor <- newEditorForText ctx notebook Nothing $ pack editorText
       processGtkEvents
@@ -74,7 +75,7 @@ spec =
 loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text!"
     (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") ctx
     buffer <- textViewGetBuffer editor

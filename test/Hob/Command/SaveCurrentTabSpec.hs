@@ -5,13 +5,14 @@ import Data.Maybe
 import Data.Text       (Text, pack)
 import Graphics.UI.Gtk
 
-import qualified Hob.Context              as HC
-import qualified Hob.Context.FileContext  as HFC
-import qualified Hob.Context.StyleContext as HSC
+import           Hob.Command.NewTab
+import           Hob.Command.SaveCurrentTab
+import qualified Hob.Context                as HC
+import qualified Hob.Context.FileContext    as HFC
+import qualified Hob.Context.StyleContext   as HSC
+import qualified Hob.Context.UiContext      as HC
+import           Hob.Ui
 
-import Hob.Command.NewTab
-import Hob.Command.SaveCurrentTab
-import Hob.Ui
 import Test.Hspec
 
 import HobTest.Context.Default
@@ -82,12 +83,12 @@ launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
 
 launchEditorTab :: HC.Context -> String -> IO ()
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     launchNewFileEditor ctx notebook file
 
 getActiveEditorTabText :: HC.Context  -> IO String
 getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text

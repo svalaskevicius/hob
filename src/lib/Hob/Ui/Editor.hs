@@ -36,6 +36,7 @@ import System.Glib.GObject
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
+import Hob.Context.UiContext
 import Hob.Control
 
 newEditorForText :: Context -> Notebook -> Maybe FilePath -> Text -> IO SourceView
@@ -110,7 +111,7 @@ getActiveEditorTab ctx = do
     else do
         tabs <- containerGetChildren tabbed
         return $ Just $ tabs!!pageNum
-    where tabbed = mainNotebook ctx
+    where tabbed = mainNotebook.uiContext $ ctx
 
 tabTitleForFile :: Maybe FilePath -> String
 tabTitleForFile (Just filePath) = filename' filePath

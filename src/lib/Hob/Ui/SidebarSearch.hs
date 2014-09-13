@@ -14,12 +14,13 @@ import Data.Text           (unpack)
 import Graphics.UI.Gtk
 
 import Hob.Context
+import Hob.Context.UiContext
 import Hob.Control
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
-    let treeView = sidebarTree ctx
-    let searchEntry = sidebarTreeSearch ctx
+    let treeView = sidebarTree.uiContext $ ctx
+    let searchEntry = sidebarTreeSearch.uiContext $ ctx
     _ <- treeView `on` keyPressEvent $ do
         key <- eventKeyVal
         maybe (return False) (startSearch searchEntry) $ keyToChar key
@@ -55,7 +56,7 @@ newSideBarFileTreeSearch ctx = do
 
 startSidebarSearch :: Context -> String -> IO ()
 startSidebarSearch ctx searchString = do
-    let entry = sidebarTreeSearch ctx
+    let entry = sidebarTreeSearch.uiContext $ ctx
     entrySetText entry searchString
     invokeOnTreeViewAndModel startSearch ctx
     where
@@ -67,7 +68,7 @@ updateSidebarSearch :: Context -> IO ()
 updateSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
-            let searchEntry = sidebarTreeSearch ctx
+            let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterOnSelection treeView model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
@@ -80,7 +81,7 @@ continueSidebarSearch :: Context -> IO ()
 continueSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
-            let searchEntry = sidebarTreeSearch ctx
+            let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterAfterSelection treeView model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
@@ -94,7 +95,7 @@ continueSidebarSearchBackwards :: Context -> IO ()
 continueSidebarSearchBackwards ctx = invokeOnTreeViewAndModel continueSearch ctx
     where
         continueSearch treeView model = do
-            let searchEntry = sidebarTreeSearch ctx
+            let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterBeforeSelection treeView model
             maybeDo (selectPreviousMatch treeView model searchString) maybeFirstIter
@@ -106,7 +107,7 @@ continueSidebarSearchBackwards ctx = invokeOnTreeViewAndModel continueSearch ctx
 
 invokeOnTreeViewAndModel :: (TreeView -> TreeModel -> IO ()) -> Context -> IO ()
 invokeOnTreeViewAndModel fnc ctx = do
-    let treeView = sidebarTree ctx
+    let treeView = sidebarTree.uiContext $ ctx
     model <- treeViewGetModel treeView
     maybeDo (fnc treeView) model
 

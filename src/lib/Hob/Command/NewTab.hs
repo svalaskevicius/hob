@@ -13,6 +13,7 @@ import Graphics.UI.Gtk
 import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
+import Hob.Context.UiContext
 import Hob.Control
 import Hob.Ui.Editor
 
@@ -43,7 +44,7 @@ editNewFile :: Context -> IO ()
 editNewFile ctx = do
     _ <- newEditorForText ctx tabbed Nothing $ pack ""
     return ()
-    where tabbed = mainNotebook ctx
+    where tabbed = mainNotebook.uiContext $ ctx
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)

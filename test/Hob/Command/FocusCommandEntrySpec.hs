@@ -7,6 +7,7 @@ import           Hob.Command
 import           Hob.Command.FocusCommandEntry
 import           Hob.Command.NewTab
 import qualified Hob.Context                   as HC
+import qualified Hob.Context.UiContext         as HC
 import           Hob.Ui
 
 import Test.Hspec
@@ -47,4 +48,4 @@ launchNewFile = do
 toggleFocusOnCommandEntryAndReturnState :: HC.Context -> IO Bool
 toggleFocusOnCommandEntryAndReturnState ctx = do
     commandExecute toggleFocusOnCommandEntryCommandHandler ctx
-    widgetGetIsFocus $ HC.commandEntry ctx
+    widgetGetIsFocus $ HC.commandEntry . HC.uiContext $ ctx

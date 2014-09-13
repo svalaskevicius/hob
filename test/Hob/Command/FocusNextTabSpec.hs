@@ -7,6 +7,7 @@ import           Hob.Command
 import           Hob.Command.FocusNextTab
 import           Hob.Command.NewTab
 import qualified Hob.Context              as HC
+import qualified Hob.Context.UiContext    as HC
 
 import Test.Hspec
 
@@ -30,20 +31,20 @@ spec =
 
     it "focuses the next tab" $ do
       ctx <- loadGuiWithNTabs 2
-      notebookSetCurrentPage (HC.mainNotebook ctx) 0
+      notebookSetCurrentPage (HC.mainNotebook . HC.uiContext $ ctx) 0
       currentPage <- focusNextTab ctx
       currentPage `shouldBe` 1
 
     it "focuses the first tab if the command is invoked on the last tab" $ do
       ctx <- loadGuiWithNTabs 2
-      notebookSetCurrentPage (HC.mainNotebook ctx) 1
+      notebookSetCurrentPage (HC.mainNotebook . HC.uiContext $ ctx) 1
       currentPage <- focusNextTab ctx
       currentPage `shouldBe` 0
 
 focusNextTab :: HC.Context -> IO Int
 focusNextTab ctx = do
     commandExecute focusNextTabCommandHandler ctx
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     notebookGetCurrentPage notebook
 
 loadGuiWithNTabs :: Int -> IO HC.Context

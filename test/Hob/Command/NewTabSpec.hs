@@ -4,10 +4,10 @@ import Test.Hspec
 
 import Graphics.UI.Gtk
 
-import qualified Hob.Context as HC
-
-import Hob.Command
-import Hob.Command.NewTab
+import           Hob.Command
+import           Hob.Command.NewTab
+import qualified Hob.Context           as HC
+import qualified Hob.Context.UiContext as HC
 
 import HobTest.Context.Default
 import HobTest.Context.Stubbed
@@ -25,7 +25,7 @@ spec =
 
     it "focuses the tab with the open file if requested to open an already loaded file" $ do
       ctx <- loadStubbedContext
-      let notebook = HC.mainNotebook ctx
+      let notebook = HC.mainNotebook . HC.uiContext $ ctx
       launchEditorTab ctx "/xxx/testName.hs"
       currentPageOfFirstLoadedFile <- notebookGetCurrentPage notebook
       launchEditorTab ctx "/xxx/c"
@@ -45,9 +45,9 @@ launchNewFile = do
 
 launchEditorTab :: HC.Context -> String -> IO ()
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook ctx
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
     launchNewFileEditor ctx notebook file
 
 getNumberOfEditorPages :: HC.Context -> IO Int
-getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook
+getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook . HC.uiContext
 

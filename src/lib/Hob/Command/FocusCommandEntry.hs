@@ -4,6 +4,7 @@ import Graphics.UI.Gtk
 
 import Hob.Command
 import Hob.Context
+import Hob.Context.UiContext
 import Hob.Control
 import Hob.Ui.Editor
 
@@ -17,4 +18,4 @@ toggleFocusOnCommandEntry ctx = do
         maybeDo widgetGrabFocus =<< getActiveEditor ctx
     else
         widgetGrabFocus cmdEntry
-    where cmdEntry = commandEntry ctx
+    where cmdEntry = commandEntry.uiContext $ ctx

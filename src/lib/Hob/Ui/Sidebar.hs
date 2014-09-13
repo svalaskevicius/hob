@@ -9,7 +9,6 @@ import Hob.Command.NewTab
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.DirectoryTree
-import Hob.Ui.SidebarSearch
 
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do

@@ -12,6 +12,7 @@ import Hob.Context
 import Hob.Context.FileContext  (FileLoader, FileTreeLoader, FileWriter,
                                  defaultFileContext)
 import Hob.Context.StyleContext (defaultStyleContext)
+import Hob.Context.UiContext
 import Hob.DirectoryTree
 import Hob.Ui
 
@@ -22,8 +23,9 @@ main = do
     fileCtx <- getFileContext
     styleCtx <- getStyleContext
     ctx <- loadGui fileCtx styleCtx
-    _ <- mainWindow ctx `on` deleteEvent $ liftIO mainQuit >> return False
-    widgetShow $ mainWindow ctx
+    let window = mainWindow . uiContext $ ctx
+    _ <- window `on` deleteEvent $ liftIO mainQuit >> return False
+    widgetShow window
     mainGUI
     where
          getFileContext = do

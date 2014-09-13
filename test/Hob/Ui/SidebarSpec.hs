@@ -4,9 +4,9 @@ import Data.Maybe
 import Data.Text       (unpack)
 import Graphics.UI.Gtk
 
-import qualified Hob.Context as HC
-
-import Hob.Ui.Editor
+import qualified Hob.Context           as HC
+import qualified Hob.Context.UiContext as HC
+import           Hob.Ui.Editor
 
 import Test.Hspec
 
@@ -21,7 +21,7 @@ spec =
   describe "sidebar" $ do
     it "is named" $ do
       ctx <- loadDefaultContext
-      name <- widgetGetName $ HC.sidebarTree ctx
+      name <- widgetGetName $ HC.sidebarTree . HC.uiContext $ ctx
       name `shouldBe` "directoryListing"
 
     it "opens a file editor" $ do
@@ -44,10 +44,10 @@ spec =
 
 activateDirectoryPath :: HC.Context -> TreePath -> IO ()
 activateDirectoryPath ctx path = do
-    let treeView = HC.sidebarTree ctx
+    let treeView = HC.sidebarTree . HC.uiContext $ ctx
     firstColumn <- treeViewGetColumn treeView 0
     treeViewRowActivated treeView path $ fromJust firstColumn
 
 
 getNumberOfEditorPages :: HC.Context -> IO Int
-getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook
+getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook . HC.uiContext

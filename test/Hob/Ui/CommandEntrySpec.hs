@@ -6,7 +6,8 @@ import Graphics.UI.Gtk.General.StyleContext
 import Data.IORef
 
 import           Hob.Command
-import qualified Hob.Context         as HC
+import qualified Hob.Context           as HC
+import qualified Hob.Context.UiContext as HC
 import           Hob.Ui.CommandEntry
 
 import Test.Hspec
@@ -24,18 +25,18 @@ spec =
   describe "command entry" $ do
     it "is named" $ do
       ctx <- loadDefaultContext
-      name <- widgetGetName $ HC.commandEntry ctx
+      name <- widgetGetName $ HC.commandEntry . HC.uiContext $ ctx
       name `shouldBe` "commandEntry"
 
     it "initially there is no error class applied" $ do
       ctx <- loadDefaultContext
-      styleContext <- widgetGetStyleContext $ HC.commandEntry ctx
+      styleContext <- widgetGetStyleContext $ HC.commandEntry . HC.uiContext $ ctx
       hasErrorClass <- styleContextHasClass styleContext "error"
       hasErrorClass `shouldBe` False
 
     it "applies error style class if the command is unknown" $ do
       ctx <- loadDefaultContext
-      let commandEntry = HC.commandEntry ctx
+      let commandEntry = HC.commandEntry . HC.uiContext $ ctx
       entrySetText commandEntry "qweqwe"
       styleContext <- widgetGetStyleContext commandEntry
       hasErrorClass <- styleContextHasClass styleContext "error"
@@ -43,7 +44,7 @@ spec =
 
     it "removes error style on empty command" $ do
       ctx <- loadDefaultContext
-      let commandEntry = HC.commandEntry ctx
+      let commandEntry = HC.commandEntry . HC.uiContext $ ctx
       entrySetText commandEntry "not empty"
       styleContext <- widgetGetStyleContext commandEntry
       styleContextAddClass styleContext "error"
