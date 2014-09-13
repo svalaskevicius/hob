@@ -21,11 +21,8 @@ newSideBarFileTreeSearch ctx = do
     let treeView = sidebarTree ctx
     let searchEntry = sidebarTreeSearch ctx
     _ <- treeView `on` keyPressEvent $ do
-        modifier <- eventModifier
-        if null modifier then do
-            key <- eventKeyVal
-            maybe (return False) (startSearch searchEntry) $ keyToChar key
-        else return False
+        key <- eventKeyVal
+        maybe (return False) (startSearch searchEntry) $ keyToChar key
     _ <- searchEntry `on` editableChanged $ updateSidebarSearch ctx
     _ <- searchEntry `on` focusOutEvent $ liftIO $ widgetHide searchEntry >> return False
     _ <- searchEntry `on` keyPressEvent $ do
