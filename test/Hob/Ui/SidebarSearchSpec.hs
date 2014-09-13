@@ -57,6 +57,24 @@ spec =
       ctx <- sideBarSearchContext
       sideBar <- getDirectoryListingSidebar ctx
       cursorShouldBeOnAfterSearch sideBar "r/rde" [0, 0]
+      
+    it "stays on the same path when search is refined" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      searchEntry <- startSidebarSearch sideBar "r/rd"
+      sideBar `cursorShouldBeOn` [0, 0]
+      entrySetText searchEntry "r/rde"
+      updateSidebarSearch sideBar searchEntry
+      sideBar `cursorShouldBeOn` [0, 0]
+
+    it "moves to the new match when search is refined" $ do
+      ctx <- sideBarSearchContext
+      sideBar <- getDirectoryListingSidebar ctx
+      searchEntry <- startSidebarSearch sideBar "r/rd"
+      sideBar `cursorShouldBeOn` [0, 0]
+      entrySetText searchEntry "r/rde2"
+      updateSidebarSearch sideBar searchEntry
+      sideBar `cursorShouldBeOn` [0, 1]
 
     it "focuses next file match when requested" $ do
       ctx <- sideBarSearchContext

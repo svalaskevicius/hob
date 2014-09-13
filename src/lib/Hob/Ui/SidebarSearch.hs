@@ -1,5 +1,6 @@
 module Hob.Ui.SidebarSearch (
         startSidebarSearch,
+        updateSidebarSearch,
         continueSidebarSearch,
         continueSidebarSearchBackwards
     ) where
@@ -23,6 +24,20 @@ startSidebarSearch treeView searchString = do
         startSearch model = do
             maybeFirstIter <- treeModelGetIterFirst model
             maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
+
+updateSidebarSearch :: TreeView -> Entry -> IO ()
+updateSidebarSearch treeView searchEntry = do
+    model <- treeViewGetModel treeView
+    maybeDo continueSearch model
+    where
+        continueSearch model = do
+            searchString <- entryGetText searchEntry
+            maybeFirstIter <- iterOnSelection model
+            maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
+
+        iterOnSelection model = do
+            (path, _) <- treeViewGetCursor treeView
+            treeModelGetIter model path
 
 continueSidebarSearch :: TreeView -> Entry -> IO ()
 continueSidebarSearch treeView searchEntry = do
@@ -62,7 +77,7 @@ selectPreviousMatch :: (TreeViewClass tv, TreeModelClass tm) => tv -> tm -> Stri
 selectPreviousMatch treeView treeModel =
     selectMatch (findPreviousSubtree treeModel) (treeModelIterLastChild treeModel) (treeModelIterPrevious treeModel) treeView treeModel
 
-selectMatch :: (TreeViewClass tv, TreeModelClass tm) =>
+selectMatch :: (TreeViewClass tv, TreeModelClass tm) => 
                 (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) ->
                 tv -> tm -> String -> TreeIter -> IO ()
 selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
