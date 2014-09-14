@@ -83,6 +83,12 @@ spec =
       executed <- executeReader
       executed `shouldBe` Just "asd"
 
+    it "clears command entry when executing a command" $ do
+      (_, commandEntry, entryApi, _) <- loadDefaultGuiWithMockedCommand
+      invokeCommand commandEntry entryApi "cmd->asd"
+      text <- entryGetText commandEntry
+      text `shouldBe` ""
+
     it "resets the last preview command before executing a command" $ do
       (_, commandEntry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
       invokeCommand commandEntry entryApi "cmd->asd"

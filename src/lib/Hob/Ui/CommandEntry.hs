@@ -43,6 +43,7 @@ newCommandEntryDetached ctx cmdEntry cmdMatcher = do
             previewCmd ctx cmdEntry cmdMatcher
         onReturn previewResetState = do
             runCmd ctx cmdEntry cmdMatcher previewResetState
+            entrySetText cmdEntry ""
             return True
 
 
