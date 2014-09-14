@@ -4,7 +4,10 @@ import Data.IORef
 import Data.Maybe      (fromJust, isNothing)
 import Data.Monoid
 import Graphics.UI.Gtk (Modifier (..))
-import Hob.Command
+
+import           Hob.Command
+import qualified Hob.Context as HC
+
 import Test.Hspec
 
 import HobTest.Context.Default
@@ -82,8 +85,21 @@ spec =
                 (handler, readHandledText) <- recordingHandler
                 let matcher = createMatcherForKeyBinding ([Control], "S") $ handler "test"
                 let matchedHandler = matchKeyBinding matcher ([Control], "S")
-                commandExecute (fromJust matchedHandler) ctx
-                handledText <- readHandledText
+                handledText <- executeRecordingHandler ctx matchedHandler readHandledText
+                handledText `shouldBe` Just "test"
+
+        describe "command matcher text command" $ do
+            it "does not match unknown text command" $ do
+                let matcher = createMatcherForCommand "hi" emptyHandler
+                let matchedHandler = matchCommand matcher "ho"
+                isNothing matchedHandler `shouldBe` True
+
+            it "matches known command" $ do
+                ctx <- loadDefaultContext
+                (handler, readHandledText) <- recordingHandler
+                let matcher = createMatcherForCommand "hi" $ handler "test"
+                let matchedHandler = matchCommand matcher "hi"
+                handledText <- executeRecordingHandler ctx matchedHandler readHandledText
                 handledText `shouldBe` Just "test"
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
@@ -119,3 +135,7 @@ recordingHandler = do
                 \params -> CommandHandler Nothing (\_ -> writeIORef state $ Just params),
                 readIORef state
             )
+executeRecordingHandler :: HC.Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
+executeRecordingHandler ctx handler readHandledText = do
+    commandExecute (fromJust handler) ctx
+    readHandledText

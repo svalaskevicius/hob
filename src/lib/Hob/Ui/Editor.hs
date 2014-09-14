@@ -31,7 +31,7 @@ import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
                                    sourceViewSetInsertSpacesInsteadOfTabs,
                                    sourceViewSetShowLineNumbers,
                                    sourceViewSetTabWidth)
-import System.Glib.GObject
+import System.Glib.GObject        (Quark)
 
 import Hob.Context
 import Hob.Context.FileContext
