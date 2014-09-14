@@ -84,6 +84,7 @@ searchStart text ctx = maybeDo searchStartOnEditor =<< getActiveEditor ctx
             setEditorSearchString editor (Just text)
             searchPreview text ctx
             searchExecute text ctx
+            widgetGrabFocus editor
 
 
 searchExecute :: String -> Context -> IO ()

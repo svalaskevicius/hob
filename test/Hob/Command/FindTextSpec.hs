@@ -12,6 +12,7 @@ import           Data.Maybe
 import           Data.Text       (pack)
 import           Graphics.UI.Gtk
 import qualified Hob.Context     as HC
+import           Hob.Ui          (getActiveEditor)
 
 import HobTest.Context.Default
 
@@ -62,6 +63,11 @@ spec = do
 
     it "scrolls to the current match on execute" $
       ensureCursorVisibleAfterCommands $ commandExecute (searchCommandHandler "customised search string at the end")
+
+    it "focuses editor on execute" $ do
+      (ctx, _) <- loadGuiAndExecuteSearch
+      editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
+      editorFocused `shouldBe` True
 
   describe "search next command handler" $ do
     it "highlights the next match from cursor on execute" $ do
