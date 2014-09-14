@@ -16,6 +16,7 @@ import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
 import Hob.Command.FocusNextTab
+import Hob.Command.FocusPreviousTab
 import Hob.Command.FocusSidebar
 import Hob.Command.NewTab
 import Hob.Command.ReloadSidebarTree
@@ -42,6 +43,8 @@ loadGui fileCtx styleCtx = do
                             createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
                             createMatcherForKeyBinding ([Control], "r") reloadSidebarTreeCommandHandler,
                             createMatcherForKeyBinding ([Control], "Tab") focusNextTabCommandHandler,
+                            createMatcherForKeyBinding ([Shift, Control], "Tab") focusPreviousTabCommandHandler,
+                            createMatcherForKeyBinding ([Shift, Control], "ISO_Left_Tab") focusPreviousTabCommandHandler,
                             createMatcherForKeyBinding ([Control], "t") focusSidebarCommandHandler,
                             createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                             createMatcherForPrefix "/" searchCommandHandler

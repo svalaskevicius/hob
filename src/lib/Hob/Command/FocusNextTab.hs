@@ -14,8 +14,8 @@ focusNextTab ctx = do
     let notebook = mainNotebook.uiContext $ ctx
     pages <- notebookGetNPages notebook
     currentPage <- notebookGetCurrentPage notebook
-    notebookSetCurrentPage notebook (nextpage currentPage pages)
+    notebookSetCurrentPage notebook (nextPage currentPage pages)
     where
-        nextpage currentPage pages =
+        nextPage currentPage pages =
             if currentPage == (pages - 1) then 0 else currentPage + 1
 
