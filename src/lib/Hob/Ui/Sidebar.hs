@@ -1,6 +1,6 @@
 module Hob.Ui.Sidebar (newSideBarFileTree, reloadSidebarTree, nameColumn) where
 
-import Control.Monad             (unless)
+import Control.Monad             (void)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 
@@ -21,7 +21,7 @@ newSideBarFileTree ctx treeView launchFile = do
     treeViewSetModel treeView treeStore
 
     _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
-    _ <- treeView `on` rowActivated $ \ path _ -> activateRow =<< treeStoreGetValue treeStore path
+    _ <- treeView `on` rowActivated $ \ path _ -> activateRow path =<< treeStoreGetValue treeStore path
 
     return ()
 
@@ -38,8 +38,9 @@ newSideBarFileTree ctx treeView launchFile = do
             _ <- treeViewAppendColumn treeView col
             return ()
 
-        activateRow :: DirectoryTreeElement -> IO ()
-        activateRow el = unless (isDirectory el) $ (launchFile . elementPath) el
+        activateRow :: TreePath -> DirectoryTreeElement -> IO ()
+        activateRow path el = if isDirectory el then void $ treeViewExpandRow treeView path False
+                              else launchFile . elementPath $ el
 
 
 nameColumn :: ColumnId row String

@@ -36,6 +36,12 @@ spec =
       pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 
+    it "expands subtree on directory activation" $ do
+      ctx <- loadStubbedContext
+      activateDirectoryPath ctx [0]
+      expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [0]
+      expanded `shouldBe` True
+
     it "does not open a file editor for files it cannot read" $ do
       ctx <- loadStubbedContext
       activateDirectoryPath ctx [2]
