@@ -153,6 +153,7 @@ selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
 
 updateMatchingPath :: TreeViewClass tv => tv -> TreePath -> IO ()
 updateMatchingPath treeView path = do
+    treeViewCollapseAll treeView
     treeViewExpandToPath treeView path
     treeViewSetCursor treeView path Nothing
 

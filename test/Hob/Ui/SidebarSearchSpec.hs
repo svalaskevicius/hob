@@ -74,6 +74,13 @@ spec =
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//rde" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
+    it "collapses previously matched path after searching in next subtree" $ do
+      ctx <- sideBarSearchContext
+      startSidebarSearch ctx "/Dir//rde"
+      continueSidebarSearch ctx
+      expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [3]
+      expanded `shouldBe` False
+
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
