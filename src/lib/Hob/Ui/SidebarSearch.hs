@@ -7,7 +7,7 @@ module Hob.Ui.SidebarSearch (
     ) where
 
 import Control.Monad.Trans (liftIO)
-import Data.Char           (isPrint)
+import Data.Char           (isPrint, toLower)
 import Data.List           (intercalate)
 import Data.Maybe          (fromJust, isJust)
 import Data.Text           (unpack)
@@ -176,7 +176,7 @@ eatMatcherFrom :: String -> String -> String
 eatMatcherFrom [] _ = []
 eatMatcherFrom search [] = search
 eatMatcherFrom (s:search) (v:value)
-    | s == v = eatMatcherFrom search value
+    | toLower s == toLower v = eatMatcherFrom search value
     | otherwise = eatMatcherFrom (s:search) value
 
 findNextSubtree :: TreeModelClass treeModel => treeModel -> TreeIter -> IO (Maybe TreeIter)

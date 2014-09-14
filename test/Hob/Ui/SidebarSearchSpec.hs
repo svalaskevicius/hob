@@ -81,6 +81,10 @@ spec =
       expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [3]
       expanded `shouldBe` False
 
+    it "allows case insensitive search" $ do
+      ctx <- sideBarSearchContext
+      cursorShouldBeOnAfterSearchAndContinue ctx "/DIR//RDE" [[3, 0, 0, 0], [4, 1, 0, 0]]
+
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
