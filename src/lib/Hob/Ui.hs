@@ -5,6 +5,7 @@ module Hob.Ui (loadGui,
                getActiveEditor) where
 
 import           Control.Monad.Trans                  (liftIO)
+import           Data.Char                            (intToDigit)
 import           Data.Monoid                          (mconcat)
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
@@ -16,6 +17,7 @@ import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
 import Hob.Command.FocusNextTab
+import Hob.Command.FocusNumberedTab
 import Hob.Command.FocusPreviousTab
 import Hob.Command.FocusSidebar
 import Hob.Command.NewTab
@@ -37,7 +39,7 @@ loadGui fileCtx styleCtx = do
         builder <- loadUiBuilder
         setGtkStyle styleCtx
 
-        let cmdMatcher = mconcat [
+        let cmdMatcher = mconcat $ [
                             createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
                             createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
                             createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
@@ -48,6 +50,10 @@ loadGui fileCtx styleCtx = do
                             createMatcherForKeyBinding ([Control], "t") focusSidebarCommandHandler,
                             createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                             createMatcherForPrefix "/" searchCommandHandler
+                        ] ++
+                        [
+                            createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
+                                | position <- [0..9]
                         ]
 
         ctx <- initMainWindow builder cmdMatcher
