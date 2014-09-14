@@ -3,6 +3,7 @@ module Hob.Ui.SidebarSearchSpec (main, spec) where
 import Data.Maybe
 import Data.Tree
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.General.StyleContext
 
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
@@ -89,6 +90,29 @@ spec =
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
 
+    it "applies error style class if there are no matches" $ do
+      ctx <- sideBarSearchContext
+      startSidebarSearch ctx "AAA!!!AAA"
+      ctx `sidebarTreeSearchErrorStateShouldBe` True
+
+    it "removes error style on empty search text" $ do
+      ctx <- sideBarSearchContext
+      startSidebarSearch ctx "AAA!!!AAA"
+      entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) ""
+      ctx `sidebarTreeSearchErrorStateShouldBe` False
+
+    it "removes error style on a match" $ do
+      ctx <- sideBarSearchContext
+      startSidebarSearch ctx "AAA!!!AAA"
+      entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) "red"
+      ctx `sidebarTreeSearchErrorStateShouldBe` False
+
+sidebarTreeSearchErrorStateShouldBe :: HC.Context -> Bool -> IO ()
+sidebarTreeSearchErrorStateShouldBe ctx state = do
+      styleContext <- widgetGetStyleContext $ HC.sidebarTreeSearch . HC.uiContext $ ctx
+      hasErrorClass <- styleContextHasClass styleContext "error"
+      hasErrorClass `shouldBe` state
+
 cursorShouldBeOnAfterSearch :: HC.Context -> String -> TreePath -> IO ()
 cursorShouldBeOnAfterSearch ctx search expectedPath = do
       startSidebarSearch ctx search
@@ -97,7 +121,6 @@ cursorShouldBeOnAfterSearch ctx search expectedPath = do
 cursorShouldBeOnAfterRefine :: HC.Context -> String -> TreePath -> IO ()
 cursorShouldBeOnAfterRefine ctx search expectedPath = do
       entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) search
-      updateSidebarSearch ctx
       ctx `cursorShouldBeOn` expectedPath
 
 cursorShouldBeOnAfterSearchAndContinue :: HC.Context -> String -> [TreePath] -> IO ()

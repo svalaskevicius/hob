@@ -1,9 +1,8 @@
 module Hob.Ui.CommandEntrySpec (main, spec) where
 
+import Data.IORef
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
---import Data.Monoid (mempty)
-import Data.IORef
 
 import           Hob.Command
 import qualified Hob.Context           as HC

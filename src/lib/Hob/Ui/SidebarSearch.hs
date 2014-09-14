@@ -6,12 +6,14 @@ module Hob.Ui.SidebarSearch (
         continueSidebarSearchBackwards
     ) where
 
-import Control.Monad.Trans (liftIO)
-import Data.Char           (isPrint, toLower)
-import Data.List           (intercalate)
-import Data.Maybe          (fromJust, isJust)
-import Data.Text           (unpack)
+import Control.Monad.Trans                  (liftIO)
+import Data.Char                            (isPrint, toLower)
+import Data.List                            (intercalate)
+import Data.Maybe                           (fromJust, isJust)
+import Data.Text                            (unpack)
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
+                                             styleContextRemoveClass)
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -58,11 +60,6 @@ startSidebarSearch :: Context -> String -> IO ()
 startSidebarSearch ctx searchString = do
     let entry = sidebarTreeSearch.uiContext $ ctx
     entrySetText entry searchString
-    invokeOnTreeViewAndModel startSearch ctx
-    where
-        startSearch treeView model = do
-            maybeFirstIter <- treeModelGetIterFirst model
-            maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
 
 updateSidebarSearch :: Context -> IO ()
 updateSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
@@ -71,11 +68,12 @@ updateSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
             let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterOnSelection treeView model
-            maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
+            maybeDo (selectNextMatch treeView model searchEntry searchString) maybeFirstIter
 
         iterOnSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
-            treeModelGetIter model path
+            selectedIter <- treeModelGetIter model path
+            maybe (treeModelGetIterFirst model) (return.Just) selectedIter
 
 continueSidebarSearch :: Context -> IO ()
 continueSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
@@ -84,7 +82,7 @@ continueSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
             let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterAfterSelection treeView model
-            maybeDo (selectNextMatch treeView model searchString) maybeFirstIter
+            maybeDo (selectNextMatch treeView model searchEntry searchString) maybeFirstIter
 
         iterAfterSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
@@ -98,7 +96,7 @@ continueSidebarSearchBackwards ctx = invokeOnTreeViewAndModel continueSearch ctx
             let searchEntry = sidebarTreeSearch.uiContext $ ctx
             searchString <- entryGetText searchEntry
             maybeFirstIter <- iterBeforeSelection treeView model
-            maybeDo (selectPreviousMatch treeView model searchString) maybeFirstIter
+            maybeDo (selectPreviousMatch treeView model searchEntry searchString) maybeFirstIter
 
         iterBeforeSelection treeView model = do
             (path, _) <- treeViewGetCursor treeView
@@ -111,21 +109,21 @@ invokeOnTreeViewAndModel fnc ctx = do
     model <- treeViewGetModel treeView
     maybeDo (fnc treeView) model
 
-selectNextMatch :: (TreeViewClass tv, TreeModelClass tm) => tv -> tm -> String -> TreeIter -> IO ()
+selectNextMatch :: (TreeViewClass tv, TreeModelClass tm, EntryClass e) => tv -> tm -> e -> String -> TreeIter -> IO ()
 selectNextMatch treeView treeModel =
     selectMatch (findNextSubtree treeModel) (treeModelIterChildren treeModel) (treeModelIterNext treeModel) treeView treeModel
 
-selectPreviousMatch :: (TreeViewClass tv, TreeModelClass tm) => tv -> tm -> String -> TreeIter -> IO ()
+selectPreviousMatch :: (TreeViewClass tv, TreeModelClass tm, EntryClass e) => tv -> tm -> e -> String -> TreeIter -> IO ()
 selectPreviousMatch treeView treeModel =
     selectMatch (findPreviousSubtree treeModel) (treeModelIterLastChild treeModel) (treeModelIterPrevious treeModel) treeView treeModel
 
-selectMatch :: (TreeViewClass tv, TreeModelClass tm) =>
+selectMatch :: (TreeViewClass tv, TreeModelClass tm, EntryClass e) =>
                 (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) -> (TreeIter -> IO (Maybe TreeIter)) ->
-                tv -> tm -> String -> TreeIter -> IO ()
+                tv -> tm -> e -> String -> TreeIter -> IO ()
 selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
-                treeView treeModel searchString currentIter = do
+                treeView treeModel searchEntry searchString currentIter = do
     maybePath <- findMatchingPath treeModel searchString currentIter
-    maybeDo (updateMatchingPath treeView) maybePath
+    maybe (setErrorState searchEntry) (\tp -> unsetErrorState searchEntry >> updateMatchingPath treeView tp) maybePath
     where
         findMatchingPath model search iter = do
             subtreeSearch <- eatParentMatches model search iter
@@ -149,7 +147,15 @@ selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
         findMatchingSibling model search iter =
             maybe (return Nothing) (findMatchingPathInSubtree model search) =<< findNextChildToMatch iter
 
+setErrorState :: EntryClass e => e -> IO ()
+setErrorState searchEntry = do
+    widgetStyleContext <- widgetGetStyleContext searchEntry
+    styleContextAddClass widgetStyleContext "error"
 
+unsetErrorState :: EntryClass e => e -> IO ()
+unsetErrorState searchEntry = do
+    widgetStyleContext <- widgetGetStyleContext searchEntry
+    styleContextRemoveClass widgetStyleContext "error"
 
 updateMatchingPath :: TreeViewClass tv => tv -> TreePath -> IO ()
 updateMatchingPath treeView path = do
