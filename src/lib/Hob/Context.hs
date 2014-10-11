@@ -2,7 +2,7 @@ module Hob.Context (
     Context(..)
 ) where
 
-import Graphics.UI.Gtk (TreeStore)
+import GtkExtras.LargeTreeStore as LTS (TreeStore)
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -13,5 +13,5 @@ data Context = Context {
     styleContext  :: StyleContext,
     fileContext   :: FileContext,
     uiContext     :: UiContext,
-    fileTreeStore :: TreeStore DirectoryTreeElement
+    fileTreeStore :: LTS.TreeStore DirectoryTreeElement
 }

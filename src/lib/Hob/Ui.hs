@@ -11,6 +11,7 @@ import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
+import           GtkExtras.LargeTreeStore             as LTS
 
 import Hob.Command
 import Hob.Command.CloseCurrentTab
@@ -86,7 +87,7 @@ loadGui fileCtx styleCtx = do
             cmdEntry <- builderGetObject builder castToEntry "command"
             treeView <- builderGetObject builder castToTreeView "directoryListing"
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
-            treeModel <- treeStoreNew []
+            treeModel <- LTS.treeStoreNew []
             let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
             let ctx = Context styleCtx fileCtx uiCtx treeModel
             widgetSetName window "mainWindow"

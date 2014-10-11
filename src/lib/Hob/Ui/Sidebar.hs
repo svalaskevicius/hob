@@ -3,6 +3,7 @@ module Hob.Ui.Sidebar (newSideBarFileTree, reloadSidebarTree, nameColumn) where
 import Control.Monad             (void)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
+import GtkExtras.LargeTreeStore  as LTS
 
 
 import Hob.Command.NewTab
@@ -21,7 +22,7 @@ newSideBarFileTree ctx treeView launchFile = do
     treeViewSetModel treeView treeStore
 
     _ <- treeView `on` rowCollapsed $ \ _ _ -> treeViewColumnsAutosize treeView
-    _ <- treeView `on` rowActivated $ \ path _ -> activateRow path =<< treeStoreGetValue treeStore path
+    _ <- treeView `on` rowActivated $ \ path _ -> activateRow path =<< LTS.treeStoreGetValue treeStore path
 
     return ()
 
@@ -51,5 +52,5 @@ reloadSidebarTree ctx = do
     let treeStore = fileTreeStore ctx
     let fileCtx = fileContext ctx
     let fileTreeLoader = contextFileTreeLoader fileCtx
-    treeStoreClear treeStore
-    treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+    LTS.treeStoreClear treeStore
+    LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
