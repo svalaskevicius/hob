@@ -1658,7 +1658,7 @@ GtkTreeView.cell:hover {
     color: @insensitive_fg_color;
 }
 
-.cell:selected {
+.cell:selected, row:selected, .cell:hover:selected {
     background-color: @theme_selected_bg_color;
     border-width: 0;
     border-radius: 3px;
