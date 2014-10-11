@@ -18,14 +18,14 @@
 @define-color insensitive_internal_element_color mix(@internal_element_color, @theme_bg_color, 0.5);
 @define-color selected_internal_element_color mix(@theme_selected_fg_color, @theme_selected_bg_color, 0.4);
 
-@define-color button_top_color mix(@theme_bg_color, @theme_base_color, 0.5);
-@define-color button_bottom_color mix(@theme_bg_color, @theme_tooltip_bg_color, 0.5);
-@define-color button_top_hover_color @theme_base_color;
-@define-color button_bottom_hover_color mix(@theme_bg_color, @subdued_color, 0.5);
-@define-color button_top_active_color mix(@theme_tooltip_bg_color, @subdued_color, 0.5);
-@define-color button_bottom_active_color mix(@theme_tooltip_bg_color, @theme_bg_color, 0.5);
-@define-color button_top_active_hover_color mix(@theme_tooltip_bg_color, @theme_bg_color, 0.5);
-@define-color button_bottom_active_hover_color mix(@theme_tooltip_bg_color, @theme_base_color, 0.5);
+@define-color button_top_color mix(@active_element, @theme_base_color, 0.7);
+@define-color button_bottom_color mix(@active_element, @theme_bg_color, 0.7);
+@define-color button_top_hover_color mix(@active_element, @theme_base_color, 0.6);
+@define-color button_bottom_hover_color mix(@active_element, @theme_bg_color, 0.6);
+@define-color button_top_active_color mix(@active_element, @theme_base_color, 0.5);
+@define-color button_bottom_active_color  mix(@active_element, @theme_bg_color, 0.5);
+@define-color button_top_active_hover_color  mix(@active_element, @theme_base_color, 0.4);
+@define-color button_bottom_active_hover_color mix(@active_element, @theme_bg_color, 0.4);
 
 @define-color colored_button_top_color mix(@button_top_color, @theme_selected_bg_color, 0.2);
 @define-color colored_button_bottom_color mix(@button_bottom_color, @theme_selected_bg_color, 0.2);
