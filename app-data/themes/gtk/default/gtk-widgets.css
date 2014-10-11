@@ -2170,3 +2170,9 @@ GsmFailWhaleDialog .button:active {
     border-color: @alt_border_color;
 }
 
+GtkSourceView {
+    background-color: @theme_bg_color;
+    color: @theme_fg_color;
+    font: monospace;
+}
+
