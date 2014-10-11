@@ -1,0 +1,10 @@
+
+@binding-set treeViewExpander
+{
+    bind "Left" { "expand-collapse-cursor-row" (1, 0, 0) };
+    bind "Right" { "expand-collapse-cursor-row" (1, 1, 0) };
+}
+
+GtkTreeView {
+    gtk-key-bindings: treeViewExpander;   
+}
