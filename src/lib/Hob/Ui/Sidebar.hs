@@ -1,6 +1,7 @@
 module Hob.Ui.Sidebar (
     newSideBarFileTree,
     reloadSidebarTree,
+    activateSidebarPath,
     nameColumn,
     pathColumn
     ) where
@@ -63,3 +64,10 @@ reloadSidebarTree ctx = do
     let fileTreeLoader = contextFileTreeLoader fileCtx
     LTS.treeStoreClear treeStore
     LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+
+
+activateSidebarPath :: TreeViewClass tv => tv -> TreePath -> IO ()
+activateSidebarPath treeView path = do
+    treeViewCollapseAll treeView
+    treeViewExpandToPath treeView path
+    treeViewSetCursor treeView path Nothing

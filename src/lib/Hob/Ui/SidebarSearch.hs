@@ -17,7 +17,7 @@ import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
 import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
-import Hob.Ui.Sidebar        (nameColumn, pathColumn)
+import Hob.Ui.Sidebar        (nameColumn, pathColumn, activateSidebarPath)
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
@@ -25,7 +25,7 @@ newSideBarFileTreeSearch ctx = do
     let searchEntry = sidebarTreeSearch.uiContext $ ctx
     _ <- treeView `on` keyPressEvent $ do
         key <- eventKeyVal
-        maybe (return False) (startSearch searchEntry) $ keyToChar key
+        maybe (return False) startSearch $ keyToChar key
     _ <- searchEntry `on` editableChanged $ updateSidebarSearch ctx
     _ <- searchEntry `on` focusOutEvent $ liftIO $ widgetHide searchEntry >> return False
     _ <- searchEntry `on` keyPressEvent $ do
@@ -40,12 +40,9 @@ newSideBarFileTreeSearch ctx = do
         else return False
     return ()
     where
-        startSearch searchEntry firstChar
+        startSearch firstChar
             | isPrint firstChar = liftIO $ do
                 startSidebarSearch ctx [firstChar]
-                widgetShow searchEntry
-                widgetGrabFocus searchEntry
-                editableSelectRegion searchEntry 1 1
                 return True
             | otherwise = return False
         stopSearchAndActivateResult treeView searchEntry = liftIO $ do
@@ -60,9 +57,13 @@ startSidebarSearch :: Context -> String -> IO ()
 startSidebarSearch ctx searchString = do
     let entry = sidebarTreeSearch.uiContext $ ctx
         sidebar = sidebarTree . uiContext $ ctx
+        len = length searchString
     treeViewSetCursor sidebar [] Nothing
     entrySetText entry ""
     entrySetText entry searchString
+    widgetShow entry
+    widgetGrabFocus entry
+    editableSelectRegion entry len len
 
 updateSidebarSearch :: Context -> IO ()
 updateSidebarSearch ctx = invokeOnTreeViewAndModel continueSearch ctx
@@ -126,7 +127,7 @@ selectMatch :: (TreeViewClass tv, TreeModelClass tm, EntryClass e) =>
 selectMatch findNextSubTreeToMatch findFirstChildToMatch findNextChildToMatch
                 treeView treeModel searchEntry searchString currentIter = do
     maybePath <- findMatchingPath treeModel searchString currentIter
-    maybe (setErrorState searchEntry) (\tp -> unsetErrorState searchEntry >> updateMatchingPath treeView tp) maybePath
+    maybe (setErrorState searchEntry) (\tp -> unsetErrorState searchEntry >> activateSidebarPath treeView tp) maybePath
     where
         findMatchingPath model search iter = do
             subtreeSearch <- eatParentMatches model search iter
@@ -159,12 +160,6 @@ unsetErrorState :: EntryClass e => e -> IO ()
 unsetErrorState searchEntry = do
     widgetStyleContext <- widgetGetStyleContext searchEntry
     styleContextRemoveClass widgetStyleContext "error"
-
-updateMatchingPath :: TreeViewClass tv => tv -> TreePath -> IO ()
-updateMatchingPath treeView path = do
-    treeViewCollapseAll treeView
-    treeViewExpandToPath treeView path
-    treeViewSetCursor treeView path Nothing
 
 eatParentMatches :: TreeModelClass treeModel => treeModel -> String -> TreeIter -> IO String
 eatParentMatches model search iter = do
