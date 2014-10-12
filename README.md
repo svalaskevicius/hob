@@ -7,3 +7,8 @@ that control the editor without the need of a menu.
 # How does it look?
 
 ![](http://svalaskevicius.github.io/hob/assets/screen1.png)
+
+# WIP corner
+
+[idea/task board](https://trello.com/b/xCl5w1kL)
+ 
