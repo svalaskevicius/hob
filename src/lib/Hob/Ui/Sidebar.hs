@@ -1,4 +1,9 @@
-module Hob.Ui.Sidebar (newSideBarFileTree, reloadSidebarTree, nameColumn) where
+module Hob.Ui.Sidebar (
+    newSideBarFileTree,
+    reloadSidebarTree,
+    nameColumn,
+    pathColumn
+    ) where
 
 import Control.Monad             (void)
 import Graphics.UI.Gtk
@@ -29,6 +34,7 @@ newSideBarFileTree ctx treeView launchFile = do
     where
         initNameColumn treeStore = do
             customStoreSetColumn treeStore nameColumn elementLabel
+            customStoreSetColumn treeStore pathColumn elementPath
 
             col <- treeViewColumnNew
 
@@ -46,6 +52,9 @@ newSideBarFileTree ctx treeView launchFile = do
 
 nameColumn :: ColumnId row String
 nameColumn = makeColumnIdString 0
+
+pathColumn :: ColumnId row FilePath
+pathColumn = makeColumnIdString 1
 
 reloadSidebarTree :: Context -> IO ()
 reloadSidebarTree ctx = do

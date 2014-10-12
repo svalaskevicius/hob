@@ -49,6 +49,7 @@ loadGui fileCtx styleCtx = do
                             createMatcherForKeyBinding ([Shift, Control], "Tab") focusPreviousTabCommandHandler,
                             createMatcherForKeyBinding ([Shift, Control], "ISO_Left_Tab") focusPreviousTabCommandHandler,
                             createMatcherForKeyBinding ([Control], "t") focusSidebarCommandHandler,
+                            createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
                             createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                             createMatcherForPrefix "/" searchCommandHandler,
                             createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,

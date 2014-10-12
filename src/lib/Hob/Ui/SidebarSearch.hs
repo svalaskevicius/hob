@@ -17,7 +17,7 @@ import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
 import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
-import Hob.Ui.Sidebar (nameColumn, pathColumn)
+import Hob.Ui.Sidebar        (nameColumn, pathColumn)
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
@@ -169,7 +169,7 @@ updateMatchingPath treeView path = do
 eatParentMatches :: TreeModelClass treeModel => treeModel -> String -> TreeIter -> IO String
 eatParentMatches model search iter = do
     path <- treeModelGetValue model iter pathColumn
-    let parentPath = reverse . (dropWhile (/= '/')) . reverse $ path
+    let parentPath = reverse . dropWhile (/= '/') . reverse $ path
     return $ eatMatcherFrom search parentPath
 
 eatMatcherFrom :: String -> String -> String
