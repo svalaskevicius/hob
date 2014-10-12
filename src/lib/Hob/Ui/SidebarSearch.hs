@@ -10,6 +10,7 @@ import Control.Monad.Trans                  (liftIO)
 import Data.Char                            (isPrint, toLower)
 import Data.Maybe                           (fromJust, isJust)
 import Data.Text                            (unpack)
+import Data.List (tails, minimumBy)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
                                              styleContextRemoveClass)
@@ -172,16 +173,20 @@ eatMatcherFrom = eatMatcherLoosely
     where eatMatcherLoosely [] _ = []
           eatMatcherLoosely search [] = search
           eatMatcherLoosely (s:search) (v:value)
-            | toLower s == toLower v = eatMatcherStrictly search value
+            | s `matches` v = maximiseStrictMatch (s:search) (v:value)
             | s == ' ' = eatMatcherLoosely search value
             | otherwise = eatMatcherLoosely (s:search) value
           eatMatcherStrictly [] _ = []
           eatMatcherStrictly search [] = search
           eatMatcherStrictly (s:search) (v:value)
-            | s == '/' = eatMatcherLoosely (s:search) (v:value)
             | s == ' ' = eatMatcherLoosely search (v:value)
-            | toLower s == toLower v = eatMatcherStrictly search value
+            | s `matches` v = eatMatcherStrictly search value
             | otherwise = s:search
+          maximiseStrictMatch search value = let
+                  searches = [eatMatcherStrictly search val | val <- tails value]
+                  searchesWithLength = [(s, length s) | s <- searches]
+              in fst $ minimumBy (\s1 s2 -> snd s1 `compare` snd s2) searchesWithLength
+          matches s v = toLower s == toLower v
 
 findNextSubtree :: TreeModelClass treeModel => treeModel -> TreeIter -> IO (Maybe TreeIter)
 findNextSubtree model iter = do

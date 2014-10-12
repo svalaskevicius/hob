@@ -33,6 +33,10 @@ spec =
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "greenFile" [1]
 
+    it "finds part even if start can be eaten" $ do
+      ctx <- sideBarSearchContext
+      cursorShouldBeOnAfterSearch ctx "greenFileZ" [6]
+
     it "places the cursor on the first nested match on the search start" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
@@ -176,7 +180,8 @@ sideBarSearchFileTreeStub = return [
         Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir" True) [
             Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir/blueDir" True) [
                 Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]],
-    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) []]
+    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
+    Node (DirectoryTreeElement "greegreenFileZ" "/xxx/greegreenFileZ" False) []]
 
 sideBarSearchContext :: IO HC.Context
 sideBarSearchContext = do
