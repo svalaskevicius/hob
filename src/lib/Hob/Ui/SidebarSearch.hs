@@ -8,7 +8,6 @@ module Hob.Ui.SidebarSearch (
 
 import Control.Monad.Trans                  (liftIO)
 import Data.Char                            (isPrint, toLower)
-import Data.List                            (intercalate)
 import Data.Maybe                           (fromJust, isJust)
 import Data.Text                            (unpack)
 import Graphics.UI.Gtk
@@ -18,6 +17,7 @@ import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
 import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
+import Hob.Ui.Sidebar (nameColumn, pathColumn)
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
@@ -59,6 +59,9 @@ newSideBarFileTreeSearch ctx = do
 startSidebarSearch :: Context -> String -> IO ()
 startSidebarSearch ctx searchString = do
     let entry = sidebarTreeSearch.uiContext $ ctx
+        sidebar = sidebarTree . uiContext $ ctx
+    treeViewSetCursor sidebar [] Nothing
+    entrySetText entry ""
     entrySetText entry searchString
 
 updateSidebarSearch :: Context -> IO ()
@@ -165,18 +168,9 @@ updateMatchingPath treeView path = do
 
 eatParentMatches :: TreeModelClass treeModel => treeModel -> String -> TreeIter -> IO String
 eatParentMatches model search iter = do
-    values <- getValues =<< getParents iter
-    return $ eatMatcherFrom search $ '/' : intercalate "/" values
-    where
-        getValues = mapM (\it -> treeModelGetValue model it nameColumn)
-        getParents childIter = do
-            parent <- treeModelIterParent model childIter
-            maybe
-                (return [])
-                (\p -> do
-                    parents <- getParents p
-                    return $ parents++[p])
-                parent
+    path <- treeModelGetValue model iter pathColumn
+    let parentPath = reverse . (dropWhile (/= '/')) . reverse $ path
+    return $ eatMatcherFrom search parentPath
 
 eatMatcherFrom :: String -> String -> String
 eatMatcherFrom [] _ = []
@@ -210,6 +204,3 @@ treeModelIterLastChild model iter = do
     childrenCount <- treeModelIterNChildren model $ Just iter
     if childrenCount > 0 then treeModelIterNthChild model (Just iter) (childrenCount - 1)
     else return Nothing
-
-nameColumn :: ColumnId row String
-nameColumn = makeColumnIdString 0

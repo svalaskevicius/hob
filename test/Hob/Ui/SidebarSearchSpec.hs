@@ -37,6 +37,21 @@ spec =
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
 
+    it "places the cursor on the first match on the search start even if started from the middle" $ do
+      ctx <- sideBarSearchContext
+      treeViewSetCursor (HC.sidebarTree . HC.uiContext $ ctx) [1] Nothing
+      cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
+
+    it "places the cursor on the first match again on the search start even if had the same search text before" $ do
+      ctx <- sideBarSearchContext
+      cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
+      treeViewSetCursor (HC.sidebarTree . HC.uiContext $ ctx) [1] Nothing
+      cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
+
+    it "allows searching by absolute path" $ do
+      ctx <- sideBarSearchContext
+      cursorShouldBeOnAfterSearch ctx "/xxx/greenFile" [1]
+
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "red" [0, 0]
