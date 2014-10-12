@@ -6,19 +6,20 @@ module Hob.Ui.SidebarSearch (
         continueSidebarSearchBackwards
     ) where
 
-import Control.Monad.Trans                  (liftIO)
-import Data.Char                            (isPrint, toLower)
-import Data.Maybe                           (fromJust, isJust)
-import Data.Text                            (unpack)
-import Data.List (tails, minimumBy)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
-                                             styleContextRemoveClass)
+import           Control.Monad.Trans                  (liftIO)
+import           Data.Char                            (isPrint, toLower)
+import qualified Data.Function                        as Fnc (on)
+import           Data.List                            (minimumBy, tails)
+import           Data.Maybe                           (fromJust, isJust)
+import           Data.Text                            (unpack)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
+                                                       styleContextRemoveClass)
 
 import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
-import Hob.Ui.Sidebar        (nameColumn, pathColumn, activateSidebarPath)
+import Hob.Ui.Sidebar        (activateSidebarPath, nameColumn, pathColumn)
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
@@ -185,7 +186,7 @@ eatMatcherFrom = eatMatcherLoosely
           maximiseStrictMatch search value = let
                   searches = [eatMatcherStrictly search val | val <- tails value]
                   searchesWithLength = [(s, length s) | s <- searches]
-              in fst $ minimumBy (\s1 s2 -> snd s1 `compare` snd s2) searchesWithLength
+              in fst $ minimumBy (compare `Fnc.on` snd) searchesWithLength
           matches s v = toLower s == toLower v
 
 findNextSubtree :: TreeModelClass treeModel => treeModel -> TreeIter -> IO (Maybe TreeIter)

@@ -10,7 +10,7 @@ import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
 import Hob.Ui.Editor         (getActiveEditor, getEditorFilePath)
-import Hob.Ui.Sidebar        (pathColumn, activateSidebarPath)
+import Hob.Ui.Sidebar        (activateSidebarPath, pathColumn)
 
 focusSidebarCommandHandler :: CommandHandler
 focusSidebarCommandHandler = CommandHandler Nothing focusSidebar
@@ -28,13 +28,13 @@ syncActiveEditorPathToSidebar ctx = maybeDo syncToEditor =<< getActiveEditor ctx
               let treeView = sidebarTree.uiContext $ ctx
               model <- treeViewGetModel treeView
               maybeDo (syncTreeViewModel filePath treeView) model
-          syncTreeViewModel filePath treeView model = 
+          syncTreeViewModel filePath treeView model =
               treeModelForeach model (\iter -> do
                       path <- treeModelGetValue model iter pathColumn
-                      if (path == filePath) then do
+                      if path == filePath then do
                           modelPath <- treeModelGetPath model iter
                           activateSidebarPath treeView modelPath
-                          return True 
+                          return True
                       else return False
                   )
 
