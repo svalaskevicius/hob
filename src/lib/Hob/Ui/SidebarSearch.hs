@@ -173,11 +173,20 @@ eatParentMatches model search iter = do
     return $ eatMatcherFrom search parentPath
 
 eatMatcherFrom :: String -> String -> String
-eatMatcherFrom [] _ = []
-eatMatcherFrom search [] = search
-eatMatcherFrom (s:search) (v:value)
-    | toLower s == toLower v = eatMatcherFrom search value
-    | otherwise = eatMatcherFrom (s:search) value
+eatMatcherFrom = eatMatcherLoosely
+    where eatMatcherLoosely [] _ = []
+          eatMatcherLoosely search [] = search
+          eatMatcherLoosely (s:search) (v:value)
+            | toLower s == toLower v = eatMatcherStrictly search value
+            | s == ' ' = eatMatcherLoosely search value
+            | otherwise = eatMatcherLoosely (s:search) value
+          eatMatcherStrictly [] _ = []
+          eatMatcherStrictly search [] = search
+          eatMatcherStrictly (s:search) (v:value)
+            | s == '/' = eatMatcherLoosely (s:search) (v:value)
+            | s == ' ' = eatMatcherLoosely search (v:value)
+            | toLower s == toLower v = eatMatcherStrictly search value
+            | otherwise = s:search
 
 findNextSubtree :: TreeModelClass treeModel => treeModel -> TreeIter -> IO (Maybe TreeIter)
 findNextSubtree model iter = do

@@ -58,48 +58,48 @@ spec =
 
     it "uses fuzzy matching on file name" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "rde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r d e" [0, 0]
 
     it "uses fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "rdDrrde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r dD r r d e" [0, 0]
 
     it "allows path separator while fuzzy matching on path" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "r/rde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r/red e" [0, 0]
 
     it "stays on the same path when search is refined" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "r/rd" [0, 0]
-      cursorShouldBeOnAfterRefine ctx "r/rde" [0, 0]
+      cursorShouldBeOnAfterSearch ctx "r/r d" [0, 0]
+      cursorShouldBeOnAfterRefine ctx "r/r d e" [0, 0]
 
     it "moves to the new match when search is refined" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "r/rd" [0, 0]
-      cursorShouldBeOnAfterRefine ctx "r/rde2" [0, 1]
+      cursorShouldBeOnAfterSearch ctx "r/r d" [0, 0]
+      cursorShouldBeOnAfterRefine ctx "r/r d e2" [0, 1]
 
     it "focuses next file match when requested" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "rde" [[0, 0], [0, 1]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "r d e" [[0, 0], [0, 1]]
 
     it "focuses next path match when requested" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "r/rde" [[0, 0], [0, 1]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "r/r d e" [[0, 0], [0, 1]]
 
     it "focuses next multi-level path match when requested" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//rde" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//r d e" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "collapses previously matched path after searching in next subtree" $ do
       ctx <- sideBarSearchContext
-      startSidebarSearch ctx "/Dir//rde"
+      startSidebarSearch ctx "/Dir//r d e"
       continueSidebarSearch ctx
       expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [3]
       expanded `shouldBe` False
 
     it "allows case insensitive search" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/DIR//RDE" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/DIR//R D E" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
