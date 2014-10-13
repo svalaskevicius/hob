@@ -3,6 +3,7 @@ module Hob.Command.FocusSidebar (
     syncFocusSidebarCommandHandler
     ) where
 
+import Data.List
 import Graphics.UI.Gtk
 
 import Hob.Command
@@ -26,19 +27,30 @@ syncActiveEditorPathToSidebar ctx = maybeDo syncToEditor =<< getActiveEditor ctx
     where syncToEditor editor = maybeDo syncToFilePath =<< getEditorFilePath editor
           syncToFilePath filePath = do
               let treeView = sidebarTree.uiContext $ ctx
-              model <- treeViewGetModel treeView
-              maybeDo (syncTreeViewModel filePath treeView) model
-          syncTreeViewModel filePath treeView model =
-              treeModelForeach model (\iter -> do
-                      path <- treeModelGetValue model iter pathColumn
-                      if path == filePath then do
-                          modelPath <- treeModelGetPath model iter
-                          activateSidebarPath treeView modelPath
-                          return True
-                      else return False
-                  )
+              maybeDo (syncTreeViewModel filePath treeView) =<< treeViewGetModel treeView
+          syncTreeViewModel filePath treeView model = do
+              mStartIter <- treeModelGetIterFirst model
+              maybeDo (syncToMatchingPath treeView model filePath) mStartIter
+          syncToMatchingPath treeView model filePath startingIter =
+              maybeDo (syncToIter treeView model) =<< findFilePath model filePath startingIter
+          syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
 
 syncFocusSidebar :: Context -> IO ()
 syncFocusSidebar ctx = do
     syncActiveEditorPathToSidebar ctx
     focusSidebar ctx
+
+findFilePath :: TreeModelClass self =>
+                self -> FilePath -> TreeIter -> IO (Maybe TreeIter)
+findFilePath model filePath iter = do
+        path <- treeModelGetValue model iter pathColumn
+        if path == filePath then return $ Just iter
+        else if path `isPrefixOf` filePath then matchChildren
+        else matchNextSibling
+    where matchChildren = recurseToMaybeIter =<< treeModelIterChildren model iter
+          matchNextSibling = recurseToMaybeIter =<< treeModelIterNext model iter
+          recurseToMaybeIter mIter =
+              case mIter of
+                  Nothing -> return Nothing
+                  (Just it) -> findFilePath model filePath it
+
