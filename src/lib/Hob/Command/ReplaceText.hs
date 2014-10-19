@@ -14,5 +14,6 @@ import Hob.Context
 import Hob.Control
 import Hob.Ui.Editor
 
-generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> String -> CommandHandler
-generateReplaceCommandHandler previewCmdHandler searchText = CommandHandler (Just $ previewCmdHandler searchText) (\_ -> return ())
+generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> CommandHandler
+generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText = 
+    CommandHandler (Just $ previewCmdHandler searchText) (executeCmdHandler searchText)

@@ -25,20 +25,32 @@ spec :: Spec
 spec = do
   describe "replace text command handler" $ do
     it "invokes the configured preview for the command handler" $ do
-        (mockedPreview, readInvokes) <- mockedPreviewCommandHandler
-        let replaceHandler = generateReplaceCommandHandler mockedPreview
+        (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
         (previewExecute . fromJust . commandPreview) (replaceHandler "text") ctx
-        invokes <- readInvokes
+        invokes <- readPreviews
         invokes `shouldBe` (["text"], 0)
 
     it "invokes the configured preview reset for the command handler" $ do
-        (mockedPreview, readInvokes) <- mockedPreviewCommandHandler
-        let replaceHandler = generateReplaceCommandHandler mockedPreview
+        (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
         (previewReset . fromJust . commandPreview) (replaceHandler "text") ctx
-        invokes <- readInvokes
+        invokes <- readPreviews
         invokes `shouldBe` ([], 1)
+        
+    it "invokes the configured command on execute" $ do
+        (replaceHandler, _, readExecutes) <- mockedReplaceCommandHandler
+        ctx <- loadDefaultContext
+        commandExecute (replaceHandler "text") ctx
+        invokes <- readExecutes
+        invokes `shouldBe` ["text"]
+
+mockedReplaceCommandHandler :: IO (String -> CommandHandler, IO ([String], Int), IO [String])
+mockedReplaceCommandHandler = do    
+    (mockedPreview, readPreviews) <- mockedPreviewCommandHandler
+    (mockedExecute, readExecutes) <- mockedStringCommand
+    let replaceHandler = generateReplaceCommandHandler mockedPreview mockedExecute
+    return (replaceHandler, readPreviews, readExecutes)
 
 mockedPreviewCommandHandler :: IO (String -> PreviewCommandHandler, IO ([String], Int))
 mockedPreviewCommandHandler = do
