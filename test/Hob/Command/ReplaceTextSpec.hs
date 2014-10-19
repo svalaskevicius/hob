@@ -44,6 +44,15 @@ spec = do
         commandExecute (replaceHandler "text") ctx
         invokes <- readExecutes
         invokes `shouldBe` ["text"]
+     
+    it "invokes the configured command on execute next" $ do
+        (replaceNextHandler, readExecutes) <- mockedReplaceNextCommandHandler
+        ctx <- loadDefaultContext
+        commandExecute (replaceNextHandler) ctx
+        invokes <- readExecutes
+        invokes `shouldBe` 1
+     
+    
 
 mockedReplaceCommandHandler :: IO (String -> CommandHandler, IO ([String], Int), IO [String])
 mockedReplaceCommandHandler = do    
@@ -51,6 +60,11 @@ mockedReplaceCommandHandler = do
     (mockedExecute, readExecutes) <- mockedStringCommand
     let replaceHandler = generateReplaceCommandHandler mockedPreview mockedExecute
     return (replaceHandler, readPreviews, readExecutes)
+
+mockedReplaceNextCommandHandler :: IO (CommandHandler, IO Int)
+mockedReplaceNextCommandHandler = do
+    (replaceNextCommand, readExecutes) <- mockedCounterCommand
+    return ((generateReplaceNextCommandHandler replaceNextCommand), readExecutes)
 
 mockedPreviewCommandHandler :: IO (String -> PreviewCommandHandler, IO ([String], Int))
 mockedPreviewCommandHandler = do
@@ -61,7 +75,6 @@ mockedPreviewCommandHandler = do
         previews <- readPreviews
         resets <- readResets
         return (previews, resets))
-
 
 mockedStringCommand :: IO (String -> HC.Context -> IO(), IO [String])
 mockedStringCommand = do

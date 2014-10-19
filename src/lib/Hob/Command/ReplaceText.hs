@@ -1,5 +1,6 @@
 module Hob.Command.ReplaceText (
         generateReplaceCommandHandler,
+        generateReplaceNextCommandHandler,
     ) where
 
 import Control.Monad              ((<=<))
@@ -17,3 +18,6 @@ import Hob.Ui.Editor
 generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> CommandHandler
 generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText = 
     CommandHandler (Just $ previewCmdHandler searchText) (executeCmdHandler searchText)
+
+generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
+generateReplaceNextCommandHandler executeCmdHandler = CommandHandler Nothing executeCmdHandler
