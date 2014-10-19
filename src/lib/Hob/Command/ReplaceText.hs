@@ -1,5 +1,6 @@
 module Hob.Command.ReplaceText (
         createMatcherForReplace,
+        replaceCommandHandler,
         replaceNextCommandHandler,
         generateReplaceCommandHandler,
         generateReplaceNextCommandHandler,
@@ -7,6 +8,7 @@ module Hob.Command.ReplaceText (
 
 import Control.Monad              ((<=<))
 import Data.Text                  (pack)
+import Data.Maybe                 (fromJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
 import System.Glib.GObject        (Quark)
@@ -45,12 +47,17 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | separator == x = Just $ handler search accumReplace
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
-generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> CommandHandler
-generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText = 
+generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> String -> CommandHandler
+generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText _ = 
     CommandHandler (Just $ previewCmdHandler searchText) (executeCmdHandler searchText)
 
 generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
 generateReplaceNextCommandHandler executeCmdHandler = CommandHandler Nothing executeCmdHandler
+
+replaceCommandHandler :: String -> String -> CommandHandler
+replaceCommandHandler = generateReplaceCommandHandler
+                            (\search -> fromJust (commandPreview (searchCommandHandler search)))
+                            (\search -> commandExecute (searchCommandHandler search))
 
 replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)

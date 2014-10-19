@@ -75,21 +75,21 @@ spec = do
     it "invokes the configured preview for the command handler" $ do
         (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        (previewExecute . fromJust . commandPreview) (replaceHandler "text") ctx
+        (previewExecute . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
         invokes <- readPreviews
         invokes `shouldBe` (["text"], 0)
 
     it "invokes the configured preview reset for the command handler" $ do
         (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        (previewReset . fromJust . commandPreview) (replaceHandler "text") ctx
+        (previewReset . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
         invokes <- readPreviews
         invokes `shouldBe` ([], 1)
         
     it "invokes the configured command on execute" $ do
         (replaceHandler, _, readExecutes) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        commandExecute (replaceHandler "text") ctx
+        commandExecute (replaceHandler "text" "newtext") ctx
         invokes <- readExecutes
         invokes `shouldBe` ["text"]
      
@@ -106,7 +106,13 @@ spec = do
         text <- buffer `get` textBufferText
         text `shouldBe` "text - initial text! text"
         
---     it "replaces previously highlighted text" $ do
+    it "replaces previously highlighted text" $ do
+        (ctx, buffer) <- loadGuiWithEditor
+        commandExecute (replaceCommandHandler "text" ":)") ctx
+        commandExecute (replaceNextCommandHandler) ctx
+        text <- buffer `get` textBufferText
+        text `shouldBe` ":) - initial text! text"
+
 --     it "does not replace if the highlighted text doesnt match the search string
         
 loadGuiWithEditor :: IO (HC.Context, TextBuffer)
@@ -117,7 +123,7 @@ loadGuiWithEditor = do
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
-mockedReplaceCommandHandler :: IO (String -> CommandHandler, IO ([String], Int), IO [String])
+mockedReplaceCommandHandler :: IO (String -> String -> CommandHandler, IO ([String], Int), IO [String])
 mockedReplaceCommandHandler = do    
     (mockedPreview, readPreviews) <- mockedPreviewCommandHandler
     (mockedExecute, readExecutes) <- mockedStringCommand
