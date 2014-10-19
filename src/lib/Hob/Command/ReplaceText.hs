@@ -1,0 +1,18 @@
+module Hob.Command.ReplaceText (
+        generateReplaceCommandHandler,
+    ) where
+
+import Control.Monad              ((<=<))
+import Data.Text                  (pack)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView)
+import System.Glib.GObject        (Quark)
+
+import Hob.Command
+import Hob.Command.FindText
+import Hob.Context
+import Hob.Control
+import Hob.Ui.Editor
+
+generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> String -> CommandHandler
+generateReplaceCommandHandler previewCmdHandler searchText = CommandHandler (Just $ previewCmdHandler searchText) (\_ -> return ())

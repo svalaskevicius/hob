@@ -1,16 +1,15 @@
 module Hob.Command.FindTextSpec (main, spec) where
 
 import Control.Monad (replicateM_)
+import           Data.Maybe
+import           Data.Text       (pack)
+import           Graphics.UI.Gtk
 import Test.Hspec
 
 import           Hob.Command
 import           Hob.Command.FindText
 import qualified Hob.Context.UiContext as HC
 import           Hob.Ui.Editor         (newEditorForText)
-
-import           Data.Maybe
-import           Data.Text       (pack)
-import           Graphics.UI.Gtk
 import qualified Hob.Context     as HC
 import           Hob.Ui          (getActiveEditor)
 
