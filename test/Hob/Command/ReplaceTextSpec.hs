@@ -22,7 +22,58 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do
+spec = do     
+  describe "replace text command matcher" $ do
+    it "accepts when command starts with the configured letter" $ do
+        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let matcher = createMatcherForReplace 's' handler
+        isJust (matchCommand matcher "s//") `shouldBe` True
+
+    it "does not accept when command starts with another than the configured letter" $ do
+        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let matcher = createMatcherForReplace 's' handler
+        isJust (matchCommand matcher "x//") `shouldBe` False
+
+    it "does not accept when command is empty" $ do
+        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let matcher = createMatcherForReplace 's' handler
+        isJust (matchCommand matcher "") `shouldBe` False
+        
+    it "parses search and replace strings" $ do
+        let handler "S" "R" = CommandHandler Nothing (\_ -> return())
+            handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
+            matcher = createMatcherForReplace 'x' handler
+            matchResult = matchCommand matcher "x/S/R"
+        commandExecute (fromJust matchResult) =<< loadDefaultContext
+
+    it "ignores options when parsing search and replace strings" $ do
+        let handler "S" "R" = CommandHandler Nothing (\_ -> return())
+            handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
+            matcher = createMatcherForReplace 'x' handler
+            matchResult = matchCommand matcher "x#S#R#options"
+        commandExecute (fromJust matchResult) =<< loadDefaultContext
+
+    it "matches escaped separator char as text" $ do
+        let handler "S/S" "R/R" = CommandHandler Nothing (\_ -> return())
+            handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
+            matcher = createMatcherForReplace 'x' handler
+            matchResult = matchCommand matcher "x/S\\/S/R\\/R"
+        commandExecute (fromJust matchResult) =<< loadDefaultContext
+
+    it "matches escaped any char as escape seq and text" $ do
+        let handler "S\\xS" "R\\xR" = CommandHandler Nothing (\_ -> return())
+            handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
+            matcher = createMatcherForReplace 'x' handler
+            matchResult = matchCommand matcher "x/S\\xS/R\\xR"
+        commandExecute (fromJust matchResult) =<< loadDefaultContext
+
+    it "matches escaped end of string as text" $ do
+        let handler "S" "R\\" = CommandHandler Nothing (\_ -> return())
+            handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
+            matcher = createMatcherForReplace 'x' handler
+            matchResult = matchCommand matcher "x/S/R\\"
+        commandExecute (fromJust matchResult) =<< loadDefaultContext
+
   describe "replace text command handler" $ do
     it "invokes the configured preview for the command handler" $ do
         (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
