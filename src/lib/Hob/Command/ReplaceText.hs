@@ -1,5 +1,6 @@
 module Hob.Command.ReplaceText (
         createMatcherForReplace,
+        replaceNextCommandHandler,
         generateReplaceCommandHandler,
         generateReplaceNextCommandHandler,
     ) where
@@ -50,3 +51,6 @@ generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText =
 
 generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
 generateReplaceNextCommandHandler executeCmdHandler = CommandHandler Nothing executeCmdHandler
+
+replaceNextCommandHandler :: CommandHandler
+replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)

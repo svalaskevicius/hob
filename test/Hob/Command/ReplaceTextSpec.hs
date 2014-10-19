@@ -4,17 +4,14 @@ import Test.Hspec
 import Data.IORef
 import           Data.Maybe
 import qualified Hob.Context     as HC
+import           Graphics.UI.Gtk
+import           Data.Text       (pack)
 
+import           Hob.Ui.Editor         (newEditorForText)
 import           Hob.Command
 import           Hob.Command.ReplaceText
-{-
 import qualified Hob.Context.UiContext as HC
-import           Hob.Ui.Editor         (newEditorForText)
-
-import           Data.Text       (pack)
-import           Graphics.UI.Gtk
-import           Hob.Ui          (getActiveEditor)
--}
+--import           Hob.Ui          (getActiveEditor)
 
 import HobTest.Context.Default
 
@@ -102,8 +99,23 @@ spec = do
         commandExecute (replaceNextHandler) ctx
         invokes <- readExecutes
         invokes `shouldBe` 1
-     
-    
+  
+    it "does not replace if there is no highlighted text" $ do
+        (ctx, buffer) <- loadGuiWithEditor
+        commandExecute (replaceNextCommandHandler) ctx
+        text <- buffer `get` textBufferText
+        text `shouldBe` "text - initial text! text"
+        
+--     it "replaces previously highlighted text" $ do
+--     it "does not replace if the highlighted text doesnt match the search string
+        
+loadGuiWithEditor :: IO (HC.Context, TextBuffer)
+loadGuiWithEditor = do
+    ctx <- loadDefaultContext
+    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
+    buffer <- textViewGetBuffer editor
+    return (ctx, buffer)
 
 mockedReplaceCommandHandler :: IO (String -> CommandHandler, IO ([String], Int), IO [String])
 mockedReplaceCommandHandler = do    
