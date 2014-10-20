@@ -1,17 +1,17 @@
 module Hob.Command.ReplaceTextSpec (main, spec) where
 
-import Test.Hspec
+import Control.Monad   (replicateM_)
 import Data.IORef
-import Control.Monad (replicateM_)
-import           Data.Maybe
-import           Graphics.UI.Gtk
-import           Data.Text       (pack)
+import Data.Maybe
+import Data.Text       (pack)
+import Graphics.UI.Gtk
+import Test.Hspec
 
-import qualified Hob.Context     as HC
-import           Hob.Ui.Editor         (newEditorForText)
 import           Hob.Command
 import           Hob.Command.ReplaceText
-import qualified Hob.Context.UiContext as HC
+import qualified Hob.Context             as HC
+import qualified Hob.Context.UiContext   as HC
+import           Hob.Ui.Editor           (newEditorForText)
 --import           Hob.Ui          (getActiveEditor)
 
 import HobTest.Context.Default
@@ -20,7 +20,7 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec = do     
+spec = do
   describe "replace text command matcher" $ do
     it "accepts when command starts with the configured letter" $ do
         let handler _ _ = CommandHandler Nothing (\_ -> return())
@@ -36,7 +36,7 @@ spec = do
         let handler _ _ = CommandHandler Nothing (\_ -> return())
         let matcher = createMatcherForReplace 's' handler
         isJust (matchCommand matcher "") `shouldBe` False
-        
+
     it "parses search and replace strings" $ do
         let handler "S" "R" = CommandHandler Nothing (\_ -> return())
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
@@ -86,34 +86,31 @@ spec = do
         (previewReset . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
         invokes <- readPreviews
         invokes `shouldBe` ([], 1)
-        
+
     it "invokes the configured command on execute" $ do
         (replaceHandler, _, readExecutes) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
         commandExecute (replaceHandler "text" "newtext") ctx
         invokes <- readExecutes
         invokes `shouldBe` ["text"]
-     
+
     it "invokes the configured command on execute next" $ do
         (replaceNextHandler, readExecutes) <- mockedReplaceNextCommandHandler
         ctx <- loadDefaultContext
-        commandExecute (replaceNextHandler) ctx
+        commandExecute replaceNextHandler ctx
         invokes <- readExecutes
         invokes `shouldBe` 1
-  
+
     it "does not replace if there is no highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
-        commandExecute (replaceNextCommandHandler) ctx
+        commandExecute replaceNextCommandHandler ctx
         text <- buffer `get` textBufferText
         text `shouldBe` "text - initial text! text"
-        
+
     it "replaces previously highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
         commandExecute (replaceCommandHandler "text" ":)") ctx
-        processGtkEvents
-        commandExecute (replaceNextCommandHandler) ctx
-        processGtkEvents
-        text <- buffer `get` textBufferText
+        text <- replaceNext ctx buffer
         text `shouldBe` ":) - initial text! text"
 
     it "does not replace if the highlighted text doesnt match the search string" $ do
@@ -122,12 +119,16 @@ spec = do
         (s, _) <- textBufferGetSelectionBounds buffer
         e <- textBufferGetIterAtOffset buffer 7
         textBufferSelectRange buffer s e
-        processGtkEvents
-        commandExecute (replaceNextCommandHandler) ctx
-        processGtkEvents
-        text <- buffer `get` textBufferText
+        text <- replaceNext ctx buffer
         text `shouldBe` "text - initial text! text"
-    
+
+replaceNext :: TextBufferClass o => HC.Context -> o -> IO String
+replaceNext ctx buffer = do
+    processGtkEvents
+    commandExecute replaceNextCommandHandler ctx
+    processGtkEvents
+    buffer `get` textBufferText
+
 loadGuiWithEditor :: IO (HC.Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext
@@ -137,7 +138,7 @@ loadGuiWithEditor = do
     return (ctx, buffer)
 
 mockedReplaceCommandHandler :: IO (String -> String -> CommandHandler, IO ([String], Int), IO [String])
-mockedReplaceCommandHandler = do    
+mockedReplaceCommandHandler = do
     (mockedPreview, readPreviews) <- mockedPreviewCommandHandler
     (mockedExecute, readExecutes) <- mockedStringCommand
     let replaceHandler = generateReplaceCommandHandler mockedPreview mockedExecute
@@ -146,7 +147,7 @@ mockedReplaceCommandHandler = do
 mockedReplaceNextCommandHandler :: IO (CommandHandler, IO Int)
 mockedReplaceNextCommandHandler = do
     (replaceNextCommand, readExecutes) <- mockedCounterCommand
-    return ((generateReplaceNextCommandHandler replaceNextCommand), readExecutes)
+    return (generateReplaceNextCommandHandler replaceNextCommand, readExecutes)
 
 mockedPreviewCommandHandler :: IO (String -> PreviewCommandHandler, IO ([String], Int))
 mockedPreviewCommandHandler = do
@@ -161,17 +162,17 @@ mockedPreviewCommandHandler = do
 mockedStringCommand :: IO (String -> HC.Context -> IO(), IO [String])
 mockedStringCommand = do
     recorder <- newIORef []
-    return ((\v _ -> do
+    return (\v _ -> do
             currentValues <- readIORef recorder
-            writeIORef recorder $ currentValues ++ [v]),
+            writeIORef recorder $ currentValues ++ [v],
         readIORef recorder)
 
 mockedCounterCommand :: IO (HC.Context -> IO(), IO Int)
 mockedCounterCommand = do
     recorder <- newIORef 0
-    return ((\_ -> do
+    return (\_ -> do
             currentValue <- readIORef recorder
-            writeIORef recorder $ currentValue + 1),
+            writeIORef recorder $ currentValue + 1,
         readIORef recorder)
 
 processGtkEvents :: IO ()

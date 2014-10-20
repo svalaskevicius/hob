@@ -6,8 +6,7 @@ module Hob.Command.ReplaceText (
         generateReplaceNextCommandHandler,
     ) where
 
-import Control.Monad              ((<=<), when)
-import Data.Text                  (pack)
+import Control.Monad              (when)
 import Data.Maybe                 (fromJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
@@ -25,10 +24,10 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
           match (p:ps)
            | p == prefix = matchSearchAndReplaceFromStart ps
            | otherwise = Nothing
-           
+
           matchSearchAndReplaceFromStart [] = Nothing
           matchSearchAndReplaceFromStart (separator:xs) = matchSearchAndReplaceFromSearch separator xs ""
-          
+
           matchSearchAndReplaceFromSearch _ [] _ = Nothing
           matchSearchAndReplaceFromSearch separator (x:xs) accumSearch
            | '\\' == x = case xs of
@@ -37,7 +36,7 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
                                        else matchSearchAndReplaceFromSearch separator xs (accumSearch++[x])
            | separator == x = matchSearchAndReplaceFromReplace separator xs accumSearch ""
            | otherwise = matchSearchAndReplaceFromSearch separator xs (accumSearch++[x])
-           
+
           matchSearchAndReplaceFromReplace _ [] search accumReplace = Just $ handler search accumReplace
           matchSearchAndReplaceFromReplace separator (x:xs) search accumReplace
            | '\\' == x = case xs of
@@ -48,7 +47,7 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
 generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> String -> CommandHandler
-generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText = 
+generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText =
     CommandHandler (Just $ previewCmdHandler searchText) executeHandler
     where executeHandler ctx = decoratedCmdHandler searchText ctx >> replaceStart searchText replaceText ctx
 
@@ -58,8 +57,8 @@ generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing e
 
 replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler = generateReplaceCommandHandler
-                            (\search -> fromJust (commandPreview (searchCommandHandler search)))
-                            (\search -> commandExecute (searchCommandHandler search))
+                            (fromJust . commandPreview . searchCommandHandler)
+                            (commandExecute . searchCommandHandler)
 
 replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
@@ -79,7 +78,7 @@ replaceBeforeNext ctx = maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
               when (searchText == selectedText) $ do
                   textBufferDelete buffer s e
                   textBufferInsert buffer s replaceText
-              
+
 
 
 setEditorReplaceString :: SourceView -> Maybe String -> IO ()
@@ -91,7 +90,7 @@ getEditorReplaceString :: SourceView -> IO (Maybe String)
 getEditorReplaceString editor = do
     quark <- replaceStringQuark
     objectGetAttributeUnsafe quark editor
-    
+
 
 
 replaceStringQuark :: IO Quark
