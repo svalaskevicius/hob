@@ -48,11 +48,13 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
 generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> String -> CommandHandler
-generateReplaceCommandHandler previewCmdHandler executeCmdHandler searchText _ = 
-    CommandHandler (Just $ previewCmdHandler searchText) (executeCmdHandler searchText)
+generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText = 
+    CommandHandler (Just $ previewCmdHandler searchText) executeHandler
+    where executeHandler ctx = decoratedCmdHandler searchText ctx >> replaceStart searchText replaceText ctx
 
 generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
-generateReplaceNextCommandHandler executeCmdHandler = CommandHandler Nothing executeCmdHandler
+generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
+    where executeHandler ctx = replaceBeforeNext ctx >> decoratedCmdHandler ctx
 
 replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler = generateReplaceCommandHandler
@@ -61,3 +63,32 @@ replaceCommandHandler = generateReplaceCommandHandler
 
 replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
+
+replaceStart :: String -> String -> Context -> IO()
+replaceStart _ replaceText ctx = maybeDo replaceStartOnEditor =<< getActiveEditor ctx
+    where replaceStartOnEditor editor = setEditorReplaceString editor (Just replaceText)
+
+replaceBeforeNext :: Context -> IO()
+replaceBeforeNext ctx = maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
+    where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
+          replaceSelectionWith editor replaceText = do
+              buffer <- textViewGetBuffer editor
+              (s, e) <- textBufferGetSelectionBounds buffer
+              textBufferDelete buffer s e
+              textBufferInsert buffer s replaceText
+
+
+setEditorReplaceString :: SourceView -> Maybe String -> IO ()
+setEditorReplaceString editor replaceString = do
+    quark <- replaceStringQuark
+    objectSetAttribute quark editor replaceString
+
+getEditorReplaceString :: SourceView -> IO (Maybe String)
+getEditorReplaceString editor = do
+    quark <- replaceStringQuark
+    objectGetAttributeUnsafe quark editor
+    
+
+
+replaceStringQuark :: IO Quark
+replaceStringQuark = quarkFromString "activeReplaceString"

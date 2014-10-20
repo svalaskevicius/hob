@@ -2,11 +2,12 @@ module Hob.Command.ReplaceTextSpec (main, spec) where
 
 import Test.Hspec
 import Data.IORef
+import Control.Monad (replicateM_)
 import           Data.Maybe
-import qualified Hob.Context     as HC
 import           Graphics.UI.Gtk
 import           Data.Text       (pack)
 
+import qualified Hob.Context     as HC
 import           Hob.Ui.Editor         (newEditorForText)
 import           Hob.Command
 import           Hob.Command.ReplaceText
@@ -109,12 +110,15 @@ spec = do
     it "replaces previously highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
         commandExecute (replaceCommandHandler "text" ":)") ctx
+        processGtkEvents
         commandExecute (replaceNextCommandHandler) ctx
+        processGtkEvents
         text <- buffer `get` textBufferText
         text `shouldBe` ":) - initial text! text"
 
 --     it "does not replace if the highlighted text doesnt match the search string
-        
+--     add options: replace all, replace case (in-)sensitive - later
+
 loadGuiWithEditor :: IO (HC.Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext
@@ -161,3 +165,5 @@ mockedCounterCommand = do
             writeIORef recorder $ currentValue + 1),
         readIORef recorder)
 
+processGtkEvents :: IO ()
+processGtkEvents = replicateM_ 500 $ mainIterationDo False
