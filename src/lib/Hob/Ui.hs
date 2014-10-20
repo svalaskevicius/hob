@@ -23,6 +23,7 @@ import Hob.Command.FocusPreviousTab
 import Hob.Command.FocusSidebar
 import Hob.Command.NewTab
 import Hob.Command.ReloadSidebarTree
+import Hob.Command.ReplaceText
 import Hob.Command.SaveCurrentTab
 import Hob.Context
 import Hob.Context.FileContext
@@ -54,7 +55,9 @@ loadGui fileCtx styleCtx = do
                             createMatcherForPrefix "/" searchCommandHandler,
                             createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
                             createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
-                            createMatcherForCommand "stopSearch" searchResetCommandHandler
+                            createMatcherForCommand "stopSearch" searchResetCommandHandler,
+                            createMatcherForReplace 's' replaceCommandHandler,
+                            createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
                         ] ++
                         [
                             createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
