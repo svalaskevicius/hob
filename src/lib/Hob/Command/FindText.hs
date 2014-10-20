@@ -2,7 +2,8 @@ module Hob.Command.FindText (
         searchCommandHandler,
         searchNextCommandHandler,
         searchBackwardsCommandHandler,
-        searchResetCommandHandler
+        searchResetCommandHandler,
+        getEditorSearchString,
     ) where
 
 import Control.Monad              ((<=<))

@@ -116,9 +116,18 @@ spec = do
         text <- buffer `get` textBufferText
         text `shouldBe` ":) - initial text! text"
 
---     it "does not replace if the highlighted text doesnt match the search string
---     add options: replace all, replace case (in-)sensitive - later
-
+    it "does not replace if the highlighted text doesnt match the search string" $ do
+        (ctx, buffer) <- loadGuiWithEditor
+        commandExecute (replaceCommandHandler "text" ":)") ctx
+        (s, _) <- textBufferGetSelectionBounds buffer
+        e <- textBufferGetIterAtOffset buffer 7
+        textBufferSelectRange buffer s e
+        processGtkEvents
+        commandExecute (replaceNextCommandHandler) ctx
+        processGtkEvents
+        text <- buffer `get` textBufferText
+        text `shouldBe` "text - initial text! text"
+    
 loadGuiWithEditor :: IO (HC.Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext

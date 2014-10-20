@@ -6,7 +6,7 @@ module Hob.Command.ReplaceText (
         generateReplaceNextCommandHandler,
     ) where
 
-import Control.Monad              ((<=<))
+import Control.Monad              ((<=<), when)
 import Data.Text                  (pack)
 import Data.Maybe                 (fromJust)
 import Graphics.UI.Gtk
@@ -71,11 +71,15 @@ replaceStart _ replaceText ctx = maybeDo replaceStartOnEditor =<< getActiveEdito
 replaceBeforeNext :: Context -> IO()
 replaceBeforeNext ctx = maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
     where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
-          replaceSelectionWith editor replaceText = do
+          replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
+          replaceSearchSelectionWith editor replaceText searchText = do
               buffer <- textViewGetBuffer editor
               (s, e) <- textBufferGetSelectionBounds buffer
-              textBufferDelete buffer s e
-              textBufferInsert buffer s replaceText
+              selectedText <- textBufferGetText buffer s e False
+              when (searchText == selectedText) $ do
+                  textBufferDelete buffer s e
+                  textBufferInsert buffer s replaceText
+              
 
 
 setEditorReplaceString :: SourceView -> Maybe String -> IO ()
