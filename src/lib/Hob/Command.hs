@@ -27,25 +27,22 @@ data CommandHandler = CommandHandler {
                 }
 
 type KeyboardBinding = ([Modifier], String)
-type KeyCommandMatcher = KeyboardBinding -> Maybe CommandHandler
-type TextCommandMatcher = String -> Maybe CommandHandler
+type SingleCommandMatcher a = a -> Maybe CommandHandler
+type KeyCommandMatcher = SingleCommandMatcher KeyboardBinding
+type TextCommandMatcher = SingleCommandMatcher String
 
 data CommandMatcher = CommandMatcher {
                     matchKeyBinding :: KeyCommandMatcher,
                     matchCommand    :: TextCommandMatcher
-                }
+                }   
 
 instance Monoid CommandMatcher where
     mempty = CommandMatcher (const Nothing) (const Nothing)
     mappend l r = CommandMatcher (combineMatchKeyBinding l r) (combineMatchCommand l r)
+        where combineMatchKeyBinding = combineMatcher matchKeyBinding
+              combineMatchCommand = combineMatcher matchCommand
 
-combineMatchKeyBinding :: CommandMatcher -> CommandMatcher -> KeyCommandMatcher
-combineMatchKeyBinding = combineMatcher matchKeyBinding
-
-combineMatchCommand :: CommandMatcher -> CommandMatcher -> TextCommandMatcher
-combineMatchCommand = combineMatcher matchCommand
-
-combineMatcher :: (CommandMatcher -> a -> Maybe CommandHandler) -> CommandMatcher -> CommandMatcher -> a -> Maybe CommandHandler
+combineMatcher :: (CommandMatcher -> SingleCommandMatcher a) -> CommandMatcher -> CommandMatcher -> SingleCommandMatcher a
 combineMatcher combiner l r cmd = if isJust rightResult then rightResult else leftResult
     where leftResult = combiner l cmd
           rightResult = combiner r cmd
