@@ -1,6 +1,6 @@
 module Hob.Command.ReloadSidebarTree (reloadSidebarTreeCommandHandler) where
 
-import Hob.Command
+import Hob.Context
 import Hob.Ui.Sidebar
 
 reloadSidebarTreeCommandHandler :: CommandHandler

@@ -6,7 +6,6 @@ import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 
-import Hob.Command
 import Hob.Context
 import Hob.Control
 

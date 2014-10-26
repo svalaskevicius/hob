@@ -2,7 +2,6 @@ module Hob.Command.FocusNextTab (focusNextTabCommandHandler) where
 
 import Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.UiContext
 

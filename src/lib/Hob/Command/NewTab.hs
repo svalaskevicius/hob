@@ -10,7 +10,6 @@ import Data.Maybe      (mapMaybe)
 import Data.Text       (pack)
 import Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.UiContext

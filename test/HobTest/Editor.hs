@@ -6,24 +6,23 @@ module HobTest.Editor (
 
 import Graphics.UI.Gtk
 
-import           Hob.Command
-import           Hob.Command.NewTab
-import qualified Hob.Context           as HC
-import qualified Hob.Context.UiContext as HC
+import Hob.Command.NewTab
+import Hob.Context
+import Hob.Context.UiContext
 
 import HobTest.Context.Default
 
-launchNewFile :: IO HC.Context
+launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
     commandExecute editNewFileCommandHandler ctx
     return ctx
 
-launchEditorTab :: HC.Context -> String -> IO ()
+launchEditorTab :: Context -> String -> IO ()
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = mainNotebook . uiContext $ ctx
     launchNewFileEditor ctx notebook file
 
-getNumberOfEditorPages :: HC.Context -> IO Int
-getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook . HC.uiContext
+getNumberOfEditorPages :: Context -> IO Int
+getNumberOfEditorPages = notebookGetNPages . mainNotebook . uiContext
 

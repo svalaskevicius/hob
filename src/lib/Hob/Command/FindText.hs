@@ -12,7 +12,6 @@ import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
 import System.Glib.GObject        (Quark)
 
-import Hob.Command
 import Hob.Context
 import Hob.Control
 import Hob.Ui.Editor

@@ -13,7 +13,6 @@ import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
 
-import Hob.Command
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
@@ -93,7 +92,7 @@ loadGui fileCtx styleCtx = do
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
             treeModel <- LTS.treeStoreNew []
             let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
-            let ctx = Context styleCtx fileCtx uiCtx treeModel
+            let ctx = Context styleCtx fileCtx uiCtx treeModel []
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier

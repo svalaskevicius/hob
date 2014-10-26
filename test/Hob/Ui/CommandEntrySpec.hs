@@ -4,10 +4,9 @@ import Data.IORef
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
 
-import           Hob.Command
-import qualified Hob.Context           as HC
-import qualified Hob.Context.UiContext as HC
-import           Hob.Ui.CommandEntry
+import Hob.Context
+import Hob.Context.UiContext
+import Hob.Ui.CommandEntry
 
 import Test.Hspec
 
@@ -24,94 +23,94 @@ spec =
   describe "command entry" $ do
     it "is named" $ do
       ctx <- loadDefaultContext
-      name <- widgetGetName $ HC.commandEntry . HC.uiContext $ ctx
+      name <- widgetGetName $ commandEntry . uiContext $ ctx
       name `shouldBe` "commandEntry"
 
     it "initially there is no error class applied" $ do
       ctx <- loadDefaultContext
-      styleContext <- widgetGetStyleContext $ HC.commandEntry . HC.uiContext $ ctx
-      hasErrorClass <- styleContextHasClass styleContext "error"
+      styleCtx <- widgetGetStyleContext $ commandEntry . uiContext $ ctx
+      hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "applies error style class if the command is unknown" $ do
       ctx <- loadDefaultContext
-      let commandEntry = HC.commandEntry . HC.uiContext $ ctx
-      entrySetText commandEntry "qweqwe"
-      styleContext <- widgetGetStyleContext commandEntry
-      hasErrorClass <- styleContextHasClass styleContext "error"
+      let entry = commandEntry . uiContext $ ctx
+      entrySetText entry "qweqwe"
+      styleCtx <- widgetGetStyleContext entry
+      hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` True
 
     it "removes error style on empty command" $ do
       ctx <- loadDefaultContext
-      let commandEntry = HC.commandEntry . HC.uiContext $ ctx
-      entrySetText commandEntry "not empty"
-      styleContext <- widgetGetStyleContext commandEntry
-      styleContextAddClass styleContext "error"
-      entrySetText commandEntry ""
-      hasErrorClass <- styleContextHasClass styleContext "error"
+      let entry = commandEntry . uiContext $ ctx
+      entrySetText entry "not empty"
+      styleCtx <- widgetGetStyleContext entry
+      styleContextAddClass styleCtx "error"
+      entrySetText entry ""
+      hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "removes error style on known command" $ do
-      (_, commandEntry, entryApi, _) <- loadDefaultGuiWithMockedCommand
-      styleContext <- widgetGetStyleContext commandEntry
-      styleContextAddClass styleContext "error"
-      invokePreview commandEntry entryApi "cmd->asd"
-      hasErrorClass <- styleContextHasClass styleContext "error"
+      (_, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
+      styleCtx <- widgetGetStyleContext entry
+      styleContextAddClass styleCtx "error"
+      invokePreview entry entryApi "cmd->asd"
+      hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "invokes preview on the command" $ do
-      (_, commandEntry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokePreview commandEntry entryApi "cmd->asd"
+      (_, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      invokePreview entry entryApi "cmd->asd"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "asd"
       previewResetText `shouldBe` Nothing
 
     it "resets preview before next preview" $ do
-      (_, commandEntry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokePreview commandEntry entryApi "cmd->asd"
-      invokePreview commandEntry entryApi "cmd->as"
+      (_, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      invokePreview entry entryApi "cmd->asd"
+      invokePreview entry entryApi "cmd->as"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "as"
       previewResetText `shouldBe` Just "called"
 
     it "executes the command" $ do
-      (_, commandEntry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
-      invokeCommand commandEntry entryApi "cmd->asd"
+      (_, entry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
+      invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       executed `shouldBe` Just "asd"
 
     it "clears command entry when executing a command" $ do
-      (_, commandEntry, entryApi, _) <- loadDefaultGuiWithMockedCommand
-      invokeCommand commandEntry entryApi "cmd->asd"
-      text <- entryGetText commandEntry
+      (_, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
+      invokeCommand entry entryApi "cmd->asd"
+      text <- entryGetText entry
       text `shouldBe` ""
 
     it "resets the last preview command before executing a command" $ do
-      (_, commandEntry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokeCommand commandEntry entryApi "cmd->asd"
+      (_, entry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       previewResetText <- previewResetReader
       executed `shouldBe` Just "asd"
       previewResetText `shouldBe` Just "called"
 
 invokePreview :: Entry -> EntryApi -> String -> IO ()
-invokePreview commandEntry api text = entrySetText commandEntry text >> fst api
+invokePreview entry api text = entrySetText entry text >> fst api
 
 invokeCommand :: Entry -> EntryApi -> String -> IO ()
-invokeCommand commandEntry api text = do
-    invokePreview commandEntry api text
+invokeCommand entry api text = do
+    invokePreview entry api text
     _ <- snd api
     return()
 
-loadDefaultGuiWithMockedCommand :: IO (HC.Context, Entry, EntryApi, CommandHandlerReaders)
+loadDefaultGuiWithMockedCommand :: IO (Context, Entry, EntryApi, CommandHandlerReaders)
 loadDefaultGuiWithMockedCommand = do
     ctx <- loadDefaultContext
-    commandEntry <- entryNew
+    entry <- entryNew
     (matcher, readHandledCommands) <- mockedMatcher "cmd->"
-    entryApi <- newCommandEntryDetached ctx commandEntry matcher
-    return (ctx, commandEntry, entryApi, readHandledCommands)
+    entryApi <- newCommandEntryDetached ctx entry matcher
+    return (ctx, entry, entryApi, readHandledCommands)
 
 mockedMatcher :: String -> IO (CommandMatcher, CommandHandlerReaders)
 mockedMatcher prefix = do

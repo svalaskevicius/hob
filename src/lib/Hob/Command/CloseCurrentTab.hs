@@ -3,7 +3,6 @@ module Hob.Command.CloseCurrentTab (closeCurrentEditorTab) where
 
 import Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.UiContext
 

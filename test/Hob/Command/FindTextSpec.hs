@@ -6,9 +6,8 @@ import Data.Text       (pack)
 import Graphics.UI.Gtk
 import Test.Hspec
 
-import           Hob.Command
 import           Hob.Command.FindText
-import qualified Hob.Context           as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext as HC
 import           Hob.Ui                (getActiveEditor)
 import           Hob.Ui.Editor         (newEditorForText)
@@ -121,10 +120,10 @@ spec = do
             commandExecute searchBackwardsCommandHandler ctx
       ensureCursorVisibleAfterCommands commands
 
-ensureCursorVisibleAfterCommands :: (HC.Context -> IO ()) -> IO ()
+ensureCursorVisibleAfterCommands :: (Context -> IO ()) -> IO ()
 ensureCursorVisibleAfterCommands commands = do
     ctx <- loadDefaultContext
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
     editor <- newEditorForText ctx notebook Nothing $ pack editorText
     processGtkEvents
@@ -136,16 +135,16 @@ ensureCursorVisibleAfterCommands commands = do
     cursor <- textViewGetIterLocation editor caretIter
     isRectangleInside visible cursor `shouldBe` True
 
-loadGuiAndPreviewSearch :: IO (HC.Context, TextBuffer)
+loadGuiAndPreviewSearch :: IO (Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
     (previewExecute . fromJust . commandPreview) (searchCommandHandler "text") ctx
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
-loadGuiAndExecuteSearch :: IO (HC.Context, TextBuffer)
+loadGuiAndExecuteSearch :: IO (Context, TextBuffer)
 loadGuiAndExecuteSearch = do
     (ctx, buffer) <- loadGuiAndPreviewSearch
     (previewReset . fromJust . commandPreview) (searchCommandHandler "text") ctx

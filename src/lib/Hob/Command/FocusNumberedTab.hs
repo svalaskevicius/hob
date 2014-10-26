@@ -3,7 +3,6 @@ module Hob.Command.FocusNumberedTab (focusNumberedTabCommandHandler) where
 import Control.Monad   (when)
 import Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.UiContext
 

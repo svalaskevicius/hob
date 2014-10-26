@@ -4,10 +4,9 @@ import Test.Hspec
 
 import Graphics.UI.Gtk
 
-import           Hob.Command
 import           Hob.Command.CloseCurrentTab
 import           Hob.Command.NewTab          (launchNewFileEditor)
-import qualified Hob.Context                 as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext       as HC
 
 import HobTest.Context.Stubbed
@@ -25,11 +24,11 @@ spec =
             pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
             pagesAfterActivatingDirectory `shouldBe` 0
 
-launchEditorTab :: HC.Context -> String -> IO ()
+launchEditorTab :: Context -> String -> IO ()
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     launchNewFileEditor ctx notebook file
 
-getNumberOfEditorPages :: HC.Context -> IO Int
-getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook . HC.uiContext
+getNumberOfEditorPages :: Context -> IO Int
+getNumberOfEditorPages = notebookGetNPages . HC.mainNotebook . uiContext
 

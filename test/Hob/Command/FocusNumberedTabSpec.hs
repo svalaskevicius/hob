@@ -3,10 +3,9 @@ module Hob.Command.FocusNumberedTabSpec (main, spec) where
 import Control.Monad   (replicateM_)
 import Graphics.UI.Gtk
 
-import           Hob.Command
 import           Hob.Command.FocusNumberedTab
 import           Hob.Command.NewTab
-import qualified Hob.Context                  as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext        as HC
 
 import Test.Hspec
@@ -26,17 +25,17 @@ spec =
 
     it "focuses the numbered tab" $ do
       ctx <- loadGuiWithNTabs 3
-      notebookSetCurrentPage (HC.mainNotebook . HC.uiContext $ ctx) 0
+      notebookSetCurrentPage (HC.mainNotebook . uiContext $ ctx) 0
       currentPage <- focusNumberedTab 2 ctx
       currentPage `shouldBe` 2
 
-focusNumberedTab :: Int -> HC.Context -> IO Int
+focusNumberedTab :: Int -> Context -> IO Int
 focusNumberedTab nr ctx = do
     commandExecute (focusNumberedTabCommandHandler nr) ctx
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 
-loadGuiWithNTabs :: Int -> IO HC.Context
+loadGuiWithNTabs :: Int -> IO Context
 loadGuiWithNTabs n = do
     ctx <- loadDefaultContext
     replicateM_ n (editNewFile ctx)

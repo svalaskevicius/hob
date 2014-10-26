@@ -7,9 +7,8 @@ import Data.Text       (pack)
 import Graphics.UI.Gtk
 import Test.Hspec
 
-import           Hob.Command
 import           Hob.Command.ReplaceText
-import qualified Hob.Context             as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext   as HC
 import           Hob.Ui.Editor           (newEditorForText)
 --import           Hob.Ui          (getActiveEditor)
@@ -122,17 +121,17 @@ spec = do
         text <- replaceNext ctx buffer
         text `shouldBe` "text - initial text! text"
 
-replaceNext :: TextBufferClass o => HC.Context -> o -> IO String
+replaceNext :: TextBufferClass o => Context -> o -> IO String
 replaceNext ctx buffer = do
     processGtkEvents
     commandExecute replaceNextCommandHandler ctx
     processGtkEvents
     buffer `get` textBufferText
 
-loadGuiWithEditor :: IO (HC.Context, TextBuffer)
+loadGuiWithEditor :: IO (Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
@@ -159,7 +158,7 @@ mockedPreviewCommandHandler = do
         resets <- readResets
         return (previews, resets))
 
-mockedStringCommand :: IO (String -> HC.Context -> IO(), IO [String])
+mockedStringCommand :: IO (String -> Context -> IO(), IO [String])
 mockedStringCommand = do
     recorder <- newIORef []
     return (\v _ -> do
@@ -167,7 +166,7 @@ mockedStringCommand = do
             writeIORef recorder $ currentValues ++ [v],
         readIORef recorder)
 
-mockedCounterCommand :: IO (HC.Context -> IO(), IO Int)
+mockedCounterCommand :: IO (Context -> IO(), IO Int)
 mockedCounterCommand = do
     recorder <- newIORef 0
     return (\_ -> do

@@ -2,9 +2,8 @@ module Hob.Command.FocusSidebarSpec (main, spec) where
 
 import Graphics.UI.Gtk
 
-import           Hob.Command
 import           Hob.Command.FocusSidebar
-import qualified Hob.Context              as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext    as HC
 
 import Test.Hspec
@@ -33,16 +32,16 @@ spec =
       focused `shouldBe` True
 
 
-sidebarFocusState :: HC.Context -> IO Bool
-sidebarFocusState = widgetGetIsFocus . HC.sidebarTree . HC.uiContext
+sidebarFocusState :: Context -> IO Bool
+sidebarFocusState = widgetGetIsFocus . HC.sidebarTree . uiContext
 
-focusSidebarAndReturnState :: HC.Context -> IO Bool
+focusSidebarAndReturnState :: Context -> IO Bool
 focusSidebarAndReturnState ctx = do
     commandExecute focusSidebarCommandHandler ctx
     sidebarFocusState ctx
 
-syncSidebarAndReturnSelectedPath :: HC.Context -> IO TreePath
+syncSidebarAndReturnSelectedPath :: Context -> IO TreePath
 syncSidebarAndReturnSelectedPath ctx = do
     commandExecute syncFocusSidebarCommandHandler ctx
-    pos <- treeViewGetCursor . HC.sidebarTree . HC.uiContext $ ctx
+    pos <- treeViewGetCursor . HC.sidebarTree . uiContext $ ctx
     return $ fst pos
