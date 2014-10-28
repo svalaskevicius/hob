@@ -6,6 +6,7 @@ module Hob.Context (
     KeyboardBinding,
     KeyCommandMatcher,
     TextCommandMatcher,
+    Mode(..),
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
