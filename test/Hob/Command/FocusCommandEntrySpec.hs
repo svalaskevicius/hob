@@ -26,13 +26,13 @@ spec =
 
     it "focus stays on toggle if there is no editor to focus to" $ do
       ctx <- loadDefaultContext
-      commandExecute toggleFocusOnCommandEntryCommandHandler ctx
+      _ <- commandExecute toggleFocusOnCommandEntryCommandHandler ctx
       focused <- toggleFocusOnCommandEntryAndReturnState ctx
       focused `shouldBe` True
 
     it "focus moves to editor on toggle" $ do
       ctx <- launchNewFile
-      commandExecute toggleFocusOnCommandEntryCommandHandler ctx
+      _ <- commandExecute toggleFocusOnCommandEntryCommandHandler ctx
       commandFocused <- toggleFocusOnCommandEntryAndReturnState ctx
       editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
       commandFocused `shouldBe` False
@@ -42,9 +42,8 @@ launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
     editNewFile ctx
-    return ctx
 
 toggleFocusOnCommandEntryAndReturnState :: Context -> IO Bool
 toggleFocusOnCommandEntryAndReturnState ctx = do
-    commandExecute toggleFocusOnCommandEntryCommandHandler ctx
+    _ <- commandExecute toggleFocusOnCommandEntryCommandHandler ctx
     widgetGetIsFocus $ HC.commandEntry . uiContext $ ctx

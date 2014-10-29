@@ -12,6 +12,7 @@ import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
+import Data.IORef
 
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
@@ -41,7 +42,8 @@ loadGui fileCtx styleCtx = do
         setGtkStyle styleCtx
 
         ctx <- initCtx builder defaultMode
-        initMainWindow ctx 
+        commandContextRunner <- contextRunner ctx
+        commandContextRunner (initMainWindow commandContextRunner)
         initSidebar ctx
         initCommandEntry ctx
         return ctx
@@ -73,7 +75,7 @@ loadGui fileCtx styleCtx = do
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName cmdEntry "commandEntry"
             newCommandEntry ctx cmdEntry cmdMatcher
-        initMainWindow ctx = do
+        initMainWindow commandContextRunner ctx = do
             let window = mainWindow . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName window "mainWindow"
@@ -81,9 +83,9 @@ loadGui fileCtx styleCtx = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
-                      (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $
+                      (\cmd -> liftIO $ (commandContextRunner $ commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
-            return ()
+            return ctx
         defaultMode = 
                 let cmdMatcher = mconcat $ [
                                     -- default:
@@ -118,6 +120,12 @@ loadGui fileCtx styleCtx = do
                                         | position <- [0..9]
                                 ]
                 in Mode "" cmdMatcher
+
+contextRunner :: Context -> IO (Command -> IO())
+contextRunner initialRunner = do
+    ref <- newIORef initialRunner
+    return (\command -> readIORef ref >>= command >>= atomicWriteIORef ref)
+
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do
     cssProvider <- cssProviderNew

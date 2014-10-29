@@ -16,7 +16,6 @@ launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
     commandExecute editNewFileCommandHandler ctx
-    return ctx
 
 launchEditorTab :: Context -> String -> IO ()
 launchEditorTab ctx file = do

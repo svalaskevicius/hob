@@ -31,7 +31,7 @@ spec =
 
 focusNumberedTab :: Int -> Context -> IO Int
 focusNumberedTab nr ctx = do
-    commandExecute (focusNumberedTabCommandHandler nr) ctx
+    _ <- commandExecute (focusNumberedTabCommandHandler nr) ctx
     let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 

@@ -24,7 +24,7 @@ spec =
       ctx <- loadStubbedContext
       values <- getDirectoryListingSidebarRootItems ctx
       values `shouldBe` ["a","c","-"]
-      commandExecute reloadSidebarTreeCommandHandler $ replaceStubbedTree ctx
+      _ <- commandExecute reloadSidebarTreeCommandHandler $ replaceStubbedTree ctx
       values' <- getDirectoryListingSidebarRootItems ctx
       values' `shouldBe` ["b","c"]
 

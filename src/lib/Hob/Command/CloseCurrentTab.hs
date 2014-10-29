@@ -9,7 +9,7 @@ import Hob.Context.UiContext
 closeCurrentEditorTab :: CommandHandler
 closeCurrentEditorTab = CommandHandler Nothing closeCurrentEditorTabHandler
 
-closeCurrentEditorTabHandler :: Context -> IO ()
+closeCurrentEditorTabHandler :: Command
 closeCurrentEditorTabHandler ctx = do
     currentPage <- notebookGetCurrentPage tabbed
     nthPage <- notebookGetNthPage tabbed currentPage
@@ -18,6 +18,6 @@ closeCurrentEditorTabHandler ctx = do
             notebookRemovePage tabbed currentPage
             widgetDestroy pageContents
         Nothing -> return ()
+    return ctx
     where tabbed = mainNotebook.uiContext $ ctx
-
 

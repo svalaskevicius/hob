@@ -24,9 +24,10 @@ saveCurrentEditorTab = CommandHandler Nothing (runWith saveCurrentEditorTabHandl
             return file
         runWith a b ctx = a (b ctx) ctx
 
-saveCurrentEditorTabHandler :: NewFileNameChooser -> Context -> IO ()
-saveCurrentEditorTabHandler newFileNameChooser ctx =
+saveCurrentEditorTabHandler :: NewFileNameChooser -> Command
+saveCurrentEditorTabHandler newFileNameChooser ctx = do
     maybeDo saveEditor =<< getActiveEditor ctx
+    return ctx
     where fileWriter = contextFileWriter . fileContext $ ctx
           saveEditor editor = do
               path <- getEditorFilePath editor

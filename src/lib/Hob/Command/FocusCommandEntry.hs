@@ -10,11 +10,12 @@ import Hob.Ui.Editor
 toggleFocusOnCommandEntryCommandHandler :: CommandHandler
 toggleFocusOnCommandEntryCommandHandler = CommandHandler Nothing toggleFocusOnCommandEntry
 
-toggleFocusOnCommandEntry :: Context -> IO ()
+toggleFocusOnCommandEntry :: Command
 toggleFocusOnCommandEntry ctx = do
     isFocused <- widgetGetIsFocus cmdEntry
     if isFocused then
         maybeDo widgetGrabFocus =<< getActiveEditor ctx
     else
         widgetGrabFocus cmdEntry
+    return ctx
     where cmdEntry = commandEntry.uiContext $ ctx

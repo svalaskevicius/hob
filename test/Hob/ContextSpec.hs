@@ -107,7 +107,7 @@ executeMockedMatcher prefix text = do
     (handler, readHandledText) <- recordingHandler
     let matcher = createMatcherForPrefix prefix handler
     let matchedHandler = matchCommand matcher text
-    commandExecute (fromJust matchedHandler) ctx
+    _ <- commandExecute (fromJust matchedHandler) ctx
     readHandledText
 
 expectCommandHandler :: Maybe CommandHandler -> Expectation
@@ -125,16 +125,16 @@ matcherForKeyBinding key = CommandMatcher (emptyCommandHandlerForKey key) (const
     where emptyCommandHandlerForKey k x = if x == k then Just emptyHandler else Nothing
 
 emptyHandler :: CommandHandler
-emptyHandler = CommandHandler Nothing (\ _ -> return())
+emptyHandler = CommandHandler Nothing return
 
 recordingHandler :: IO (String -> CommandHandler, IO (Maybe String))
 recordingHandler = do
     state <- newIORef Nothing
     return (
-                \params -> CommandHandler Nothing (\_ -> writeIORef state $ Just params),
+                \params -> CommandHandler Nothing (\ctx -> (writeIORef state $ Just params) >> return ctx),
                 readIORef state
             )
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
 executeRecordingHandler ctx handler readHandledText = do
-    commandExecute (fromJust handler) ctx
+    _ <- commandExecute (fromJust handler) ctx
     readHandledText

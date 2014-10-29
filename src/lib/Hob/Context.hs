@@ -1,5 +1,6 @@
 module Hob.Context (
     Context(..),
+    Command,
     PreviewCommandHandler(..),
     CommandHandler(..),
     CommandMatcher(..),
@@ -33,15 +34,16 @@ data Context = Context {
     modeStack     :: [Mode]
 }
 
+type Command = Context -> IO Context
 
 data PreviewCommandHandler = PreviewCommandHandler {
-                    previewExecute :: Context -> IO (),
-                    previewReset   :: Context -> IO ()
+                    previewExecute :: Command,
+                    previewReset   :: Command
                 }
 
 data CommandHandler = CommandHandler {
                     commandPreview :: Maybe PreviewCommandHandler,
-                    commandExecute :: Context -> IO ()
+                    commandExecute :: Command
                 }
 
 type KeyboardBinding = ([Modifier], String)

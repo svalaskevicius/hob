@@ -45,12 +45,12 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | separator == x = Just $ handler search accumReplace
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
-generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> String -> CommandHandler
+generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Command) -> String -> String -> CommandHandler
 generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText =
     CommandHandler (Just $ previewCmdHandler searchText) executeHandler
     where executeHandler ctx = decoratedCmdHandler searchText ctx >> replaceStart searchText replaceText ctx
 
-generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
+generateReplaceNextCommandHandler :: Command -> CommandHandler
 generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
     where executeHandler ctx = replaceBeforeNext ctx >> decoratedCmdHandler ctx
 
@@ -62,12 +62,16 @@ replaceCommandHandler = generateReplaceCommandHandler
 replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
 
-replaceStart :: String -> String -> Context -> IO()
-replaceStart _ replaceText ctx = maybeDo replaceStartOnEditor =<< getActiveEditor ctx
+replaceStart :: String -> String -> Command
+replaceStart _ replaceText ctx = do
+    maybeDo replaceStartOnEditor =<< getActiveEditor ctx
+    return ctx
     where replaceStartOnEditor editor = setEditorReplaceString editor (Just replaceText)
 
-replaceBeforeNext :: Context -> IO()
-replaceBeforeNext ctx = maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
+replaceBeforeNext :: Command
+replaceBeforeNext ctx = do
+    maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
+    return ctx
     where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
           replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
           replaceSearchSelectionWith editor replaceText searchText = do

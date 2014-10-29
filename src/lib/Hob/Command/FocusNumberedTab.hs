@@ -9,9 +9,9 @@ import Hob.Context.UiContext
 focusNumberedTabCommandHandler :: Int -> CommandHandler
 focusNumberedTabCommandHandler nr = CommandHandler Nothing $ focusNumberedTab nr
 
-focusNumberedTab :: Int -> Context -> IO ()
+focusNumberedTab :: Int -> Command
 focusNumberedTab nr ctx = do
     let notebook = mainNotebook.uiContext $ ctx
     pages <- notebookGetNPages notebook
     when (nr >= 0 && nr < pages) $ notebookSetCurrentPage notebook nr
-
+    return ctx

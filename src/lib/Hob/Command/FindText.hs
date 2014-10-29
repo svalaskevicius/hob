@@ -28,9 +28,10 @@ searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 searchResetCommandHandler :: CommandHandler
 searchResetCommandHandler = CommandHandler Nothing searchReset
 
-searchPreview :: String -> Context -> IO ()
-searchPreview text ctx =
+searchPreview :: String -> Command
+searchPreview text ctx = do
     maybeDo updateSearchPreview =<< getActiveEditor ctx
+    return ctx
     where
         updateSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -51,13 +52,15 @@ searchPreview text ctx =
                     addNewSearchTags buffer tag matchEnd end
                 Nothing -> return()
 
-searchReset :: Context -> IO ()
+searchReset :: Command
 searchReset ctx = do
     maybeDo (`setEditorSearchString` Nothing) =<< getActiveEditor ctx
     searchResetPreview ctx
-
-searchResetPreview :: Context -> IO ()
-searchResetPreview ctx = maybeDo resetSearchPreview =<< getActiveEditor ctx
+    
+searchResetPreview :: Command
+searchResetPreview ctx = do
+    maybeDo resetSearchPreview =<< getActiveEditor ctx
+    return ctx
     where
         resetSearchPreview editor = do
             buffer <- textViewGetBuffer editor
@@ -67,18 +70,24 @@ searchResetPreview ctx = maybeDo resetSearchPreview =<< getActiveEditor ctx
             (start, end) <- textBufferGetBounds buffer
             textBufferRemoveTag buffer tag start end
 
-searchNext :: Context -> IO ()
-searchNext ctx = maybeDo searchOnEditor =<< getActiveEditor ctx
+searchNext :: Command
+searchNext ctx = do
+    maybeDo searchOnEditor =<< getActiveEditor ctx
+    return ctx
     where
         searchOnEditor = maybeDo (`searchExecute` ctx) <=< getEditorSearchString
 
-searchPrevious :: Context -> IO ()
-searchPrevious ctx = maybeDo searchOnEditor =<< getActiveEditor ctx
+searchPrevious :: Command
+searchPrevious ctx = do
+    maybeDo searchOnEditor =<< getActiveEditor ctx
+    return ctx
     where
         searchOnEditor = maybeDo (`searchExecuteBackwards` ctx) <=< getEditorSearchString
 
-searchStart :: String -> Context -> IO ()
-searchStart text ctx = maybeDo searchStartOnEditor =<< getActiveEditor ctx
+searchStart :: String -> Command
+searchStart text ctx = do
+    maybeDo searchStartOnEditor =<< getActiveEditor ctx
+    return ctx
     where
         searchStartOnEditor editor = do
             setEditorSearchString editor (Just text)

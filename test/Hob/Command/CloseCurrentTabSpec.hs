@@ -20,7 +20,7 @@ spec =
         it "closes the currently active editor tab" $ do
             ctx <- loadStubbedContext
             launchEditorTab ctx "/xxx/testName.hs"
-            commandExecute closeCurrentEditorTab ctx
+            _ <- commandExecute closeCurrentEditorTab ctx
             pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
             pagesAfterActivatingDirectory `shouldBe` 0
 

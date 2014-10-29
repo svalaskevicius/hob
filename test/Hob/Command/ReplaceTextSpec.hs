@@ -22,99 +22,104 @@ spec :: Spec
 spec = do
   describe "replace text command matcher" $ do
     it "accepts when command starts with the configured letter" $ do
-        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let handler _ _ = CommandHandler Nothing return
         let matcher = createMatcherForReplace 's' handler
         isJust (matchCommand matcher "s//") `shouldBe` True
 
     it "does not accept when command starts with another than the configured letter" $ do
-        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let handler _ _ = CommandHandler Nothing return
         let matcher = createMatcherForReplace 's' handler
         isJust (matchCommand matcher "x//") `shouldBe` False
 
     it "does not accept when command is empty" $ do
-        let handler _ _ = CommandHandler Nothing (\_ -> return())
+        let handler _ _ = CommandHandler Nothing return
         let matcher = createMatcherForReplace 's' handler
         isJust (matchCommand matcher "") `shouldBe` False
 
     it "parses search and replace strings" $ do
-        let handler "S" "R" = CommandHandler Nothing (\_ -> return())
+        let handler "S" "R" = CommandHandler Nothing return
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S/R"
-        commandExecute (fromJust matchResult) =<< loadDefaultContext
+        _ <- commandExecute (fromJust matchResult) =<< loadDefaultContext
+        return ()
 
     it "ignores options when parsing search and replace strings" $ do
-        let handler "S" "R" = CommandHandler Nothing (\_ -> return())
+        let handler "S" "R" = CommandHandler Nothing return
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x#S#R#options"
-        commandExecute (fromJust matchResult) =<< loadDefaultContext
+        _ <- commandExecute (fromJust matchResult) =<< loadDefaultContext
+        return ()
 
     it "matches escaped separator char as text" $ do
-        let handler "S/S" "R/R" = CommandHandler Nothing (\_ -> return())
+        let handler "S/S" "R/R" = CommandHandler Nothing return
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S\\/S/R\\/R"
-        commandExecute (fromJust matchResult) =<< loadDefaultContext
+        _ <- commandExecute (fromJust matchResult) =<< loadDefaultContext
+        return ()
 
     it "matches escaped any char as escape seq and text" $ do
-        let handler "S\\xS" "R\\xR" = CommandHandler Nothing (\_ -> return())
+        let handler "S\\xS" "R\\xR" = CommandHandler Nothing return
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S\\xS/R\\xR"
-        commandExecute (fromJust matchResult) =<< loadDefaultContext
+        _ <- commandExecute (fromJust matchResult) =<< loadDefaultContext
+        return ()
 
     it "matches escaped end of string as text" $ do
-        let handler "S" "R\\" = CommandHandler Nothing (\_ -> return())
+        let handler "S" "R\\" = CommandHandler Nothing return
             handler s r = error $ "unexpected invokation with \""++s++ "\" / \""++r++"\""
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S/R\\"
-        commandExecute (fromJust matchResult) =<< loadDefaultContext
+        _ <- commandExecute (fromJust matchResult) =<< loadDefaultContext
+        return ()
 
   describe "replace text command handler" $ do
     it "invokes the configured preview for the command handler" $ do
         (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        (previewExecute . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
+        _ <- (previewExecute . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
         invokes <- readPreviews
         invokes `shouldBe` (["text"], 0)
 
     it "invokes the configured preview reset for the command handler" $ do
         (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        (previewReset . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
+        _ <- (previewReset . fromJust . commandPreview) (replaceHandler "text" "newtext") ctx
         invokes <- readPreviews
         invokes `shouldBe` ([], 1)
 
     it "invokes the configured command on execute" $ do
         (replaceHandler, _, readExecutes) <- mockedReplaceCommandHandler
         ctx <- loadDefaultContext
-        commandExecute (replaceHandler "text" "newtext") ctx
+        _ <- commandExecute (replaceHandler "text" "newtext") ctx
         invokes <- readExecutes
         invokes `shouldBe` ["text"]
 
     it "invokes the configured command on execute next" $ do
         (replaceNextHandler, readExecutes) <- mockedReplaceNextCommandHandler
         ctx <- loadDefaultContext
-        commandExecute replaceNextHandler ctx
+        _ <- commandExecute replaceNextHandler ctx
         invokes <- readExecutes
         invokes `shouldBe` 1
 
     it "does not replace if there is no highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
-        commandExecute replaceNextCommandHandler ctx
+        _ <- commandExecute replaceNextCommandHandler ctx
         text <- buffer `get` textBufferText
         text `shouldBe` "text - initial text! text"
 
     it "replaces previously highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
-        commandExecute (replaceCommandHandler "text" ":)") ctx
+        _ <- commandExecute (replaceCommandHandler "text" ":)") ctx
         text <- replaceNext ctx buffer
         text `shouldBe` ":) - initial text! text"
 
     it "does not replace if the highlighted text doesnt match the search string" $ do
         (ctx, buffer) <- loadGuiWithEditor
-        commandExecute (replaceCommandHandler "text" ":)") ctx
+        _ <- commandExecute (replaceCommandHandler "text" ":)") ctx
         (s, _) <- textBufferGetSelectionBounds buffer
         e <- textBufferGetIterAtOffset buffer 7
         textBufferSelectRange buffer s e
@@ -124,7 +129,7 @@ spec = do
 replaceNext :: TextBufferClass o => Context -> o -> IO String
 replaceNext ctx buffer = do
     processGtkEvents
-    commandExecute replaceNextCommandHandler ctx
+    _ <- commandExecute replaceNextCommandHandler ctx
     processGtkEvents
     buffer `get` textBufferText
 
@@ -158,20 +163,22 @@ mockedPreviewCommandHandler = do
         resets <- readResets
         return (previews, resets))
 
-mockedStringCommand :: IO (String -> Context -> IO(), IO [String])
+mockedStringCommand :: IO (String -> Command, IO [String])
 mockedStringCommand = do
     recorder <- newIORef []
-    return (\v _ -> do
+    return (\v ctx -> do
             currentValues <- readIORef recorder
-            writeIORef recorder $ currentValues ++ [v],
+            writeIORef recorder $ currentValues ++ [v]
+            return ctx,
         readIORef recorder)
 
-mockedCounterCommand :: IO (Context -> IO(), IO Int)
+mockedCounterCommand :: IO (Command, IO Int)
 mockedCounterCommand = do
     recorder <- newIORef 0
-    return (\_ -> do
+    return (\ctx -> do
             currentValue <- readIORef recorder
-            writeIORef recorder $ currentValue + 1,
+            writeIORef recorder $ currentValue + 1
+            return ctx,
         readIORef recorder)
 
 processGtkEvents :: IO ()

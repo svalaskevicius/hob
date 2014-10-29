@@ -126,9 +126,9 @@ recordingHandler = do
     return (
                 \params -> CommandHandler
                             (Just $ PreviewCommandHandler
-                                (\_ -> writeIORef previewCmd $ Just params)
-                                (\_ -> writeIORef previewResetCmd $ Just "called"))
-                            (\_ -> writeIORef cmd $ Just params),
+                                (\ctx -> (writeIORef previewCmd $ Just params) >> return ctx)
+                                (\ctx -> (writeIORef previewResetCmd $ Just "called") >> return ctx))
+                            (\ctx -> (writeIORef cmd $ Just params) >> return ctx),
                 (
                     readIORef cmd,
                     readIORef previewCmd,

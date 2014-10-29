@@ -39,10 +39,10 @@ launchNewFileEditor ctx targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-editNewFile :: Context -> IO ()
+editNewFile :: Command
 editNewFile ctx = do
     _ <- newEditorForText ctx tabbed Nothing $ pack ""
-    return ()
+    return ctx
     where tabbed = mainNotebook.uiContext $ ctx
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)

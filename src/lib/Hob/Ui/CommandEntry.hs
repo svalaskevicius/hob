@@ -17,7 +17,7 @@ commandPreviewPreviewState = do
         writeIORef state . Just,
         \ctx -> do
             resetCommand <- readIORef state
-            maybeDo (`previewReset` ctx) resetCommand
+            maybeDo (\cmd -> previewReset cmd ctx >> return()) resetCommand
             writeIORef state Nothing
         )
 
@@ -61,7 +61,7 @@ previewCmd ctx cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset)
             setOkStatus cmdEntry
             maybeDo invokePreview $ commandPreview command
         invokePreview prev = do
-            previewExecute prev ctx
+            _ <- previewExecute prev ctx
             setLastPreviewCmd prev
 
 runCmd :: Context -> Entry -> CommandMatcher -> PreviewResetState -> IO ()
@@ -69,7 +69,7 @@ runCmd ctx cmdEntry cmdMatcher (_, dispatchLastPreviewReset) = do
     dispatchLastPreviewReset ctx
     text <- entryGetText cmdEntry
     let command = matchCommand cmdMatcher text
-    maybeDo (`commandExecute` ctx) command
+    maybeDo (\cmd -> commandExecute cmd ctx >> return()) command
 
 setErrorStatus :: Entry -> IO ()
 setErrorStatus cmdEntry = do

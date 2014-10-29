@@ -42,7 +42,7 @@ spec =
 
 focusPreviousTab :: Context -> IO Int
 focusPreviousTab ctx = do
-    commandExecute focusPreviousTabCommandHandler ctx
+    _ <- commandExecute focusPreviousTabCommandHandler ctx
     let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 
