@@ -1,4 +1,5 @@
 module Hob.Context (
+    App,
     Context(..),
     Command,
     PreviewCommandHandler(..),
@@ -8,6 +9,7 @@ module Hob.Context (
     KeyCommandMatcher,
     TextCommandMatcher,
     Mode(..),
+    runApp,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -17,6 +19,7 @@ import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
 import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import Control.Monad.State
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -24,7 +27,12 @@ import Hob.Context.UiContext
 import Hob.DirectoryTree
 
 
+type App = StateT Context IO
 
+runApp :: Context -> App () -> IO Context
+runApp ctx appSteps =  do
+    ret <- runStateT appSteps ctx
+    return $ snd ret
 
 data Context = Context {
     styleContext  :: StyleContext,

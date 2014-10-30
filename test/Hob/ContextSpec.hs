@@ -15,7 +15,7 @@ main :: IO ()
 main = hspec spec
 
 spec :: Spec
-spec =
+spec = do
     describe "command matcher" $ do
         describe "mempty" $ do
             it "does not return any commands on matching a command" $
@@ -101,6 +101,12 @@ spec =
                 handledText <- executeRecordingHandler ctx matchedHandler readHandledText
                 handledText `shouldBe` Just "test"
 
+    describe "app runner monad" $ do
+        it "runs empty monad" $ do
+            ctx <- loadDefaultContext
+            _ <- runApp ctx (return ())
+            return()
+    
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
     ctx <- loadDefaultContext
