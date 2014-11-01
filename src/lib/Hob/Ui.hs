@@ -13,7 +13,6 @@ import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
 
-import Hob.Command
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
 import Hob.Command.FocusCommandEntry
@@ -41,34 +40,23 @@ loadGui fileCtx styleCtx = do
         builder <- loadUiBuilder
         setGtkStyle styleCtx
 
-        let cmdMatcher = mconcat $ [
-                            createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
-                            createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
-                            createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
-                            createMatcherForKeyBinding ([Control], "r") reloadSidebarTreeCommandHandler,
-                            createMatcherForKeyBinding ([Control], "Tab") focusNextTabCommandHandler,
-                            createMatcherForKeyBinding ([Shift, Control], "Tab") focusPreviousTabCommandHandler,
-                            createMatcherForKeyBinding ([Shift, Control], "ISO_Left_Tab") focusPreviousTabCommandHandler,
-                            createMatcherForKeyBinding ([Control], "t") focusSidebarCommandHandler,
-                            createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
-                            createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
-                            createMatcherForPrefix "/" searchCommandHandler,
-                            createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
-                            createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
-                            createMatcherForCommand "stopSearch" searchResetCommandHandler,
-                            createMatcherForReplace 's' replaceCommandHandler,
-                            createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
-                        ] ++
-                        [
-                            createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
-                                | position <- [0..9]
-                        ]
-
-        ctx <- initMainWindow builder cmdMatcher
+        ctx <- initCtx builder defaultMode
+        commandContextRunner <- contextRunner ctx
+        initMainWindow commandContextRunner ctx
         initSidebar ctx
-        initCommandEntry ctx cmdMatcher
+        initCommandEntry commandContextRunner ctx
         return ctx
     where
+        initCtx builder initMode = do
+            window <- builderGetObject builder castToWindow "mainWindow"
+            notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
+            cmdEntry <- builderGetObject builder castToEntry "command"
+            treeView <- builderGetObject builder castToTreeView "directoryListing"
+            treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
+            treeModel <- LTS.treeStoreNew []
+            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
+            let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode]
+            return ctx
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx
@@ -81,27 +69,56 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
-        initCommandEntry ctx cmdMatcher = do
+        initCommandEntry commandContextRunner ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
+            let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName cmdEntry "commandEntry"
-            newCommandEntry ctx cmdEntry cmdMatcher
-        initMainWindow builder cmdMatcher = do
-            window <- builderGetObject builder castToWindow "mainWindow"
-            notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
-            cmdEntry <- builderGetObject builder castToEntry "command"
-            treeView <- builderGetObject builder castToTreeView "directoryListing"
-            treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
-            treeModel <- LTS.treeStoreNew []
-            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
-            let ctx = Context styleCtx fileCtx uiCtx treeModel
+            commandContextRunner $ newCommandEntry cmdEntry cmdMatcher
+        initMainWindow commandContextRunner ctx = do
+            let window = mainWindow . uiContext $ ctx
+            let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
-                      (\cmd -> liftIO $ commandExecute cmd ctx >> return True) $
+                      (\cmd -> liftIO $ commandContextRunner (commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
-            return ctx
+            return ()
+        defaultMode =
+                let cmdMatcher = mconcat $ [
+                                    -- default:
+                                    createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
+                                    createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
+                                    createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
+                                    createMatcherForKeyBinding ([Control], "r") reloadSidebarTreeCommandHandler,
+                                    createMatcherForKeyBinding ([Control], "Tab") focusNextTabCommandHandler,
+                                    createMatcherForKeyBinding ([Shift, Control], "Tab") focusPreviousTabCommandHandler,
+                                    createMatcherForKeyBinding ([Shift, Control], "ISO_Left_Tab") focusPreviousTabCommandHandler,
+                                    createMatcherForKeyBinding ([Control], "t") focusSidebarCommandHandler,
+                                    createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
+                                    createMatcherForPrefix "/" searchCommandHandler,
+                                    createMatcherForReplace 's' replaceCommandHandler,
+
+                                    -- + focus cmd on ctrl key press
+                                    -- + pop mode on escape, focuses editor
+
+                                    -- search / replace
+                                    createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
+                                    createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
+                                    -- replace
+                                    createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler,
+
+                                    -- tbc
+                                    createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
+                                    createMatcherForCommand "stopSearch" searchResetCommandHandler
+                                ] ++
+                                [
+                                    -- default
+                                    createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
+                                        | position <- [0..9]
+                                ]
+                in Mode "" cmdMatcher
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

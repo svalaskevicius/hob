@@ -4,9 +4,8 @@ import Data.Maybe
 import Data.Tree
 import Graphics.UI.Gtk
 
-import           Hob.Command
 import           Hob.Command.ReloadSidebarTree
-import qualified Hob.Context                   as HC
+import           Hob.Context
 import qualified Hob.Context.FileContext       as HFC
 import qualified Hob.Context.UiContext         as HC
 import           Hob.DirectoryTree
@@ -25,23 +24,23 @@ spec =
       ctx <- loadStubbedContext
       values <- getDirectoryListingSidebarRootItems ctx
       values `shouldBe` ["a","c","-"]
-      commandExecute reloadSidebarTreeCommandHandler $ replaceStubbedTree ctx
+      _ <- runApp (commandExecute reloadSidebarTreeCommandHandler) $ replaceStubbedTree ctx
       values' <- getDirectoryListingSidebarRootItems ctx
       values' `shouldBe` ["b","c"]
 
-replaceStubbedTree :: HC.Context -> HC.Context
-replaceStubbedTree ctx = ctx{HC.fileContext = newFileContext}
+replaceStubbedTree :: Context -> Context
+replaceStubbedTree ctx = ctx{fileContext = newFileContext}
     where
-        newFileContext = (HC.fileContext ctx){HFC.contextFileTreeLoader = altFileTreeStub}
+        newFileContext = (fileContext ctx){HFC.contextFileTreeLoader = altFileTreeStub}
 
 altFileTreeStub :: IO (Forest DirectoryTreeElement)
 altFileTreeStub = return [
     Node (DirectoryTreeElement "b" "/xxx/b" True) [],
     Node (DirectoryTreeElement "c" "/xxx/c" False) []]
 
-getDirectoryListingSidebarRootItems :: HC.Context -> IO [String]
+getDirectoryListingSidebarRootItems :: Context -> IO [String]
 getDirectoryListingSidebarRootItems ctx = do
-    let treeView = HC.sidebarTree . HC.uiContext $ ctx
+    let treeView = HC.sidebarTree . uiContext $ ctx
     maybeTreeModel <- treeViewGetModel treeView
     let treeModel = fromJust maybeTreeModel
     maybeRoot <- treeModelGetIter treeModel [0]

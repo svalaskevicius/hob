@@ -6,13 +6,14 @@ module Hob.Command.ReplaceText (
         generateReplaceNextCommandHandler,
     ) where
 
-import Control.Monad              (when)
-import Data.Maybe                 (fromJust)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView)
-import System.Glib.GObject        (Quark)
+import           Control.Monad              (when)
+import qualified Control.Monad.State        as S
+import           Control.Monad.Trans        (liftIO)
+import           Data.Maybe                 (fromJust)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView)
+import           System.Glib.GObject        (Quark)
 
-import Hob.Command
 import Hob.Command.FindText
 import Hob.Context
 import Hob.Control
@@ -46,14 +47,14 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | separator == x = Just $ handler search accumReplace
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
-generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Context -> IO ()) -> String -> String -> CommandHandler
+generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Command) -> String -> String -> CommandHandler
 generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText =
     CommandHandler (Just $ previewCmdHandler searchText) executeHandler
-    where executeHandler ctx = decoratedCmdHandler searchText ctx >> replaceStart searchText replaceText ctx
+    where executeHandler = decoratedCmdHandler searchText >> replaceStart searchText replaceText
 
-generateReplaceNextCommandHandler :: (Context -> IO ()) -> CommandHandler
+generateReplaceNextCommandHandler :: Command -> CommandHandler
 generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
-    where executeHandler ctx = replaceBeforeNext ctx >> decoratedCmdHandler ctx
+    where executeHandler = replaceBeforeNext >> decoratedCmdHandler
 
 replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler = generateReplaceCommandHandler
@@ -63,12 +64,18 @@ replaceCommandHandler = generateReplaceCommandHandler
 replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
 
-replaceStart :: String -> String -> Context -> IO()
-replaceStart _ replaceText ctx = maybeDo replaceStartOnEditor =<< getActiveEditor ctx
+replaceStart :: String -> String -> Command
+replaceStart _ replaceText = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo replaceStartOnEditor editor
     where replaceStartOnEditor editor = setEditorReplaceString editor (Just replaceText)
 
-replaceBeforeNext :: Context -> IO()
-replaceBeforeNext ctx = maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
+replaceBeforeNext :: Command
+replaceBeforeNext = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo replaceContinueOnEditor editor
     where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
           replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
           replaceSearchSelectionWith editor replaceText searchText = do

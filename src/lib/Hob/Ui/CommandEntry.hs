@@ -1,56 +1,61 @@
 module Hob.Ui.CommandEntry (newCommandEntry, newCommandEntryDetached) where
 
+import           Control.Monad                        (liftM)
+import qualified Control.Monad.State                  as S
 import           Control.Monad.Trans                  (liftIO)
 import           Data.IORef
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 
-import Hob.Command
 import Hob.Context
 import Hob.Control
 
-type PreviewResetState = (PreviewCommandHandler -> IO(), Context -> IO())
-commandPreviewPreviewState :: IO PreviewResetState
-commandPreviewPreviewState = do
-    state <- newIORef Nothing
+type PreviewResetState = (PreviewCommandHandler -> App(), Command)
+
+commandPreviewResetState :: App PreviewResetState
+commandPreviewResetState = do
+    state <- liftIO $ newIORef Nothing
     return (
-        writeIORef state . Just,
-        \ctx -> do
-            resetCommand <- readIORef state
-            maybeDo (`previewReset` ctx) resetCommand
-            writeIORef state Nothing
+        liftIO . writeIORef state . Just,
+        do
+            resetCommand <- liftIO $ readIORef state
+            maybeDo previewReset resetCommand
+            liftIO $ writeIORef state Nothing
         )
 
-newCommandEntry :: Context -> Entry -> CommandMatcher -> IO ()
-newCommandEntry ctx cmdEntry cmdMatcher = do
-    (onChange, onReturn) <- newCommandEntryDetached ctx cmdEntry cmdMatcher
-    _ <- cmdEntry `on` editableChanged $ onChange
-    _ <- cmdEntry `on` keyPressEvent $ do
+newCommandEntry :: Entry -> CommandMatcher -> App ()
+newCommandEntry cmdEntry cmdMatcher = do
+    ctx <- S.get
+    (onChange, onReturn) <- newCommandEntryDetached cmdEntry cmdMatcher
+    let liftedOn a b c = liftIO $ on a b c
+    let runInCtx command = liftM fst $ S.runStateT command ctx
+    _ <- cmdEntry `liftedOn` editableChanged $ runInCtx onChange
+    _ <- cmdEntry `liftedOn` keyPressEvent $ do
         modifier <- eventModifier
         key <- eventKeyName
         case (modifier, unpack key) of
-            ([], "Return") -> liftIO onReturn
+            ([], "Return") -> liftIO $ runInCtx onReturn
             _ -> return False
     return ()
 
-newCommandEntryDetached :: Context -> Entry -> CommandMatcher -> IO (IO (), IO Bool)
-newCommandEntryDetached ctx cmdEntry cmdMatcher = do
-    previewResetState <- commandPreviewPreviewState
+newCommandEntryDetached :: Entry -> CommandMatcher -> App (App (), App Bool)
+newCommandEntryDetached cmdEntry cmdMatcher = do
+    previewResetState <- commandPreviewResetState
     return (onChanged previewResetState, onReturn previewResetState)
     where
         onChanged =
-            previewCmd ctx cmdEntry cmdMatcher
+            previewCmd cmdEntry cmdMatcher
         onReturn previewResetState = do
-            runCmd ctx cmdEntry cmdMatcher previewResetState
-            entrySetText cmdEntry ""
+            runCmd cmdEntry cmdMatcher previewResetState
+            liftIO $ entrySetText cmdEntry ""
             return True
 
 
-previewCmd :: Context -> Entry -> CommandMatcher -> PreviewResetState -> IO ()
-previewCmd ctx cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset) = do
-    dispatchLastPreviewReset ctx
-    text <- entryGetText cmdEntry
+previewCmd :: Entry -> CommandMatcher -> PreviewResetState -> App ()
+previewCmd cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset) = do
+    dispatchLastPreviewReset
+    text <- liftIO $ entryGetText cmdEntry
     if text == "" then
         setOkStatus cmdEntry
     else do
@@ -62,22 +67,22 @@ previewCmd ctx cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset)
             setOkStatus cmdEntry
             maybeDo invokePreview $ commandPreview command
         invokePreview prev = do
-            previewExecute prev ctx
+            previewExecute prev
             setLastPreviewCmd prev
 
-runCmd :: Context -> Entry -> CommandMatcher -> PreviewResetState -> IO ()
-runCmd ctx cmdEntry cmdMatcher (_, dispatchLastPreviewReset) = do
-    dispatchLastPreviewReset ctx
-    text <- entryGetText cmdEntry
+runCmd :: Entry -> CommandMatcher -> PreviewResetState -> App ()
+runCmd cmdEntry cmdMatcher (_, dispatchLastPreviewReset) = do
+    dispatchLastPreviewReset
+    text <- liftIO $ entryGetText cmdEntry
     let command = matchCommand cmdMatcher text
-    maybeDo (`commandExecute` ctx) command
+    maybeDo commandExecute command
 
-setErrorStatus :: Entry -> IO ()
+setErrorStatus :: Entry -> App ()
 setErrorStatus cmdEntry = do
-    cmdEntryStyleContext <- widgetGetStyleContext cmdEntry
-    GtkSc.styleContextAddClass cmdEntryStyleContext "error"
+    cmdEntryStyleContext <- liftIO $ widgetGetStyleContext cmdEntry
+    liftIO $ GtkSc.styleContextAddClass cmdEntryStyleContext "error"
 
-setOkStatus :: Entry -> IO ()
+setOkStatus :: Entry -> App ()
 setOkStatus cmdEntry = do
-    cmdEntryStyleContext <- widgetGetStyleContext cmdEntry
-    GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"
+    cmdEntryStyleContext <- liftIO $ widgetGetStyleContext cmdEntry
+    liftIO $ GtkSc.styleContextRemoveClass cmdEntryStyleContext "error"

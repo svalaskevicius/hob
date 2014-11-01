@@ -5,12 +5,13 @@ module Hob.Command.NewTab (
             NewFileEditorLauncher) where
 
 
-import Control.Monad   (filterM, (<=<))
-import Data.Maybe      (mapMaybe)
-import Data.Text       (pack)
-import Graphics.UI.Gtk
+import           Control.Monad       (filterM, (<=<))
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans (liftIO)
+import           Data.Maybe          (mapMaybe)
+import           Data.Text           (pack)
+import           Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.FileContext
 import Hob.Context.UiContext
@@ -40,11 +41,12 @@ launchNewFileEditor ctx targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-editNewFile :: Context -> IO ()
-editNewFile ctx = do
-    _ <- newEditorForText ctx tabbed Nothing $ pack ""
+editNewFile :: Command
+editNewFile = do
+    ctx <- S.get
+    let tabbed = mainNotebook.uiContext $ ctx
+    _ <- liftIO $ newEditorForText ctx tabbed Nothing $ pack ""
     return ()
-    where tabbed = mainNotebook.uiContext $ ctx
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)

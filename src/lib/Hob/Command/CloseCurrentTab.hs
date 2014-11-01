@@ -1,24 +1,25 @@
 module Hob.Command.CloseCurrentTab (closeCurrentEditorTab) where
 
 
-import Graphics.UI.Gtk
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans (liftIO)
+import           Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.UiContext
 
 closeCurrentEditorTab :: CommandHandler
 closeCurrentEditorTab = CommandHandler Nothing closeCurrentEditorTabHandler
 
-closeCurrentEditorTabHandler :: Context -> IO ()
-closeCurrentEditorTabHandler ctx = do
-    currentPage <- notebookGetCurrentPage tabbed
-    nthPage <- notebookGetNthPage tabbed currentPage
+closeCurrentEditorTabHandler :: Command
+closeCurrentEditorTabHandler = do
+    ctx <- S.get
+    let tabbed = mainNotebook.uiContext $ ctx
+    currentPage <- liftIO $ notebookGetCurrentPage tabbed
+    nthPage <- liftIO $ notebookGetNthPage tabbed currentPage
     case nthPage of
         Just pageContents -> do
-            notebookRemovePage tabbed currentPage
-            widgetDestroy pageContents
+            liftIO $ notebookRemovePage tabbed currentPage
+            liftIO $ widgetDestroy pageContents
         Nothing -> return ()
-    where tabbed = mainNotebook.uiContext $ ctx
-
 

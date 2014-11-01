@@ -3,10 +3,11 @@ module Hob.Command.FocusSidebar (
     syncFocusSidebarCommandHandler
     ) where
 
-import Data.List
-import Graphics.UI.Gtk
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans (liftIO)
+import           Data.List
+import           Graphics.UI.Gtk
 
-import Hob.Command
 import Hob.Context
 import Hob.Context.UiContext
 import Hob.Control
@@ -19,13 +20,18 @@ focusSidebarCommandHandler = CommandHandler Nothing focusSidebar
 syncFocusSidebarCommandHandler :: CommandHandler
 syncFocusSidebarCommandHandler = CommandHandler Nothing syncFocusSidebar
 
-focusSidebar :: Context -> IO ()
-focusSidebar = widgetGrabFocus . sidebarTree . uiContext
+focusSidebar :: Command
+focusSidebar = do
+    ctx <- S.get
+    liftIO $ widgetGrabFocus . sidebarTree . uiContext $ ctx
 
-syncActiveEditorPathToSidebar :: Context -> IO ()
-syncActiveEditorPathToSidebar ctx = maybeDo syncToEditor =<< getActiveEditor ctx
-    where syncToEditor editor = maybeDo syncToFilePath =<< getEditorFilePath editor
-          syncToFilePath filePath = do
+syncActiveEditorPathToSidebar :: Command
+syncActiveEditorPathToSidebar = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo (syncToEditor ctx) editor
+    where syncToEditor ctx editor = maybeDo (syncToFilePath ctx) =<< getEditorFilePath editor
+          syncToFilePath ctx filePath = do
               let treeView = sidebarTree.uiContext $ ctx
               maybeDo (syncTreeViewModel filePath treeView) =<< treeViewGetModel treeView
           syncTreeViewModel filePath treeView model = do
@@ -35,10 +41,8 @@ syncActiveEditorPathToSidebar ctx = maybeDo syncToEditor =<< getActiveEditor ctx
               maybeDo (syncToIter treeView model) =<< findFilePath model filePath startingIter
           syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
 
-syncFocusSidebar :: Context -> IO ()
-syncFocusSidebar ctx = do
-    syncActiveEditorPathToSidebar ctx
-    focusSidebar ctx
+syncFocusSidebar :: Command
+syncFocusSidebar = syncActiveEditorPathToSidebar >> focusSidebar
 
 findFilePath :: TreeModelClass self =>
                 self -> FilePath -> TreeIter -> IO (Maybe TreeIter)

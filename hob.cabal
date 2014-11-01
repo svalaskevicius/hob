@@ -38,7 +38,7 @@ executable hob
 library
     Exposed-modules:     Hob.Ui, Hob.Ui.Editor, Hob.Ui.Sidebar, Hob.Ui.CommandEntry,
                          Hob.Ui.SidebarSearch,
-                         Hob.Command, Hob.Command.FindText, Hob.Command.ReplaceText, Hob.Command.CloseCurrentTab,
+                         Hob.Command.FindText, Hob.Command.ReplaceText, Hob.Command.CloseCurrentTab,
                          Hob.Command.SaveCurrentTab, Hob.Command.NewTab, Hob.Command.FocusCommandEntry,
                          Hob.Command.FocusNextTab, Hob.Command.ReloadSidebarTree, Hob.Command.FocusSidebar,
                          Hob.Command.FocusPreviousTab, Hob.Command.FocusNumberedTab,
