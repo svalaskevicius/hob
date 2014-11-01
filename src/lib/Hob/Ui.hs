@@ -82,10 +82,10 @@ loadGui fileCtx styleCtx = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
-                      (\cmd -> liftIO $ (commandContextRunner $ commandExecute cmd) >> return True) $
+                      (\cmd -> liftIO $ commandContextRunner (commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ()
-        defaultMode = 
+        defaultMode =
                 let cmdMatcher = mconcat $ [
                                     -- default:
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
@@ -99,16 +99,16 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
                                     createMatcherForPrefix "/" searchCommandHandler,
                                     createMatcherForReplace 's' replaceCommandHandler,
-                                    
+
                                     -- + focus cmd on ctrl key press
                                     -- + pop mode on escape, focuses editor
-                                    
+
                                     -- search / replace
                                     createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
                                     createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
                                     -- replace
                                     createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler,
-                                    
+
                                     -- tbc
                                     createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
                                     createMatcherForCommand "stopSearch" searchResetCommandHandler

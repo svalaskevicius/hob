@@ -3,10 +3,10 @@ module Hob.Command.SaveCurrentTab (
         saveCurrentEditorTab,
         saveCurrentEditorTabHandler) where
 
-import Graphics.UI.Gtk
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
-import Graphics.UI.Gtk.SourceView (SourceView)
+import qualified Control.Monad.State        as S
+import           Control.Monad.Trans        (liftIO)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView)
 
 import Hob.Context
 import Hob.Context.FileContext

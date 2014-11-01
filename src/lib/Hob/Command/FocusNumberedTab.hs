@@ -1,9 +1,9 @@
 module Hob.Command.FocusNumberedTab (focusNumberedTabCommandHandler) where
 
-import Control.Monad   (when)
-import Graphics.UI.Gtk
+import           Control.Monad       (when)
 import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Trans (liftIO)
+import           Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.UiContext

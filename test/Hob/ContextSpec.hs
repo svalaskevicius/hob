@@ -1,10 +1,10 @@
 module Hob.ContextSpec (main, spec) where
 
-import Data.IORef
-import Data.Maybe      (fromJust, isNothing)
-import Data.Monoid
-import Graphics.UI.Gtk (Modifier (..))
 import Control.Monad.State
+import Data.IORef
+import Data.Maybe          (fromJust, isNothing)
+import Data.Monoid
+import Graphics.UI.Gtk     (Modifier (..))
 
 import Hob.Context
 
@@ -102,11 +102,11 @@ spec = do
                 handledText <- executeRecordingHandler ctx matchedHandler readHandledText
                 handledText `shouldBe` Just "test"
 
-    describe "app runner monad" $ do
+    describe "app runner monad" $
         it "runs empty monad" $ do
             _ <- runApp (return ()) =<< loadDefaultContext
             return()
-    
+
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
     ctx <- loadDefaultContext
@@ -140,7 +140,7 @@ recordingHandler = do
                 \params -> CommandHandler Nothing (liftIO $ writeIORef records $ Just params),
                 readIORef records
             )
-            
+
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
 executeRecordingHandler ctx handler readHandledText = do
     _ <- runApp (commandExecute (fromJust handler)) ctx

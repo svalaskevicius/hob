@@ -6,12 +6,12 @@ module Hob.Command.FindText (
         getEditorSearchString,
     ) where
 
-import Data.Text                  (pack)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView)
-import System.Glib.GObject        (Quark)
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
+import qualified Control.Monad.State        as S
+import           Control.Monad.Trans        (liftIO)
+import           Data.Text                  (pack)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView)
+import           System.Glib.GObject        (Quark)
 
 import Hob.Context
 import Hob.Control
@@ -60,7 +60,7 @@ searchReset = do
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo (`setEditorSearchString` Nothing) editor
     searchResetPreview
-    
+
 searchResetPreview :: Command
 searchResetPreview = do
     ctx <- S.get
@@ -76,45 +76,35 @@ searchResetPreview = do
             textBufferRemoveTag buffer tag start end
 
 searchNext :: Command
-searchNext = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    maybeDo searchOnEditor editor
-    where
-        searchOnEditor editor = do
-            searchString <- liftIO $ getEditorSearchString editor
-            maybeDo searchExecute searchString
+searchNext = searchOnEditorCallback searchOnEditor
+    where searchOnEditor editor = do
+             searchString <- liftIO $ getEditorSearchString editor
+             maybeDo searchExecute searchString
 
 searchPrevious :: Command
-searchPrevious = do
+searchPrevious = searchOnEditorCallback searchOnEditor
+    where searchOnEditor editor = do
+              searchString <- liftIO $ getEditorSearchString editor
+              maybeDo searchExecuteBackwards searchString
+
+searchOnEditorCallback :: (SourceView -> App ()) -> App ()
+searchOnEditorCallback searchOnEditor = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
     maybeDo searchOnEditor editor
-    where
-        searchOnEditor editor = do
-            searchString <- liftIO $ getEditorSearchString editor
-            maybeDo searchExecuteBackwards searchString
 
 searchStart :: String -> Command
-searchStart text = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    maybeDo searchStartOnEditor editor
-    where
-        searchStartOnEditor editor = do
-            liftIO $ setEditorSearchString editor (Just text)
-            searchPreview text
-            searchExecute text
-            liftIO $ widgetGrabFocus editor
-
+searchStart text = searchOnEditorCallback searchStartOnEditor
+    where searchStartOnEditor editor = do
+              liftIO $ setEditorSearchString editor (Just text)
+              searchPreview text
+              searchExecute text
+              liftIO $ widgetGrabFocus editor
 
 searchExecute :: String -> App ()
-searchExecute text = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo doSearch editor
+searchExecute text = searchOnEditorCallback doSearch
     where
-        doSearch editor = do
+        doSearch editor = liftIO $ do
             buffer <- textViewGetBuffer editor
             (_, start) <- textBufferGetSelectionBounds buffer
             maybe (retryFromStart editor buffer) (selectMatch editor buffer) =<< findNextResult start
@@ -124,12 +114,9 @@ searchExecute text = do
             maybeDo (selectMatch editor buffer) =<< findNextResult start
 
 searchExecuteBackwards :: String -> App ()
-searchExecuteBackwards text = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo doSearch editor
+searchExecuteBackwards text = searchOnEditorCallback doSearch
     where
-        doSearch editor = do
+        doSearch editor = liftIO $ do
             buffer <- textViewGetBuffer editor
             (end, _) <- textBufferGetSelectionBounds buffer
             maybe (retryFromEnd editor buffer) (selectMatch editor buffer) =<< findPreviousResult end

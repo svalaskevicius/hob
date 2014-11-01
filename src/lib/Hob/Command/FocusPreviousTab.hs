@@ -1,8 +1,8 @@
 module Hob.Command.FocusPreviousTab (focusPreviousTabCommandHandler) where
 
-import Graphics.UI.Gtk
 import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Trans (liftIO)
+import           Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.UiContext

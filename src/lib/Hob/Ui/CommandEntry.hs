@@ -1,11 +1,12 @@
 module Hob.Ui.CommandEntry (newCommandEntry, newCommandEntryDetached) where
 
+import           Control.Monad                        (liftM)
+import qualified Control.Monad.State                  as S
 import           Control.Monad.Trans                  (liftIO)
 import           Data.IORef
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
-import qualified Control.Monad.State as S
 
 import Hob.Context
 import Hob.Control
@@ -27,14 +28,14 @@ newCommandEntry :: Entry -> CommandMatcher -> App ()
 newCommandEntry cmdEntry cmdMatcher = do
     ctx <- S.get
     (onChange, onReturn) <- newCommandEntryDetached cmdEntry cmdMatcher
-    let liftedOn = \a b c -> liftIO $ on a b c
-    let runInCtx command = S.runStateT command ctx >>= return . fst
-    _ <- cmdEntry `liftedOn` editableChanged $ runInCtx $ onChange
+    let liftedOn a b c = liftIO $ on a b c
+    let runInCtx command = liftM fst $ S.runStateT command ctx
+    _ <- cmdEntry `liftedOn` editableChanged $ runInCtx onChange
     _ <- cmdEntry `liftedOn` keyPressEvent $ do
         modifier <- eventModifier
         key <- eventKeyName
         case (modifier, unpack key) of
-            ([], "Return") -> liftIO $ runInCtx $ onReturn
+            ([], "Return") -> liftIO $ runInCtx onReturn
             _ -> return False
     return ()
 

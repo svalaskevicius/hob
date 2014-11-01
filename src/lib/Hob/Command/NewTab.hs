@@ -5,12 +5,12 @@ module Hob.Command.NewTab (
             NewFileEditorLauncher) where
 
 
-import Control.Monad   (filterM, (<=<))
-import Data.Maybe      (mapMaybe)
-import Data.Text       (pack)
-import Graphics.UI.Gtk
+import           Control.Monad       (filterM, (<=<))
 import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Trans (liftIO)
+import           Data.Maybe          (mapMaybe)
+import           Data.Text           (pack)
+import           Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.FileContext

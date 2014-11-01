@@ -1,9 +1,9 @@
 module Hob.Ui.CommandEntrySpec (main, spec) where
 
+import Control.Monad.State
 import Data.IORef
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
-import Control.Monad.State
 
 import Hob.Context
 import Hob.Context.UiContext

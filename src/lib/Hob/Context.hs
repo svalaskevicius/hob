@@ -16,12 +16,12 @@ module Hob.Context (
     createMatcherForKeyBinding,
 ) where
 
+import Control.Monad.State
+import Data.IORef
 import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
 import GtkExtras.LargeTreeStore as LTS (TreeStore)
-import Control.Monad.State
-import Data.IORef
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext

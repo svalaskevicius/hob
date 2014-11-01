@@ -6,13 +6,13 @@ module Hob.Command.ReplaceText (
         generateReplaceNextCommandHandler,
     ) where
 
-import Control.Monad              (when)
-import Data.Maybe                 (fromJust)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView)
-import System.Glib.GObject        (Quark)
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad              (when)
+import qualified Control.Monad.State        as S
+import           Control.Monad.Trans        (liftIO)
+import           Data.Maybe                 (fromJust)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView)
+import           System.Glib.GObject        (Quark)
 
 import Hob.Command.FindText
 import Hob.Context
@@ -54,7 +54,7 @@ generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText r
 
 generateReplaceNextCommandHandler :: Command -> CommandHandler
 generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
-    where executeHandler = replaceBeforeNext >> decoratedCmdHandler 
+    where executeHandler = replaceBeforeNext >> decoratedCmdHandler
 
 replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler = generateReplaceCommandHandler
