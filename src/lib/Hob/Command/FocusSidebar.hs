@@ -5,6 +5,8 @@ module Hob.Command.FocusSidebar (
 
 import Data.List
 import Graphics.UI.Gtk
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans                  (liftIO)
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -19,16 +21,17 @@ syncFocusSidebarCommandHandler :: CommandHandler
 syncFocusSidebarCommandHandler = CommandHandler Nothing syncFocusSidebar
 
 focusSidebar :: Command
-focusSidebar ctx = do
-    widgetGrabFocus . sidebarTree . uiContext $ ctx
-    return ctx
+focusSidebar = do
+    ctx <- S.get
+    liftIO $ widgetGrabFocus . sidebarTree . uiContext $ ctx
 
 syncActiveEditorPathToSidebar :: Command
-syncActiveEditorPathToSidebar ctx = do
-    maybeDo syncToEditor =<< getActiveEditor ctx
-    return ctx
-    where syncToEditor editor = maybeDo syncToFilePath =<< getEditorFilePath editor
-          syncToFilePath filePath = do
+syncActiveEditorPathToSidebar = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo (syncToEditor ctx) editor
+    where syncToEditor ctx editor = maybeDo (syncToFilePath ctx) =<< getEditorFilePath editor
+          syncToFilePath ctx filePath = do
               let treeView = sidebarTree.uiContext $ ctx
               maybeDo (syncTreeViewModel filePath treeView) =<< treeViewGetModel treeView
           syncTreeViewModel filePath treeView model = do
@@ -39,7 +42,7 @@ syncActiveEditorPathToSidebar ctx = do
           syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
 
 syncFocusSidebar :: Command
-syncFocusSidebar ctx = syncActiveEditorPathToSidebar ctx >>= focusSidebar
+syncFocusSidebar = syncActiveEditorPathToSidebar >> focusSidebar
 
 findFilePath :: TreeModelClass self =>
                 self -> FilePath -> TreeIter -> IO (Maybe TreeIter)

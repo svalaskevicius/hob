@@ -4,6 +4,7 @@ import Data.IORef
 import Data.Maybe      (fromJust, isNothing)
 import Data.Monoid
 import Graphics.UI.Gtk (Modifier (..))
+import Control.Monad.State
 
 import Hob.Context
 
@@ -103,8 +104,7 @@ spec = do
 
     describe "app runner monad" $ do
         it "runs empty monad" $ do
-            ctx <- loadDefaultContext
-            _ <- runApp ctx (return ())
+            _ <- runApp (return ()) =<< loadDefaultContext
             return()
     
 executeMockedMatcher :: String -> String -> IO (Maybe String)
@@ -113,7 +113,7 @@ executeMockedMatcher prefix text = do
     (handler, readHandledText) <- recordingHandler
     let matcher = createMatcherForPrefix prefix handler
     let matchedHandler = matchCommand matcher text
-    _ <- commandExecute (fromJust matchedHandler) ctx
+    _ <- runApp (commandExecute (fromJust matchedHandler)) ctx
     readHandledText
 
 expectCommandHandler :: Maybe CommandHandler -> Expectation
@@ -131,16 +131,17 @@ matcherForKeyBinding key = CommandMatcher (emptyCommandHandlerForKey key) (const
     where emptyCommandHandlerForKey k x = if x == k then Just emptyHandler else Nothing
 
 emptyHandler :: CommandHandler
-emptyHandler = CommandHandler Nothing return
+emptyHandler = CommandHandler Nothing (return())
 
 recordingHandler :: IO (String -> CommandHandler, IO (Maybe String))
 recordingHandler = do
-    state <- newIORef Nothing
+    records <- newIORef Nothing
     return (
-                \params -> CommandHandler Nothing (\ctx -> (writeIORef state $ Just params) >> return ctx),
-                readIORef state
+                \params -> CommandHandler Nothing (liftIO $ writeIORef records $ Just params),
+                readIORef records
             )
+            
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
 executeRecordingHandler ctx handler readHandledText = do
-    _ <- commandExecute (fromJust handler) ctx
+    _ <- runApp (commandExecute (fromJust handler)) ctx
     readHandledText

@@ -10,6 +10,7 @@ module Hob.Context (
     TextCommandMatcher,
     Mode(..),
     runApp,
+    contextRunner,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -20,6 +21,7 @@ import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
 import GtkExtras.LargeTreeStore as LTS (TreeStore)
 import Control.Monad.State
+import Data.IORef
 
 import Hob.Context.FileContext
 import Hob.Context.StyleContext
@@ -29,8 +31,8 @@ import Hob.DirectoryTree
 
 type App = StateT Context IO
 
-runApp :: Context -> App () -> IO Context
-runApp ctx appSteps =  do
+runApp :: App () -> Context -> IO Context
+runApp appSteps ctx =  do
     ret <- runStateT appSteps ctx
     return $ snd ret
 
@@ -42,7 +44,12 @@ data Context = Context {
     modeStack     :: [Mode]
 }
 
-type Command = Context -> IO Context
+type Command = App ()
+
+contextRunner :: Context -> IO (Command -> IO())
+contextRunner initialContext = do
+    ref <- newIORef initialContext
+    return (\command -> readIORef ref >>= runApp command >>= atomicWriteIORef ref)
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: Command,

@@ -9,6 +9,8 @@ import Control.Monad   (filterM, (<=<))
 import Data.Maybe      (mapMaybe)
 import Data.Text       (pack)
 import Graphics.UI.Gtk
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans                  (liftIO)
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -40,10 +42,11 @@ launchNewFileEditor ctx targetNotebook filePath = do
           alreadyLoadedPage _ = Nothing
 
 editNewFile :: Command
-editNewFile ctx = do
-    _ <- newEditorForText ctx tabbed Nothing $ pack ""
-    return ctx
-    where tabbed = mainNotebook.uiContext $ ctx
+editNewFile = do
+    ctx <- S.get
+    let tabbed = mainNotebook.uiContext $ ctx
+    _ <- liftIO $ newEditorForText ctx tabbed Nothing $ pack ""
+    return ()
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)

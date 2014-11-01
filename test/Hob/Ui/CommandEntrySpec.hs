@@ -3,6 +3,7 @@ module Hob.Ui.CommandEntrySpec (main, spec) where
 import Data.IORef
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
+import Control.Monad.State
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -13,7 +14,7 @@ import Test.Hspec
 import HobTest.Context.Default
 
 type CommandHandlerReaders = (IO (Maybe String), IO (Maybe String), IO (Maybe String))
-type EntryApi = (IO(), IO Bool)
+type EntryApi = (App(), App Bool)
 
 main :: IO ()
 main = hspec spec
@@ -51,54 +52,56 @@ spec =
       hasErrorClass `shouldBe` False
 
     it "removes error style on known command" $ do
-      (_, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
+      (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
       styleCtx <- widgetGetStyleContext entry
       styleContextAddClass styleCtx "error"
-      invokePreview entry entryApi "cmd->asd"
+      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
       hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "invokes preview on the command" $ do
-      (_, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokePreview entry entryApi "cmd->asd"
+      (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "asd"
       previewResetText `shouldBe` Nothing
 
     it "resets preview before next preview" $ do
-      (_, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokePreview entry entryApi "cmd->asd"
-      invokePreview entry entryApi "cmd->as"
+      (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
+      _ <- runApp (invokePreview entry entryApi "cmd->as") ctx
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "as"
       previewResetText `shouldBe` Just "called"
 
     it "executes the command" $ do
-      (_, entry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
-      invokeCommand entry entryApi "cmd->asd"
+      (ctx, entry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
+      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
       executed <- executeReader
       executed `shouldBe` Just "asd"
 
     it "clears command entry when executing a command" $ do
-      (_, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
-      invokeCommand entry entryApi "cmd->asd"
+      (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
+      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
       text <- entryGetText entry
       text `shouldBe` ""
 
     it "resets the last preview command before executing a command" $ do
-      (_, entry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      invokeCommand entry entryApi "cmd->asd"
+      (ctx, entry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
+      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
       executed <- executeReader
       previewResetText <- previewResetReader
       executed `shouldBe` Just "asd"
       previewResetText `shouldBe` Just "called"
 
-invokePreview :: Entry -> EntryApi -> String -> IO ()
-invokePreview entry api text = entrySetText entry text >> fst api
+invokePreview :: Entry -> EntryApi -> String -> App ()
+invokePreview entry api text = do
+    liftIO $ entrySetText entry text
+    fst api
 
-invokeCommand :: Entry -> EntryApi -> String -> IO ()
+invokeCommand :: Entry -> EntryApi -> String -> App ()
 invokeCommand entry api text = do
     invokePreview entry api text
     _ <- snd api
@@ -109,8 +112,9 @@ loadDefaultGuiWithMockedCommand = do
     ctx <- loadDefaultContext
     entry <- entryNew
     (matcher, readHandledCommands) <- mockedMatcher "cmd->"
-    entryApi <- newCommandEntryDetached ctx entry matcher
-    return (ctx, entry, entryApi, readHandledCommands)
+    ret <- runStateT (newCommandEntryDetached entry matcher) ctx
+    let entryApi = fst ret
+    return (snd ret, entry, entryApi, readHandledCommands)
 
 mockedMatcher :: String -> IO (CommandMatcher, CommandHandlerReaders)
 mockedMatcher prefix = do
@@ -126,9 +130,9 @@ recordingHandler = do
     return (
                 \params -> CommandHandler
                             (Just $ PreviewCommandHandler
-                                (\ctx -> (writeIORef previewCmd $ Just params) >> return ctx)
-                                (\ctx -> (writeIORef previewResetCmd $ Just "called") >> return ctx))
-                            (\ctx -> (writeIORef cmd $ Just params) >> return ctx),
+                                (liftIO $ writeIORef previewCmd $ Just params)
+                                (liftIO $ writeIORef previewResetCmd $ Just "called"))
+                            (liftIO $ writeIORef cmd $ Just params),
                 (
                     readIORef cmd,
                     readIORef previewCmd,

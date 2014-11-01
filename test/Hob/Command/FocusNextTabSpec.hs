@@ -42,12 +42,12 @@ spec =
 
 focusNextTab :: Context -> IO Int
 focusNextTab ctx = do
-    _ <- commandExecute focusNextTabCommandHandler ctx
+    _ <- runApp (commandExecute focusNextTabCommandHandler) ctx
     let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 
 loadGuiWithNTabs :: Int -> IO Context
 loadGuiWithNTabs n = do
     ctx <- loadDefaultContext
-    replicateM_ n (editNewFile ctx)
+    replicateM_ n (runApp editNewFile ctx)
     return ctx

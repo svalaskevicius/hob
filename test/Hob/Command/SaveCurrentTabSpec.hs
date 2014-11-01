@@ -29,7 +29,7 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
-      _ <- saveCurrentEditorTabHandler emptyFileChooser ctx
+      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
@@ -37,7 +37,7 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
       ctx <- loadGui fc sc
-      _ <- saveCurrentEditorTabHandler emptyFileChooser ctx
+      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
       return ()
 
     it "marks buffer as unmodified on save" $ do
@@ -46,7 +46,7 @@ spec =
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
       buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
       textBufferSetModified buffer True
-      _ <- saveCurrentEditorTabHandler emptyFileChooser ctx
+      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
@@ -78,8 +78,8 @@ launchFileInContext fileCtx styleCtx filename = do
 launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
 launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
     ctx <- loadGui fileCtx styleCtx
-    _ <- editNewFile ctx
-    _ <- saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename) ctx
+    _ <- HC.runApp editNewFile ctx
+    _ <- HC.runApp (saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename)) ctx
     return ctx
 
 launchEditorTab :: HC.Context -> String -> IO ()

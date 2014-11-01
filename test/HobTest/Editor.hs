@@ -15,7 +15,7 @@ import HobTest.Context.Default
 launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
-    commandExecute editNewFileCommandHandler ctx
+    runApp (commandExecute editNewFileCommandHandler) ctx
 
 launchEditorTab :: Context -> String -> IO ()
 launchEditorTab ctx file = do

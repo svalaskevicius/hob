@@ -12,7 +12,6 @@ import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
-import Data.IORef
 
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
@@ -43,9 +42,9 @@ loadGui fileCtx styleCtx = do
 
         ctx <- initCtx builder defaultMode
         commandContextRunner <- contextRunner ctx
-        commandContextRunner (initMainWindow commandContextRunner)
+        initMainWindow commandContextRunner ctx
         initSidebar ctx
-        initCommandEntry ctx
+        initCommandEntry commandContextRunner ctx
         return ctx
     where
         initCtx builder initMode = do
@@ -70,11 +69,11 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
-        initCommandEntry ctx = do
+        initCommandEntry commandContextRunner ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName cmdEntry "commandEntry"
-            newCommandEntry ctx cmdEntry cmdMatcher
+            commandContextRunner $ newCommandEntry cmdEntry cmdMatcher
         initMainWindow commandContextRunner ctx = do
             let window = mainWindow . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
@@ -85,7 +84,7 @@ loadGui fileCtx styleCtx = do
                 maybe (return False)
                       (\cmd -> liftIO $ (commandContextRunner $ commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
-            return ctx
+            return ()
         defaultMode = 
                 let cmdMatcher = mconcat $ [
                                     -- default:
@@ -120,11 +119,6 @@ loadGui fileCtx styleCtx = do
                                         | position <- [0..9]
                                 ]
                 in Mode "" cmdMatcher
-
-contextRunner :: Context -> IO (Command -> IO())
-contextRunner initialRunner = do
-    ref <- newIORef initialRunner
-    return (\command -> readIORef ref >>= command >>= atomicWriteIORef ref)
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

@@ -11,6 +11,8 @@ import Data.Maybe                 (fromJust)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
 import System.Glib.GObject        (Quark)
+import qualified Control.Monad.State as S
+import           Control.Monad.Trans                  (liftIO)
 
 import Hob.Command.FindText
 import Hob.Context
@@ -48,11 +50,11 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
 generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> Command) -> String -> String -> CommandHandler
 generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText =
     CommandHandler (Just $ previewCmdHandler searchText) executeHandler
-    where executeHandler ctx = decoratedCmdHandler searchText ctx >> replaceStart searchText replaceText ctx
+    where executeHandler = decoratedCmdHandler searchText >> replaceStart searchText replaceText
 
 generateReplaceNextCommandHandler :: Command -> CommandHandler
 generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
-    where executeHandler ctx = replaceBeforeNext ctx >> decoratedCmdHandler ctx
+    where executeHandler = replaceBeforeNext >> decoratedCmdHandler 
 
 replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler = generateReplaceCommandHandler
@@ -63,15 +65,17 @@ replaceNextCommandHandler :: CommandHandler
 replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
 
 replaceStart :: String -> String -> Command
-replaceStart _ replaceText ctx = do
-    maybeDo replaceStartOnEditor =<< getActiveEditor ctx
-    return ctx
+replaceStart _ replaceText = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo replaceStartOnEditor editor
     where replaceStartOnEditor editor = setEditorReplaceString editor (Just replaceText)
 
 replaceBeforeNext :: Command
-replaceBeforeNext ctx = do
-    maybeDo replaceContinueOnEditor =<< getActiveEditor ctx
-    return ctx
+replaceBeforeNext = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo replaceContinueOnEditor editor
     where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
           replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
           replaceSearchSelectionWith editor replaceText searchText = do

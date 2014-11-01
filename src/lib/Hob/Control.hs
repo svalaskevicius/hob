@@ -2,5 +2,5 @@ module Hob.Control (
     maybeDo
 ) where
 
-maybeDo :: (a -> IO ()) -> Maybe a -> IO ()
+maybeDo :: Monad b => (a -> b ()) -> Maybe a -> b ()
 maybeDo = maybe (return())
