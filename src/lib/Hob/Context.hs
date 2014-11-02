@@ -10,7 +10,7 @@ module Hob.Context (
     TextCommandMatcher,
     Mode(..),
     runApp,
-    contextRunner,
+    initContext,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -31,25 +31,29 @@ import Hob.DirectoryTree
 
 type App = StateT Context IO
 
+data Context = Context {
+    styleContext   :: StyleContext,
+    fileContext    :: FileContext,
+    uiContext      :: UiContext,
+    fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
+    modeStack      :: [Mode],
+    deferredRunner :: Command -> IO()
+}
+
+type Command = App ()
+
 runApp :: App () -> Context -> IO Context
 runApp appSteps ctx =  do
     ret <- runStateT appSteps ctx
     return $ snd ret
 
-data Context = Context {
-    styleContext  :: StyleContext,
-    fileContext   :: FileContext,
-    uiContext     :: UiContext,
-    fileTreeStore :: LTS.TreeStore DirectoryTreeElement,
-    modeStack     :: [Mode]
-}
-
-type Command = App ()
-
-contextRunner :: Context -> IO (Command -> IO())
-contextRunner initialContext = do
-    ref <- newIORef initialContext
-    return (\command -> readIORef ref >>= runApp command >>= atomicWriteIORef ref)
+initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> Mode -> IO (Context)
+initContext styleCtx fileCtx uiCtx treeModel initMode = do
+    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] undefined
+    ref <- newIORef ctx
+    let commandRunner = (\command -> readIORef ref >>= runApp command >>= atomicWriteIORef ref)
+    atomicWriteIORef ref (ctx{deferredRunner = commandRunner})
+    readIORef ref
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: Command,

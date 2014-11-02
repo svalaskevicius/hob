@@ -41,7 +41,7 @@ loadGui fileCtx styleCtx = do
         setGtkStyle styleCtx
 
         ctx <- initCtx builder defaultMode
-        commandContextRunner <- contextRunner ctx
+        let commandContextRunner = deferredRunner ctx
         initMainWindow commandContextRunner ctx
         initSidebar ctx
         initCommandEntry commandContextRunner ctx
@@ -55,8 +55,7 @@ loadGui fileCtx styleCtx = do
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
             treeModel <- LTS.treeStoreNew []
             let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
-            let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode]
-            return ctx
+            initContext styleCtx fileCtx uiCtx treeModel initMode
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx

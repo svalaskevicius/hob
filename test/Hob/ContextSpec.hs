@@ -102,9 +102,14 @@ spec = do
                 handledText <- executeRecordingHandler ctx matchedHandler readHandledText
                 handledText `shouldBe` Just "test"
 
-    describe "app runner monad" $
+    describe "app runner monad" $ do
         it "runs empty monad" $ do
             _ <- runApp (return ()) =<< loadDefaultContext
+            return()
+
+        it "can defer command execution to IO" $ do
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ return()
             return()
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
