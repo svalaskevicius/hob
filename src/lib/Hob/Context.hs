@@ -9,7 +9,6 @@ module Hob.Context (
     KeyCommandMatcher,
     TextCommandMatcher,
     Mode(..),
-    runApp,
     initContext,
     createMatcherForPrefix,
     createMatcherForCommand,
@@ -42,8 +41,8 @@ data Context = Context {
 
 type Command = App ()
 
-runApp :: App () -> Context -> IO Context
-runApp appSteps ctx =  do
+runApp :: Context -> App () -> IO Context
+runApp ctx appSteps =  do
     ret <- runStateT appSteps ctx
     return $ snd ret
 
@@ -64,8 +63,7 @@ initContext styleCtx fileCtx uiCtx treeModel initMode = do
         flushCommandQueue deferredCommandsRef ctx = do
             commands <- swapMVar deferredCommandsRef []
             if null commands then return ctx
-            else foldM runApp' ctx commands >>= flushCommandQueue deferredCommandsRef
-        runApp' ctx command = runApp command ctx
+            else foldM runApp ctx commands >>= flushCommandQueue deferredCommandsRef
         queueCommand deferredCommandsRef command = modifyMVar_ deferredCommandsRef (\cmds -> return $ cmds ++ [command])
 
 data PreviewCommandHandler = PreviewCommandHandler {

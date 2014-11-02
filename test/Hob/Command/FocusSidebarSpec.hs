@@ -37,11 +37,11 @@ sidebarFocusState = widgetGetIsFocus . HC.sidebarTree . uiContext
 
 focusSidebarAndReturnState :: Context -> IO Bool
 focusSidebarAndReturnState ctx = do
-    _ <- runApp (commandExecute focusSidebarCommandHandler) ctx
+    deferredRunner ctx $ commandExecute focusSidebarCommandHandler
     sidebarFocusState ctx
 
 syncSidebarAndReturnSelectedPath :: Context -> IO TreePath
 syncSidebarAndReturnSelectedPath ctx = do
-    _ <- runApp (commandExecute syncFocusSidebarCommandHandler) ctx
+    deferredRunner ctx $ commandExecute syncFocusSidebarCommandHandler
     pos <- treeViewGetCursor . HC.sidebarTree . uiContext $ ctx
     return $ fst pos

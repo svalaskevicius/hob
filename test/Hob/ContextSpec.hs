@@ -102,10 +102,10 @@ spec = do
                 handledText <- executeRecordingHandler ctx matchedHandler readHandledText
                 handledText `shouldBe` Just "test"
 
-    describe "app runner monad" $ do
+    describe "app runner" $ do
         it "runs empty monad" $ do
-            _ <- runApp (return ()) =<< loadDefaultContext
-            return()
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ return ()
 
         it "can defer command execution to IO" $ do
             record <- newIORef (0::Int)
@@ -124,7 +124,7 @@ executeMockedMatcher prefix text = do
     (handler, readHandledText) <- recordingHandler
     let matcher = createMatcherForPrefix prefix handler
     let matchedHandler = matchCommand matcher text
-    _ <- runApp (commandExecute (fromJust matchedHandler)) ctx
+    deferredRunner ctx $ commandExecute $ fromJust matchedHandler
     readHandledText
 
 expectCommandHandler :: Maybe CommandHandler -> Expectation
@@ -154,5 +154,5 @@ recordingHandler = do
 
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
 executeRecordingHandler ctx handler readHandledText = do
-    _ <- runApp (commandExecute (fromJust handler)) ctx
+    deferredRunner ctx $ commandExecute $ fromJust handler
     readHandledText

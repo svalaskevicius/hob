@@ -7,10 +7,10 @@ import Graphics.UI.Gtk
 
 import           Hob.Command.NewTab
 import           Hob.Command.SaveCurrentTab
-import qualified Hob.Context                as HC
+import           Hob.Context
 import qualified Hob.Context.FileContext    as HFC
 import qualified Hob.Context.StyleContext   as HSC
-import qualified Hob.Context.UiContext      as HC
+import qualified Hob.Context.UiContext      as HUC
 import           Hob.Ui
 
 import Test.Hspec
@@ -29,7 +29,7 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
-      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
+      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
@@ -37,8 +37,7 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
       ctx <- loadGui fc sc
-      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
-      return ()
+      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
 
     it "marks buffer as unmodified on save" $ do
       sc <- HSC.defaultStyleContext "app-data"
@@ -46,7 +45,7 @@ spec =
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
       buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
       textBufferSetModified buffer True
-      _ <- HC.runApp (saveCurrentEditorTabHandler emptyFileChooser) ctx
+      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
@@ -69,27 +68,27 @@ spec =
       tabText <- getActiveEditorTabText ctx
       tabText `shouldBe` "fileResponded.hs*"
 
-launchFileInContext :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
+launchFileInContext :: HFC.FileContext -> HSC.StyleContext -> String -> IO Context
 launchFileInContext fileCtx styleCtx filename = do
     ctx <- loadGui fileCtx styleCtx
     launchEditorTab ctx filename
     return ctx
 
-launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO HC.Context
+launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO Context
 launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
     ctx <- loadGui fileCtx styleCtx
-    _ <- HC.runApp editNewFile ctx
-    _ <- HC.runApp (saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename)) ctx
+    deferredRunner ctx editNewFile
+    deferredRunner ctx $ saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename)
     return ctx
 
-launchEditorTab :: HC.Context -> String -> IO ()
+launchEditorTab :: Context -> String -> IO ()
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HUC.mainNotebook . uiContext $ ctx
     launchNewFileEditor ctx notebook file
 
-getActiveEditorTabText :: HC.Context  -> IO String
+getActiveEditorTabText :: Context  -> IO String
 getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HUC.mainNotebook . uiContext $ ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text

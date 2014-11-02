@@ -33,7 +33,7 @@ spec = do
 
     it "removes all search tags on reset" $ do
       (ctx, buffer) <- loadGuiAndPreviewSearch
-      _ <- runApp ((previewReset . fromJust . commandPreview) (searchCommandHandler "")) ctx
+      deferredRunner ctx $ (previewReset . fromJust . commandPreview) (searchCommandHandler "")
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
@@ -49,13 +49,13 @@ spec = do
 
     it "highlights the next match from cursor on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      _ <- runApp (commandExecute (searchCommandHandler "text")) ctx
+      deferredRunner ctx $ commandExecute (searchCommandHandler "text")
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (15, 19)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      replicateM_ 3 $ runApp (commandExecute (searchCommandHandler "text")) ctx
+      replicateM_ 3 $ deferredRunner ctx $ commandExecute (searchCommandHandler "text")
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
@@ -70,13 +70,13 @@ spec = do
   describe "search next command handler" $ do
     it "highlights the next match from cursor on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      _ <- runApp (commandExecute searchNextCommandHandler) ctx
+      deferredRunner ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (15, 19)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      replicateM_ 3 $ runApp (commandExecute searchNextCommandHandler) ctx
+      replicateM_ 3 $ deferredRunner ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
@@ -89,28 +89,28 @@ spec = do
   describe "search reset command handler" $ do
     it "removes all search tags on reset" $ do
       (ctx, buffer) <- loadGuiAndPreviewSearch
-      _ <- runApp (commandExecute searchResetCommandHandler) ctx
+      deferredRunner ctx $ commandExecute searchResetCommandHandler
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
     it "stops the next search" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      _ <- runApp (commandExecute searchResetCommandHandler) ctx
-      _ <- runApp (commandExecute searchNextCommandHandler) ctx
+      deferredRunner ctx $ commandExecute searchResetCommandHandler
+      deferredRunner ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
   describe "search backwards command handler" $ do
     it "highlights the previous match from cursor on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      _ <- runApp (commandExecute searchNextCommandHandler) ctx
-      _ <- runApp (commandExecute searchBackwardsCommandHandler) ctx
+      deferredRunner ctx $ commandExecute searchNextCommandHandler
+      deferredRunner ctx $ commandExecute searchBackwardsCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
     it "wraps the search from start if there are no matches till the end on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      _ <- runApp (commandExecute searchBackwardsCommandHandler) ctx
+      deferredRunner ctx $ commandExecute searchBackwardsCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (21, 25)
 
@@ -127,7 +127,7 @@ ensureCursorVisibleAfterCommands commands = do
     let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
     editor <- newEditorForText ctx notebook Nothing $ pack editorText
     processGtkEvents
-    _ <- runApp commands ctx
+    deferredRunner ctx commands
     processGtkEvents
     buffer <- textViewGetBuffer editor
     visible <- textViewGetVisibleRect editor
@@ -140,17 +140,17 @@ loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
     editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
-    _ <- runApp ((previewExecute . fromJust . commandPreview) (searchCommandHandler "text")) ctx
+    deferredRunner ctx $ (previewExecute . fromJust . commandPreview) (searchCommandHandler "text")
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
 loadGuiAndExecuteSearch :: IO (Context, TextBuffer)
 loadGuiAndExecuteSearch = do
     (ctx, buffer) <- loadGuiAndPreviewSearch
-    _ <- runApp ((previewReset . fromJust . commandPreview) (searchCommandHandler "text")) ctx
+    deferredRunner ctx $ (previewReset . fromJust . commandPreview) (searchCommandHandler "text")
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
-    _ <- runApp (commandExecute (searchCommandHandler "text")) ctx
+    deferredRunner ctx $ commandExecute (searchCommandHandler "text")
     return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)

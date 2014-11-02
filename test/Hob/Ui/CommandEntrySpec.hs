@@ -55,13 +55,13 @@ spec =
       (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
       styleCtx <- widgetGetStyleContext entry
       styleContextAddClass styleCtx "error"
-      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
+      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
       hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "invokes preview on the command" $ do
       (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
+      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "asd"
@@ -69,8 +69,8 @@ spec =
 
     it "resets preview before next preview" $ do
       (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      _ <- runApp (invokePreview entry entryApi "cmd->asd") ctx
-      _ <- runApp (invokePreview entry entryApi "cmd->as") ctx
+      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
+      deferredRunner ctx $ invokePreview entry entryApi "cmd->as"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "as"
@@ -78,19 +78,19 @@ spec =
 
     it "executes the command" $ do
       (ctx, entry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
-      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
+      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       executed `shouldBe` Just "asd"
 
     it "clears command entry when executing a command" $ do
       (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
-      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
+      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
       text <- entryGetText entry
       text `shouldBe` ""
 
     it "resets the last preview command before executing a command" $ do
       (ctx, entry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      _ <- runApp (invokeCommand entry entryApi "cmd->asd") ctx
+      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       previewResetText <- previewResetReader
       executed `shouldBe` Just "asd"

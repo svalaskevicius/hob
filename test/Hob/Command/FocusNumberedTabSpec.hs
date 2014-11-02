@@ -31,12 +31,12 @@ spec =
 
 focusNumberedTab :: Int -> Context -> IO Int
 focusNumberedTab nr ctx = do
-    _ <- runApp (commandExecute (focusNumberedTabCommandHandler nr)) ctx
+    deferredRunner ctx $ commandExecute (focusNumberedTabCommandHandler nr)
     let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 
 loadGuiWithNTabs :: Int -> IO Context
 loadGuiWithNTabs n = do
     ctx <- loadDefaultContext
-    replicateM_ n (runApp editNewFile ctx)
+    replicateM_ n $ deferredRunner ctx editNewFile
     return ctx
