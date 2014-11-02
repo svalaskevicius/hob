@@ -108,9 +108,15 @@ spec = do
             return()
 
         it "can defer command execution to IO" $ do
+            record <- newIORef (0::Int)
             ctx <- loadDefaultContext
-            deferredRunner ctx $ return()
-            return()
+            let countingCommand = liftIO $ modifyIORef record (+1)
+            let deferCommand cmd = liftIO $ deferredRunner ctx cmd
+            deferCommand (countingCommand >>
+                deferCommand (countingCommand >>
+                    deferCommand countingCommand))
+            invokeCount <- readIORef record
+            invokeCount `shouldBe` (3::Int)
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
@@ -140,10 +146,10 @@ emptyHandler = CommandHandler Nothing (return())
 
 recordingHandler :: IO (String -> CommandHandler, IO (Maybe String))
 recordingHandler = do
-    records <- newIORef Nothing
+    record <- newIORef Nothing
     return (
-                \params -> CommandHandler Nothing (liftIO $ writeIORef records $ Just params),
-                readIORef records
+                \params -> CommandHandler Nothing (liftIO $ writeIORef record $ Just params),
+                readIORef record
             )
 
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)

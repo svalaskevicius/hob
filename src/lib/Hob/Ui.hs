@@ -41,10 +41,9 @@ loadGui fileCtx styleCtx = do
         setGtkStyle styleCtx
 
         ctx <- initCtx builder defaultMode
-        let commandContextRunner = deferredRunner ctx
-        initMainWindow commandContextRunner ctx
+        initMainWindow ctx
         initSidebar ctx
-        initCommandEntry commandContextRunner ctx
+        initCommandEntry ctx
         return ctx
     where
         initCtx builder initMode = do
@@ -68,12 +67,12 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
-        initCommandEntry commandContextRunner ctx = do
+        initCommandEntry ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName cmdEntry "commandEntry"
-            commandContextRunner $ newCommandEntry cmdEntry cmdMatcher
-        initMainWindow commandContextRunner ctx = do
+            deferredRunner ctx $ newCommandEntry cmdEntry cmdMatcher
+        initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName window "mainWindow"
@@ -81,7 +80,7 @@ loadGui fileCtx styleCtx = do
                 modifier <- eventModifier
                 key <- eventKeyName
                 maybe (return False)
-                      (\cmd -> liftIO $ commandContextRunner (commandExecute cmd) >> return True) $
+                      (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ()
         defaultMode =

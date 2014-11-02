@@ -16,8 +16,8 @@ module Hob.Context (
     createMatcherForKeyBinding,
 ) where
 
+import Control.Concurrent.MVar
 import Control.Monad.State
-import Data.IORef
 import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
@@ -47,13 +47,26 @@ runApp appSteps ctx =  do
     ret <- runStateT appSteps ctx
     return $ snd ret
 
-initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> Mode -> IO (Context)
+initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> Mode -> IO Context
 initContext styleCtx fileCtx uiCtx treeModel initMode = do
-    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] undefined
-    ref <- newIORef ctx
-    let commandRunner = (\command -> readIORef ref >>= runApp command >>= atomicWriteIORef ref)
-    atomicWriteIORef ref (ctx{deferredRunner = commandRunner})
-    readIORef ref
+    ctxRef <- newEmptyMVar
+    deferredCommandsRef <- newMVar []
+    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (commandRunner ctxRef deferredCommandsRef)
+    putMVar ctxRef ctx
+    return ctx
+    where
+        commandRunner ctxRef deferredCommandsRef command = do
+            queueCommand deferredCommandsRef command
+            mCtx <- tryTakeMVar ctxRef
+            case mCtx of
+                Just ctx -> putMVar ctxRef =<< flushCommandQueue deferredCommandsRef ctx
+                Nothing -> return()
+        flushCommandQueue deferredCommandsRef ctx = do
+            commands <- swapMVar deferredCommandsRef []
+            if null commands then return ctx
+            else foldM runApp' ctx commands >>= flushCommandQueue deferredCommandsRef
+        runApp' ctx command = runApp command ctx
+        queueCommand deferredCommandsRef command = modifyMVar_ deferredCommandsRef (\cmds -> return $ cmds ++ [command])
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: Command,

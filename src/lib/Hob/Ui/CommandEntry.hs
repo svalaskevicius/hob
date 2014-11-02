@@ -28,13 +28,12 @@ newCommandEntry cmdEntry cmdMatcher = do
     ctx <- S.get
     (onChange, onReturn) <- newCommandEntryDetached cmdEntry cmdMatcher
     let liftedOn a b c = liftIO $ on a b c
-    let runInCtx command = deferredRunner ctx command
-    _ <- cmdEntry `liftedOn` editableChanged $ runInCtx onChange
+    _ <- cmdEntry `liftedOn` editableChanged $ deferredRunner ctx onChange
     _ <- cmdEntry `liftedOn` keyPressEvent $ do
         modifier <- eventModifier
         key <- eventKeyName
         case (modifier, unpack key) of
-            ([], "Return") -> liftIO $ runInCtx onReturn >> return True
+            ([], "Return") -> liftIO $ deferredRunner ctx onReturn >> return True
             _ -> return False
     return ()
 
