@@ -108,15 +108,14 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler,
 
                                     -- tbc
-                                    createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler,
-                                    createMatcherForCommand "stopSearch" searchResetCommandHandler
+                                    createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler
                                 ] ++
                                 [
                                     -- default
                                     createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
                                         | position <- [0..9]
                                 ]
-                in Mode "" cmdMatcher
+                in Mode "" cmdMatcher $ return()
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

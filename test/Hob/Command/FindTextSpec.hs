@@ -31,7 +31,7 @@ spec = do
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(True, True), (True, True)]
 
-    it "removes all search tags on reset" $ do
+    it "removes all search tags on preview reset" $ do
       (ctx, buffer) <- loadGuiAndPreviewSearch
       deferredRunner ctx $ (previewReset . fromJust . commandPreview) (searchCommandHandler "")
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
@@ -66,6 +66,10 @@ spec = do
       (ctx, _) <- loadGuiAndExecuteSearch
       editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
       editorFocused `shouldBe` True
+      
+    it "enters the search mode" $ do
+      (ctx, _) <- loadGuiAndExecuteSearch
+      (modeName . last . modeStack) ctx `shouldBe` "search"
 
   describe "search next command handler" $ do
     it "highlights the next match from cursor on execute" $ do
@@ -86,16 +90,16 @@ spec = do
             commandExecute searchNextCommandHandler
       ensureCursorVisibleAfterCommands commands
 
-  describe "search reset command handler" $ do
-    it "removes all search tags on reset" $ do
-      (ctx, buffer) <- loadGuiAndPreviewSearch
-      deferredRunner ctx $ commandExecute searchResetCommandHandler
+  describe "search reset command on mode exit" $ do
+    it "removes all search tags on cleanup" $ do
+      (ctx, buffer) <- loadGuiAndExecuteSearch
+      deferredRunner ctx $ exitLastMode
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
     it "stops the next search" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      deferredRunner ctx $ commandExecute searchResetCommandHandler
+      deferredRunner ctx $ exitLastMode
       deferredRunner ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
@@ -151,7 +155,8 @@ loadGuiAndExecuteSearch = do
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
     deferredRunner ctx $ commandExecute (searchCommandHandler "text")
-    return (ctx, buffer)
+    ctx' <- currentContext ctx
+    return (ctx', buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)
 getSelectionOffsets buffer = do

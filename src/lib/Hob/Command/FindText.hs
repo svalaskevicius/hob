@@ -2,7 +2,6 @@ module Hob.Command.FindText (
         searchCommandHandler,
         searchNextCommandHandler,
         searchBackwardsCommandHandler,
-        searchResetCommandHandler,
         getEditorSearchString,
     ) where
 
@@ -12,6 +11,7 @@ import           Data.Text                  (pack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.SourceView (SourceView)
 import           System.Glib.GObject        (Quark)
+import Data.Monoid (mconcat)
 
 import Hob.Context
 import Hob.Control
@@ -25,9 +25,6 @@ searchNextCommandHandler = CommandHandler Nothing searchNext
 
 searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
-
-searchResetCommandHandler :: CommandHandler
-searchResetCommandHandler = CommandHandler Nothing searchReset
 
 searchPreview :: String -> Command
 searchPreview text = do
@@ -94,7 +91,7 @@ searchOnEditorCallback searchOnEditor = do
     maybeDo searchOnEditor editor
 
 searchStart :: String -> Command
-searchStart text = searchOnEditorCallback searchStartOnEditor
+searchStart text = searchOnEditorCallback searchStartOnEditor >> enterMode searchMode
     where searchStartOnEditor editor = do
               liftIO $ setEditorSearchString editor (Just text)
               searchPreview text
@@ -145,3 +142,8 @@ getEditorSearchString editor = do
 searchStringQuark :: IO Quark
 searchStringQuark = quarkFromString "activeSearchString"
 
+searchMode :: Mode
+searchMode = Mode "search" matcher searchReset
+    where matcher = mconcat [
+                              createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
+                              createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler]

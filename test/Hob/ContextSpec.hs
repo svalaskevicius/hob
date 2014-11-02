@@ -117,6 +117,25 @@ spec = do
                     deferCommand countingCommand))
             invokeCount <- readIORef record
             invokeCount `shouldBe` (3::Int)
+            
+    describe "context commands" $ do
+        it "enters given mode" $ do
+            record <- newIORef Nothing
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef record $ Just modes)
+            mode <- readIORef record
+            (modeName . last . fromJust) mode `shouldBe` "testmode"
+
+        it "invokes mode teardown on exitMode" $ do
+            record <- newIORef False
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
+            deferredRunner ctx $ exitLastMode
+            cleanupInvoked <- readIORef record
+            cleanupInvoked `shouldBe` True
+        
+            
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do

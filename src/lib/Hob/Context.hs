@@ -10,6 +10,9 @@ module Hob.Context (
     TextCommandMatcher,
     Mode(..),
     initContext,
+    enterMode,
+    exitLastMode,
+    activeModes,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -36,7 +39,14 @@ data Context = Context {
     uiContext      :: UiContext,
     fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
     modeStack      :: [Mode],
-    deferredRunner :: Command -> IO()
+    deferredRunner :: Command -> IO(),
+    currentContext :: IO Context
+}
+
+data Mode = Mode {
+    modeName       :: String,
+    commandMatcher :: CommandMatcher,
+    cleanup        :: Command
 }
 
 type Command = App ()
@@ -50,7 +60,7 @@ initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore Directo
 initContext styleCtx fileCtx uiCtx treeModel initMode = do
     ctxRef <- newEmptyMVar
     deferredCommandsRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (commandRunner ctxRef deferredCommandsRef)
+    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (commandRunner ctxRef deferredCommandsRef) (readMVar ctxRef)
     putMVar ctxRef ctx
     return ctx
     where
@@ -58,13 +68,34 @@ initContext styleCtx fileCtx uiCtx treeModel initMode = do
             queueCommand deferredCommandsRef command
             mCtx <- tryTakeMVar ctxRef
             case mCtx of
-                Just ctx -> putMVar ctxRef =<< flushCommandQueue deferredCommandsRef ctx
+                Just ctx -> flushCommandQueue deferredCommandsRef ctx >>= putMVar ctxRef
                 Nothing -> return()
         flushCommandQueue deferredCommandsRef ctx = do
             commands <- swapMVar deferredCommandsRef []
             if null commands then return ctx
             else foldM runApp ctx commands >>= flushCommandQueue deferredCommandsRef
         queueCommand deferredCommandsRef command = modifyMVar_ deferredCommandsRef (\cmds -> return $ cmds ++ [command])
+
+
+enterMode :: Mode -> Command
+enterMode mode = do
+    ctx <- get
+    put ctx{modeStack = modeStack ctx++[mode]}
+
+activeModes :: App [Mode]
+activeModes = do
+    ctx <- get
+    return $ modeStack ctx
+
+exitLastMode :: Command
+exitLastMode = do
+    ctx <- get
+    let modes = modeStack ctx
+    if length modes > 1 then do
+        let lastMode = last modes
+        put ctx{modeStack = init modes}
+        cleanup lastMode
+    else return()
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: Command,
@@ -123,7 +154,3 @@ createMatcherForKeyBinding keyBinding handler = CommandMatcher (matchHandler key
         matchHandler boundKey matchedKey = if boundKey == matchedKey then Just handler else Nothing
 
 
-data Mode = Mode {
-    modeName       :: String,
-    commandMatcher :: CommandMatcher
-}
