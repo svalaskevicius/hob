@@ -11,7 +11,7 @@ import Hob.Context.UiContext
 focusNumberedTabCommandHandler :: Int -> CommandHandler
 focusNumberedTabCommandHandler nr = CommandHandler Nothing $ focusNumberedTab nr
 
-focusNumberedTab :: Int -> Command
+focusNumberedTab :: Int -> App()
 focusNumberedTab nr = do
     ctx <- S.get
     let notebook = mainNotebook.uiContext $ ctx

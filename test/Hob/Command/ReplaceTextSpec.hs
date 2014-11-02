@@ -12,7 +12,6 @@ import           Hob.Command.ReplaceText
 import           Hob.Context
 import qualified Hob.Context.UiContext   as HC
 import           Hob.Ui.Editor           (newEditorForText)
---import           Hob.Ui          (getActiveEditor)
 
 import HobTest.Context.Default
 
@@ -164,7 +163,7 @@ mockedPreviewCommandHandler = do
         resets <- readResets
         return (previews, resets))
 
-mockedStringCommand :: IO (String -> Command, IO [String])
+mockedStringCommand :: IO (String -> App(), IO [String])
 mockedStringCommand = do
     recorder <- newIORef []
     return (\v -> S.liftIO $ do
@@ -172,7 +171,7 @@ mockedStringCommand = do
             writeIORef recorder $ currentValues ++ [v],
         readIORef recorder)
 
-mockedCounterCommand :: IO (Command, IO Int)
+mockedCounterCommand :: IO (App(), IO Int)
 mockedCounterCommand = do
     recorder <- newIORef 0
     return (S.liftIO $ do

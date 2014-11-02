@@ -124,7 +124,7 @@ spec = do
             commandExecute searchBackwardsCommandHandler
       ensureCursorVisibleAfterCommands commands
 
-ensureCursorVisibleAfterCommands :: Command -> IO ()
+ensureCursorVisibleAfterCommands :: App() -> IO ()
 ensureCursorVisibleAfterCommands commands = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx

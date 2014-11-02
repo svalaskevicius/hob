@@ -11,7 +11,7 @@ import Hob.Context.UiContext
 closeCurrentEditorTab :: CommandHandler
 closeCurrentEditorTab = CommandHandler Nothing closeCurrentEditorTabHandler
 
-closeCurrentEditorTabHandler :: Command
+closeCurrentEditorTabHandler :: App()
 closeCurrentEditorTabHandler = do
     ctx <- S.get
     let tabbed = mainNotebook.uiContext $ ctx

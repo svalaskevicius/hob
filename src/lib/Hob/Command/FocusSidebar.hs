@@ -20,12 +20,12 @@ focusSidebarCommandHandler = CommandHandler Nothing focusSidebar
 syncFocusSidebarCommandHandler :: CommandHandler
 syncFocusSidebarCommandHandler = CommandHandler Nothing syncFocusSidebar
 
-focusSidebar :: Command
+focusSidebar :: App()
 focusSidebar = do
     ctx <- S.get
     liftIO $ widgetGrabFocus . sidebarTree . uiContext $ ctx
 
-syncActiveEditorPathToSidebar :: Command
+syncActiveEditorPathToSidebar :: App()
 syncActiveEditorPathToSidebar = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
@@ -41,7 +41,7 @@ syncActiveEditorPathToSidebar = do
               maybeDo (syncToIter treeView model) =<< findFilePath model filePath startingIter
           syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
 
-syncFocusSidebar :: Command
+syncFocusSidebar :: App()
 syncFocusSidebar = syncActiveEditorPathToSidebar >> focusSidebar
 
 findFilePath :: TreeModelClass self =>

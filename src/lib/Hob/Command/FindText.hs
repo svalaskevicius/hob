@@ -26,7 +26,7 @@ searchNextCommandHandler = CommandHandler Nothing searchNext
 searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
-searchPreview :: String -> Command
+searchPreview :: String -> App()
 searchPreview text = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
@@ -51,14 +51,14 @@ searchPreview text = do
                     addNewSearchTags buffer tag matchEnd end
                 Nothing -> return()
 
-searchReset :: Command
+searchReset :: App()
 searchReset = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo (`setEditorSearchString` Nothing) editor
     searchResetPreview
 
-searchResetPreview :: Command
+searchResetPreview :: App()
 searchResetPreview = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
@@ -72,13 +72,13 @@ searchResetPreview = do
             (start, end) <- textBufferGetBounds buffer
             textBufferRemoveTag buffer tag start end
 
-searchNext :: Command
+searchNext :: App()
 searchNext = searchOnEditorCallback searchOnEditor
     where searchOnEditor editor = do
              searchString <- liftIO $ getEditorSearchString editor
              maybeDo searchExecute searchString
 
-searchPrevious :: Command
+searchPrevious :: App()
 searchPrevious = searchOnEditorCallback searchOnEditor
     where searchOnEditor editor = do
               searchString <- liftIO $ getEditorSearchString editor
@@ -90,7 +90,7 @@ searchOnEditorCallback searchOnEditor = do
     editor <- liftIO $ getActiveEditor ctx
     maybeDo searchOnEditor editor
 
-searchStart :: String -> Command
+searchStart :: String -> App()
 searchStart text = searchOnEditorCallback searchStartOnEditor >> enterMode searchMode
     where searchStartOnEditor editor = do
               liftIO $ setEditorSearchString editor (Just text)

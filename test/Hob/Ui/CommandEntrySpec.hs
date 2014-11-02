@@ -14,7 +14,7 @@ import Test.Hspec
 import HobTest.Context.Default
 
 type CommandHandlerReaders = (IO (Maybe String), IO (Maybe String), IO (Maybe String))
-type EntryApi = (Command, Command)
+type EntryApi = (App(), App())
 
 main :: IO ()
 main = hspec spec

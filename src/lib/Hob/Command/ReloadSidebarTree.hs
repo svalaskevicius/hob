@@ -8,7 +8,7 @@ import Hob.Ui.Sidebar
 reloadSidebarTreeCommandHandler :: CommandHandler
 reloadSidebarTreeCommandHandler = CommandHandler Nothing reloadCmd
 
-reloadCmd :: Command
+reloadCmd :: App()
 reloadCmd = do
     ctx <- S.get
     liftIO $ reloadSidebarTree ctx

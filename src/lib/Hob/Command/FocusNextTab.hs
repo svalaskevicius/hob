@@ -10,7 +10,7 @@ import Hob.Context.UiContext
 focusNextTabCommandHandler :: CommandHandler
 focusNextTabCommandHandler = CommandHandler Nothing focusNextTab
 
-focusNextTab :: Command
+focusNextTab :: App()
 focusNextTab = do
     ctx <- S.get
     let notebook = mainNotebook.uiContext $ ctx

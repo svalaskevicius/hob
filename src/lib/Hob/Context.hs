@@ -1,7 +1,6 @@
 module Hob.Context (
     App,
     Context(..),
-    Command,
     PreviewCommandHandler(..),
     CommandHandler(..),
     CommandMatcher(..),
@@ -39,17 +38,15 @@ data Context = Context {
     uiContext      :: UiContext,
     fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
     modeStack      :: [Mode],
-    deferredRunner :: Command -> IO(),
+    deferredRunner :: App() -> IO(),
     currentContext :: IO Context
 }
 
 data Mode = Mode {
     modeName       :: String,
     commandMatcher :: CommandMatcher,
-    cleanup        :: Command
+    cleanup        :: App()
 }
-
-type Command = App ()
 
 runApp :: Context -> App () -> IO Context
 runApp ctx appSteps =  do
@@ -77,7 +74,7 @@ initContext styleCtx fileCtx uiCtx treeModel initMode = do
         queueCommand deferredCommandsRef command = modifyMVar_ deferredCommandsRef (\cmds -> return $ cmds ++ [command])
 
 
-enterMode :: Mode -> Command
+enterMode :: Mode -> App()
 enterMode mode = do
     ctx <- get
     put ctx{modeStack = modeStack ctx++[mode]}
@@ -87,7 +84,7 @@ activeModes = do
     ctx <- get
     return $ modeStack ctx
 
-exitLastMode :: Command
+exitLastMode :: App()
 exitLastMode = do
     ctx <- get
     let modes = modeStack ctx
@@ -98,13 +95,13 @@ exitLastMode = do
     else return()
 
 data PreviewCommandHandler = PreviewCommandHandler {
-                    previewExecute :: Command,
-                    previewReset   :: Command
+                    previewExecute :: App(),
+                    previewReset   :: App()
                 }
 
 data CommandHandler = CommandHandler {
                     commandPreview :: Maybe PreviewCommandHandler,
-                    commandExecute :: Command
+                    commandExecute :: App()
                 }
 
 type KeyboardBinding = ([Modifier], String)

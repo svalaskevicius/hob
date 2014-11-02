@@ -10,7 +10,7 @@ import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import Hob.Context
 import Hob.Control
 
-type PreviewResetState = (PreviewCommandHandler -> App(), Command)
+type PreviewResetState = (PreviewCommandHandler -> App(), App())
 
 commandPreviewResetState :: App PreviewResetState
 commandPreviewResetState = do
@@ -37,7 +37,7 @@ newCommandEntry cmdEntry cmdMatcher = do
             _ -> return False
     return ()
 
-newCommandEntryDetached :: Entry -> CommandMatcher -> App (Command, Command)
+newCommandEntryDetached :: Entry -> CommandMatcher -> App (App(), App())
 newCommandEntryDetached cmdEntry cmdMatcher = do
     previewResetState <- commandPreviewResetState
     return (onChanged previewResetState, onReturn previewResetState)

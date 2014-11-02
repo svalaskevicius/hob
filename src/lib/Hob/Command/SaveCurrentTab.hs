@@ -29,7 +29,7 @@ saveCurrentEditorTab = CommandHandler Nothing (do
             widgetDestroy dialog
             return file
 
-saveCurrentEditorTabHandler :: NewFileNameChooser -> Command
+saveCurrentEditorTabHandler :: NewFileNameChooser -> App()
 saveCurrentEditorTabHandler newFileNameChooser = do
     ctx <- S.get
     maybeEditor <- liftIO $ getActiveEditor ctx

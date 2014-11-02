@@ -41,7 +41,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
           alreadyLoadedPage [(nr, _)] = Just nr
           alreadyLoadedPage _ = Nothing
 
-editNewFile :: Command
+editNewFile :: App()
 editNewFile = do
     ctx <- S.get
     let tabbed = mainNotebook.uiContext $ ctx
