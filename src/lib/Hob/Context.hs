@@ -12,6 +12,7 @@ module Hob.Context (
     enterMode,
     exitLastMode,
     activeModes,
+    deferredRunner,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -38,7 +39,7 @@ data Context = Context {
     uiContext      :: UiContext,
     fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
     modeStack      :: [Mode],
-    deferredRunner :: App() -> IO(),
+    messageLoop    :: Message -> IO(),
     currentContext :: IO Context
 }
 
@@ -48,31 +49,39 @@ data Mode = Mode {
     cleanup        :: App()
 }
 
+data Message = AppAction (App())
+
 runApp :: Context -> App () -> IO Context
 runApp ctx appSteps =  do
     ret <- runStateT appSteps ctx
     return $ snd ret
 
+runMessage :: Context -> Message -> IO Context
+runMessage  ctx (AppAction action) = runApp ctx action
+
 initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> Mode -> IO Context
 initContext styleCtx fileCtx uiCtx treeModel initMode = do
     ctxRef <- newEmptyMVar
-    deferredCommandsRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (commandRunner ctxRef deferredCommandsRef) (readMVar ctxRef)
+    deferredMessagesRef <- newMVar []
+    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef)
     putMVar ctxRef ctx
     return ctx
     where
-        commandRunner ctxRef deferredCommandsRef command = do
-            queueCommand deferredCommandsRef command
+        messageRunner ctxRef deferredMessagesRef message = do
+            queueMessage deferredMessagesRef message
             mCtx <- tryTakeMVar ctxRef
             case mCtx of
-                Just ctx -> flushCommandQueue deferredCommandsRef ctx >>= putMVar ctxRef
+                Just ctx -> flushMessageQueue deferredMessagesRef ctx >>= putMVar ctxRef
                 Nothing -> return()
-        flushCommandQueue deferredCommandsRef ctx = do
-            commands <- swapMVar deferredCommandsRef []
-            if null commands then return ctx
-            else foldM runApp ctx commands >>= flushCommandQueue deferredCommandsRef
-        queueCommand deferredCommandsRef command = modifyMVar_ deferredCommandsRef (\cmds -> return $ cmds ++ [command])
+        flushMessageQueue deferredMessagesRef ctx = do
+            messages <- swapMVar deferredMessagesRef []
+            if null messages then return ctx
+            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
+        queueMessage deferredMessagesRef message = modifyMVar_ deferredMessagesRef (\messages -> return $ messages ++ [message])
 
+
+deferredRunner :: Context -> App() -> IO()
+deferredRunner ctx actions = messageLoop ctx $ AppAction actions
 
 enterMode :: Mode -> App()
 enterMode mode = do

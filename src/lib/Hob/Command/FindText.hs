@@ -7,11 +7,11 @@ module Hob.Command.FindText (
 
 import qualified Control.Monad.State        as S
 import           Control.Monad.Trans        (liftIO)
+import           Data.Monoid                (mconcat)
 import           Data.Text                  (pack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.SourceView (SourceView)
 import           System.Glib.GObject        (Quark)
-import Data.Monoid (mconcat)
 
 import Hob.Context
 import Hob.Control
