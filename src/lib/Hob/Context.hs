@@ -8,11 +8,14 @@ module Hob.Context (
     KeyCommandMatcher,
     TextCommandMatcher,
     Mode(..),
+    Event(..),
     initContext,
     enterMode,
     exitLastMode,
     activeModes,
     deferredRunner,
+    registerEventHandler,
+    emitEvent,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -32,6 +35,7 @@ import Hob.DirectoryTree
 
 
 type App = StateT Context IO
+newtype Event = Event String deriving (Eq)
 
 data Context = Context {
     styleContext   :: StyleContext,
@@ -40,7 +44,8 @@ data Context = Context {
     fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
     modeStack      :: [Mode],
     messageLoop    :: Message -> IO(),
-    currentContext :: IO Context
+    currentContext :: IO Context,
+    eventListeners :: [(Event, [App()])]
 }
 
 data Mode = Mode {
@@ -63,7 +68,7 @@ initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore Directo
 initContext styleCtx fileCtx uiCtx treeModel initMode = do
     ctxRef <- newEmptyMVar
     deferredMessagesRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef)
+    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) []
     putMVar ctxRef ctx
     return ctx
     where
@@ -76,12 +81,32 @@ initContext styleCtx fileCtx uiCtx treeModel initMode = do
         flushMessageQueue deferredMessagesRef ctx = do
             messages <- swapMVar deferredMessagesRef []
             if null messages then return ctx
-            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
+            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef        
         queueMessage deferredMessagesRef message = modifyMVar_ deferredMessagesRef (\messages -> return $ messages ++ [message])
 
 
 deferredRunner :: Context -> App() -> IO()
 deferredRunner ctx actions = messageLoop ctx $ AppAction actions
+
+registerEventHandler :: Event -> App() -> App()
+registerEventHandler event handler = do
+    ctx <- get
+    put ctx{eventListeners = addEventHandler $ eventListeners ctx}
+    where addEventHandler :: [(Event, [App()])] -> [(Event, [App()])]
+          addEventHandler [] = [(event, [handler])]
+          addEventHandler (x@(evt, initHandlers):xs) = 
+                if evt == event then (evt, handler:initHandlers) : xs
+                else x : addEventHandler xs
+                                    
+emitEvent :: Event -> App()
+emitEvent event = do
+    ctx <- get
+    let handlers = findEvent $ eventListeners ctx
+    sequence_ $ handlers
+    where findEvent [] = []
+          findEvent ((evt, handlers):xs) = if evt == event then handlers
+                                           else findEvent xs
+
 
 enterMode :: Mode -> App()
 enterMode mode = do
@@ -102,6 +127,7 @@ exitLastMode = do
         put ctx{modeStack = init modes}
         cleanup lastMode
     else return()
+
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: App(),

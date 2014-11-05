@@ -134,7 +134,16 @@ spec = do
             deferredRunner ctx $ exitLastMode
             cleanupInvoked <- readIORef record
             cleanupInvoked `shouldBe` True
-        
+
+    describe "event handler support" $ do
+        it "invokes a registered handler on fireEvent" $ do
+            record <- newIORef False
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ registerEventHandler (Event "test.event") (liftIO $ writeIORef record True)
+            deferredRunner ctx $ emitEvent (Event "test.event")
+            invoked <- readIORef record
+            invoked `shouldBe` True
+            
             
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
