@@ -52,8 +52,9 @@ loadGui fileCtx styleCtx = do
             cmdEntry <- builderGetObject builder castToEntry "command"
             treeView <- builderGetObject builder castToTreeView "directoryListing"
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
+            activeModesObject <- builderGetObject builder castToLabel "activeMode"
             treeModel <- LTS.treeStoreNew []
-            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
+            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch activeModesObject
             initContext styleCtx fileCtx uiCtx treeModel initMode
         loadUiBuilder = do
             builder <- builderNew
