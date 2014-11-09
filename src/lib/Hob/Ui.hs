@@ -5,6 +5,7 @@ module Hob.Ui (loadGui,
                getActiveEditor) where
 
 import           Control.Monad.Trans                  (liftIO)
+import Data.IORef
 import           Data.Char                            (intToDigit)
 import           Data.Monoid                          (mconcat)
 import           Data.Text                            (unpack)
@@ -79,13 +80,28 @@ loadGui fileCtx styleCtx = do
         initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
             let cmdMatcher = commandMatcher . head . modeStack $ ctx
+            lastPressedKeyRef <- newIORef ""
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier
-                key <- eventKeyName
-                maybe (return False)
-                      (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
-                      matchKeyBinding cmdMatcher (modifier, unpack key)
+                keyT <- eventKeyName
+                let key = unpack keyT
+                if key == "Control_L" then do
+                    liftIO $ writeIORef lastPressedKeyRef key
+                    return False
+                else maybe (return False)
+                           (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
+                           matchKeyBinding cmdMatcher (modifier, key)
+            _ <- window `on` keyReleaseEvent $ do
+                modifier <- eventModifier
+                keyT <- eventKeyName
+                lastPressedKey <- liftIO $ readIORef lastPressedKeyRef
+                let key = unpack keyT
+                if lastPressedKey == key then
+                    maybe (return False)
+                          (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
+                          matchKeyBinding cmdMatcher (modifier, key)
+                else return False
             return ()
         initActiveModesMonitor ctx = do
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
@@ -108,18 +124,13 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
                                     createMatcherForPrefix "/" searchCommandHandler,
                                     createMatcherForReplace 's' replaceCommandHandler,
-
-                                    -- + focus cmd on ctrl key press
-                                    -- + pop mode on escape, focuses editor
-
+                                    createMatcherForKeyBinding ([Control], "Control_L") focusCommandEntryCommandHandler,
+                                    createMatcherForKeyBinding ([], "Escape") focusActiveEditorAndExitLastModeCommandHandler,
                                     -- search / replace
                                     createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
                                     createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
                                     -- replace
-                                    createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler,
-
-                                    -- tbc
-                                    createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler
+                                    createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
                                 ] ++
                                 [
                                     -- default
