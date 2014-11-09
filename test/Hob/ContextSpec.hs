@@ -144,6 +144,13 @@ spec = do
             invoked <- readIORef record
             invoked `shouldBe` True
             
+        it "does not invoke an event handler with different name" $ do
+            record <- newIORef False
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ registerEventHandler (Event "test.event1") (liftIO $ writeIORef record True)
+            deferredRunner ctx $ emitEvent (Event "test.event2")
+            invoked <- readIORef record
+            invoked `shouldBe` False
             
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
