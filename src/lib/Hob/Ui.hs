@@ -86,8 +86,8 @@ loadGui fileCtx styleCtx = do
                 modifier <- eventModifier
                 keyT <- eventKeyName
                 let key = unpack keyT
+                liftIO $ writeIORef lastPressedKeyRef key
                 if key == "Control_L" then do
-                    liftIO $ writeIORef lastPressedKeyRef key
                     return False
                 else maybe (return False)
                            (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
