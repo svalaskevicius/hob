@@ -8,10 +8,12 @@ import           Control.Monad.Trans                  (liftIO)
 import           Data.Char                            (intToDigit)
 import           Data.Monoid                          (mconcat)
 import           Data.Text                            (unpack)
+import           Data.List                            (intercalate)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
+import qualified Control.Monad.State as S
 
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText
@@ -44,6 +46,7 @@ loadGui fileCtx styleCtx = do
         initMainWindow ctx
         initSidebar ctx
         initCommandEntry ctx
+        initActiveModesMonitor ctx
         return ctx
     where
         initCtx builder initMode = do
@@ -84,6 +87,13 @@ loadGui fileCtx styleCtx = do
                       (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
                       matchKeyBinding cmdMatcher (modifier, unpack key)
             return ()
+        initActiveModesMonitor ctx = do
+            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
+                activeCtx <- S.get
+                modes <- activeModes
+                let modesUi = activeModesLabel . uiContext $ activeCtx
+                let modesToString = (intercalate " | ") . (filter $ not . null) . (map modeName)
+                liftIO $ labelSetText modesUi $ modesToString modes
         defaultMode =
                 let cmdMatcher = mconcat $ [
                                     -- default:
