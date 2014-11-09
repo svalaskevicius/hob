@@ -135,6 +135,24 @@ spec = do
             cleanupInvoked <- readIORef record
             cleanupInvoked `shouldBe` True
 
+        it "emits mode change event on entering a mode" $ do
+            record <- newIORef False
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            invoked <- readIORef record
+            invoked `shouldBe` True
+
+        it "emits mode change event on exiting a mode" $ do
+            record <- newIORef False
+            ctx <- loadDefaultContext
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
+            deferredRunner ctx $ exitLastMode
+            invoked <- readIORef record
+            invoked `shouldBe` True
+            
+
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
             record <- newIORef False

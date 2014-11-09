@@ -112,6 +112,7 @@ enterMode :: Mode -> App()
 enterMode mode = do
     ctx <- get
     put ctx{modeStack = modeStack ctx++[mode]}
+    emitEvent $ Event "core.mode.change"
 
 activeModes :: App [Mode]
 activeModes = do
@@ -126,6 +127,7 @@ exitLastMode = do
         let lastMode = last modes
         put ctx{modeStack = init modes}
         cleanup lastMode
+        emitEvent $ Event "core.mode.change"
     else return()
 
 
