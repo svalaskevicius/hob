@@ -43,14 +43,14 @@ loadGui fileCtx styleCtx = do
         builder <- loadUiBuilder
         setGtkStyle styleCtx
 
-        ctx <- initCtx builder defaultMode
+        ctx <- initCtx builder defaultCommands
         initMainWindow ctx
         initSidebar ctx
         initCommandEntry ctx
         initActiveModesMonitor ctx
         return ctx
     where
-        initCtx builder initMode = do
+        initCtx builder initCommands = do
             window <- builderGetObject builder castToWindow "mainWindow"
             notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             cmdEntry <- builderGetObject builder castToEntry "command"
@@ -59,7 +59,7 @@ loadGui fileCtx styleCtx = do
             activeModesObject <- builderGetObject builder castToLabel "activeMode"
             treeModel <- LTS.treeStoreNew []
             let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch activeModesObject
-            initContext styleCtx fileCtx uiCtx treeModel initMode
+            initContext styleCtx fileCtx uiCtx treeModel initCommands
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx
@@ -74,12 +74,12 @@ loadGui fileCtx styleCtx = do
             newSideBarFileTreeSearch ctx
         initCommandEntry ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
-            let cmdMatcher = commandMatcher . head . modeStack $ ctx
+            let cmdMatcher = baseCommands $ ctx
             widgetSetName cmdEntry "commandEntry"
             deferredRunner ctx $ newCommandEntry cmdEntry cmdMatcher
         initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
-            let cmdMatcher = commandMatcher . head . modeStack $ ctx
+            let cmdMatcher = baseCommands $ ctx
             lastPressedKeyRef <- newIORef ""
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
@@ -109,9 +109,8 @@ loadGui fileCtx styleCtx = do
                 modes <- activeModes
                 let modesUi = activeModesLabel . uiContext $ activeCtx
                 let modesToString = (intercalate " | ") . (filter $ not . null) . (map modeName)
-                liftIO $ labelSetText modesUi $ modesToString modes
-        defaultMode =
-                let cmdMatcher = mconcat $ [
+                liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
+        defaultCommands = mconcat $ [
                                     -- default:
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
                                     createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
@@ -137,7 +136,6 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
                                         | position <- [0..9]
                                 ]
-                in Mode "" cmdMatcher $ return()
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

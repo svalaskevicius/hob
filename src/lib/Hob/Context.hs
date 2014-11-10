@@ -1,3 +1,5 @@
+{-# LANGUAGE ExistentialQuantification #-}
+
 module Hob.Context (
     App,
     Context(..),
@@ -9,6 +11,8 @@ module Hob.Context (
     TextCommandMatcher,
     Mode(..),
     Event(..),
+    Editor(..),
+    EditorClass(..),
     initContext,
     enterMode,
     exitLastMode,
@@ -35,14 +39,32 @@ import Hob.DirectoryTree
 
 
 type App = StateT Context IO
+
 newtype Event = Event String deriving (Eq)
+
+class EditorClass a where
+    enterEditorMode :: a -> Mode -> a
+    exitLastEditorMode :: a -> a
+    modeStack      :: a -> [Mode]
+    isCurrentlyActive :: a -> Bool
+    
+
+data Editor = forall a. (EditorClass a) => Editor a
+
+instance EditorClass Editor where
+    enterEditorMode (Editor subj) mode = Editor $ enterEditorMode subj mode
+    exitLastEditorMode (Editor subj) = Editor $ exitLastEditorMode subj
+    modeStack      (Editor subj) = modeStack subj
+    isCurrentlyActive (Editor subj) = isCurrentlyActive subj
+    
 
 data Context = Context {
     styleContext   :: StyleContext,
     fileContext    :: FileContext,
     uiContext      :: UiContext,
     fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
-    modeStack      :: [Mode],
+    baseCommands   :: CommandMatcher,
+    editors        :: [Editor],
     messageLoop    :: Message -> IO(),
     currentContext :: IO Context,
     eventListeners :: [(Event, [App()])]
@@ -64,11 +86,11 @@ runApp ctx appSteps =  do
 runMessage :: Context -> Message -> IO Context
 runMessage  ctx (AppAction action) = runApp ctx action
 
-initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> Mode -> IO Context
-initContext styleCtx fileCtx uiCtx treeModel initMode = do
+initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> CommandMatcher -> IO Context
+initContext styleCtx fileCtx uiCtx treeModel initCommands = do
     ctxRef <- newEmptyMVar
     deferredMessagesRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel [initMode] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) []
+    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) []
     putMVar ctxRef ctx
     return ctx
     where
@@ -108,26 +130,41 @@ emitEvent event = do
                                            else findEvent xs
 
 
-enterMode :: Mode -> App()
-enterMode mode = do
+currentEditor :: App (Maybe Editor)
+currentEditor = do
     ctx <- get
-    put ctx{modeStack = modeStack ctx++[mode]}
-    emitEvent $ Event "core.mode.change"
+    let active = filter isCurrentlyActive $ editors ctx
+    return $ 
+        if null active then Nothing
+        else Just $ head active
 
-activeModes :: App [Mode]
+isCurrentlyActive' (Editor editor) = isCurrentlyActive editor
+
+enterMode :: Mode -> App()
+enterMode mode = updateActiveEditor (\editor -> do
+        emitEvent $ Event "core.mode.change"
+        return $ enterEditorMode editor mode
+    )
+
+activeModes :: App (Maybe [Mode])
 activeModes = do
-    ctx <- get
-    return $ modeStack ctx
+    active <- currentEditor
+    return $ fmap modeStack active
 
 exitLastMode :: App()
-exitLastMode = do
-    ctx <- get
-    let modes = modeStack ctx
-    if length modes > 1 then do
-        let lastMode = last modes
-        put ctx{modeStack = init modes}
-        cleanup lastMode
+exitLastMode = updateActiveEditor (\editor -> do
         emitEvent $ Event "core.mode.change"
+        return $ exitLastEditorMode editor
+    )
+
+updateActiveEditor :: (Editor -> App Editor) -> App()
+updateActiveEditor actions = do
+    ctx <- get
+    let (e1, e2) = span (not . isCurrentlyActive) $ editors ctx
+    if not . null $ e2 then do
+        let active = head e2
+        active' <- actions active
+        put ctx{editors = e1 ++ [active'] ++ (tail e2)}
     else return()
 
 
