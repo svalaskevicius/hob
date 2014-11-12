@@ -23,10 +23,12 @@ module Hob.Context (
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
+    generateNewId,
 ) where
 
 import Control.Concurrent.MVar
 import Control.Monad.State
+import Control.Monad (filterM)
 import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
@@ -43,17 +45,19 @@ type App = StateT Context IO
 newtype Event = Event String deriving (Eq)
 
 class EditorClass a where
-    enterEditorMode :: a -> Mode -> a
-    exitLastEditorMode :: a -> a
-    modeStack      :: a -> [Mode]
-    isCurrentlyActive :: a -> Bool
+    editorId :: a -> App Int
+    enterEditorMode :: a -> Mode -> App a
+    exitLastEditorMode :: a -> App a
+    modeStack      :: a -> App [Mode]
+    isCurrentlyActive :: a -> App Bool
     
 
 data Editor = forall a. (EditorClass a) => Editor a
 
 instance EditorClass Editor where
-    enterEditorMode (Editor subj) mode = Editor $ enterEditorMode subj mode
-    exitLastEditorMode (Editor subj) = Editor $ exitLastEditorMode subj
+    editorId (Editor subj) = editorId subj
+    enterEditorMode (Editor subj) mode = return . Editor =<< enterEditorMode subj mode
+    exitLastEditorMode (Editor subj) = return . Editor =<< exitLastEditorMode subj
     modeStack      (Editor subj) = modeStack subj
     isCurrentlyActive (Editor subj) = isCurrentlyActive subj
     
@@ -67,7 +71,8 @@ data Context = Context {
     editors        :: [Editor],
     messageLoop    :: Message -> IO(),
     currentContext :: IO Context,
-    eventListeners :: [(Event, [App()])]
+    eventListeners :: [(Event, [App()])],
+    lastGeneratdId :: Int
 }
 
 data Mode = Mode {
@@ -90,7 +95,7 @@ initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore Directo
 initContext styleCtx fileCtx uiCtx treeModel initCommands = do
     ctxRef <- newEmptyMVar
     deferredMessagesRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) []
+    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) [] 0
     putMVar ctxRef ctx
     return ctx
     where
@@ -133,40 +138,44 @@ emitEvent event = do
 currentEditor :: App (Maybe Editor)
 currentEditor = do
     ctx <- get
-    let active = filter isCurrentlyActive $ editors ctx
+    active <- filterM isCurrentlyActive $ editors ctx
     return $ 
         if null active then Nothing
         else Just $ head active
 
-isCurrentlyActive' (Editor editor) = isCurrentlyActive editor
-
 enterMode :: Mode -> App()
 enterMode mode = updateActiveEditor (\editor -> do
         emitEvent $ Event "core.mode.change"
-        return $ enterEditorMode editor mode
+        enterEditorMode editor mode
     )
 
 activeModes :: App (Maybe [Mode])
 activeModes = do
     active <- currentEditor
-    return $ fmap modeStack active
+    maybe (return Nothing) (\editor -> modeStack editor >>= return . Just) active
 
 exitLastMode :: App()
 exitLastMode = updateActiveEditor (\editor -> do
         emitEvent $ Event "core.mode.change"
-        return $ exitLastEditorMode editor
+        exitLastEditorMode editor
     )
 
 updateActiveEditor :: (Editor -> App Editor) -> App()
 updateActiveEditor actions = do
     ctx <- get
-    let (e1, e2) = span (not . isCurrentlyActive) $ editors ctx
+    (e1, e2) <- splitBeforeFirstActive $ editors ctx
     if not . null $ e2 then do
         let active = head e2
         active' <- actions active
         put ctx{editors = e1 ++ [active'] ++ (tail e2)}
     else return()
-
+    where splitBeforeFirstActive [] = return ([], [])
+          splitBeforeFirstActive (x:xs) = do
+            active <- isCurrentlyActive x
+            if active then return ([], x:xs)
+            else do
+                (n, ns) <- splitBeforeFirstActive xs
+                return (x:n, ns)
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: App(),
@@ -199,7 +208,12 @@ combineMatcher combiner l r cmd = if isJust rightResult then rightResult else le
     where leftResult = combiner l cmd
           rightResult = combiner r cmd
 
-
+generateNewId :: App Int
+generateNewId = do
+    ctx <- get
+    let newId = lastGeneratdId ctx
+    put $ ctx{lastGeneratdId = newId}
+    return newId
 
 createMatcherForPrefix :: String -> (String -> CommandHandler) -> CommandMatcher
 createMatcherForPrefix prefix handler = CommandMatcher (const Nothing) (matchHandler prefix)

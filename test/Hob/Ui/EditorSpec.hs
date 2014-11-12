@@ -2,6 +2,8 @@ module Hob.Ui.EditorSpec (main, spec) where
 
 import Test.Hspec
 
+import qualified Control.Monad.State as S
+import Data.IORef
 import Data.Maybe
 import Data.Text                  (pack, unpack)
 import Graphics.UI.Gtk
@@ -45,6 +47,14 @@ spec =
       editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
       activeEditor <- getActiveEditor ctx
       fromJust activeEditor == editor `shouldBe` True
+
+    it "registers the new editor in the context on creation" $ do
+      ctx <- loadDefaultContext
+      _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      retRef <- newIORef Nothing
+      HC.deferredRunner ctx $ S.get >>= (\ctx' -> S.liftIO $ writeIORef retRef (Just . HC.editors $ ctx'))
+      editors <- readIORef retRef
+      (length . fromJust) editors `shouldBe` 1
 
     it "retrieves editor text" $ do
       ctx <- loadDefaultContext
@@ -90,7 +100,9 @@ launchNewFileAndSetModified = do
 launchEditorTab :: HC.Context -> Maybe FilePath -> IO SourceView
 launchEditorTab ctx file = do
     let notebook = HC.mainNotebook . HC.uiContext $ ctx
-    newEditorForText ctx notebook file $ pack "initial text"
+    HC.deferredRunner ctx $ newEditorForText notebook file $ pack "initial text"
+    mEditor <- getActiveEditor ctx
+    return $ fromJust mEditor
 
 getActiveEditorTabText :: HC.Context  -> IO String
 getActiveEditorTabText ctx = do

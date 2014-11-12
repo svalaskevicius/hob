@@ -1,10 +1,12 @@
 module Hob.Command.FindTextSpec (main, spec) where
 
+import Control.Monad.State (liftIO)
 import Control.Monad   (replicateM_)
 import Data.Maybe
 import Data.Text       (pack)
 import Graphics.UI.Gtk
 import Test.Hspec
+import Data.IORef
 
 import           Hob.Command.FindText
 import           Hob.Context
@@ -69,7 +71,10 @@ spec = do
       
     it "enters the search mode" $ do
       (ctx, _) <- loadGuiAndExecuteSearch
-      (modeName . last . modeStack) ctx `shouldBe` "search"
+      ref <- newIORef Nothing
+      deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef ref modes)
+      modes <- readIORef ref
+      (modeName . last . fromJust) modes `shouldBe` "search"
 
   describe "search next command handler" $ do
     it "highlights the next match from cursor on execute" $ do
@@ -129,7 +134,9 @@ ensureCursorVisibleAfterCommands commands = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
     let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
-    editor <- newEditorForText ctx notebook Nothing $ pack editorText
+    deferredRunner ctx $ newEditorForText notebook Nothing $ pack editorText
+    mEditor <- getActiveEditor ctx
+    let editor = fromJust mEditor
     processGtkEvents
     deferredRunner ctx commands
     processGtkEvents
@@ -143,7 +150,9 @@ loadGuiAndPreviewSearch :: IO (Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
-    editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
+    deferredRunner ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
+    mEditor <- getActiveEditor ctx
+    let editor = fromJust mEditor
     deferredRunner ctx $ (previewExecute . fromJust . commandPreview) (searchCommandHandler "text")
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)

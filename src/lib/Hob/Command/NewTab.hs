@@ -7,7 +7,6 @@ module Hob.Command.NewTab (
 
 import           Control.Monad       (filterM, (<=<))
 import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
 import           Data.Maybe          (mapMaybe)
 import           Data.Text           (pack)
 import           Graphics.UI.Gtk
@@ -32,9 +31,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
         Just nr -> notebookSetCurrentPage targetNotebook nr
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
-    where launchEditor text = do
-              _ <- newEditorForText ctx targetNotebook (Just filePath) text
-              return ()
+    where launchEditor text = deferredRunner ctx $ newEditorForText targetNotebook (Just filePath) text
           isEditorFileMatching editor = do
               f <- getEditorFilePath editor
               return $ maybe False (filePath ==) f
@@ -45,8 +42,7 @@ editNewFile :: App()
 editNewFile = do
     ctx <- S.get
     let tabbed = mainNotebook.uiContext $ ctx
-    _ <- liftIO $ newEditorForText ctx tabbed Nothing $ pack ""
-    return ()
+    newEditorForText tabbed Nothing $ pack ""
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)

@@ -11,7 +11,7 @@ import           Test.Hspec
 import           Hob.Command.ReplaceText
 import           Hob.Context
 import qualified Hob.Context.UiContext   as HC
-import           Hob.Ui.Editor           (newEditorForText)
+import           Hob.Ui.Editor           (newEditorForText, getActiveEditor)
 
 import HobTest.Context.Default
 
@@ -137,7 +137,9 @@ loadGuiWithEditor :: IO (Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
-    editor <- newEditorForText ctx notebook Nothing $ pack "text - initial text! text"
+    deferredRunner ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
+    mEditor <- getActiveEditor ctx
+    let editor = fromJust mEditor
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 

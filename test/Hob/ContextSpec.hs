@@ -16,10 +16,11 @@ import HobTest.Context.Default
 data DummyEditor = DummyEditor [Mode]
 
 instance EditorClass DummyEditor where
-    enterEditorMode (DummyEditor dummy) mode = DummyEditor $ dummy ++ [mode]
-    exitLastEditorMode (DummyEditor dummy) = DummyEditor $ init dummy
-    modeStack      (DummyEditor dummy) = dummy
-    isCurrentlyActive _ = True
+    editorId _ = return 1
+    enterEditorMode (DummyEditor dummy) mode = return $ DummyEditor $ dummy ++ [mode]
+    exitLastEditorMode (DummyEditor dummy) = return $ DummyEditor $ init dummy
+    modeStack      (DummyEditor dummy) = return dummy
+    isCurrentlyActive _ = return True
 
 main :: IO ()
 main = hspec spec
