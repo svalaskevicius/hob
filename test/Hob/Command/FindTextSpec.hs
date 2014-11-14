@@ -72,7 +72,7 @@ spec = do
     it "enters the search mode" $ do
       (ctx, _) <- loadGuiAndExecuteSearch
       ref <- newIORef Nothing
-      deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef ref modes)
+      deferredRunner ctx $ activeModes >>= (liftIO . writeIORef ref)
       modes <- readIORef ref
       (modeName . last . fromJust) modes `shouldBe` "search"
 
@@ -98,13 +98,13 @@ spec = do
   describe "search reset command on mode exit" $ do
     it "removes all search tags on cleanup" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      deferredRunner ctx $ exitLastMode
+      deferredRunner ctx exitLastMode
       tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
       tagStates `shouldBe` [(False, False), (False, False)]
 
     it "stops the next search" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      deferredRunner ctx $ exitLastMode
+      deferredRunner ctx exitLastMode
       deferredRunner ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)

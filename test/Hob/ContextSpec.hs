@@ -133,7 +133,7 @@ spec = do
             record <- newIORef Nothing
             ctx <- loadDefaultContext
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef record $ Just modes)
+            deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
             mode <- readIORef record
             (isNothing . fromJust) mode `shouldBe` True
 
@@ -142,7 +142,7 @@ spec = do
             ctx <- loadDefaultContext
             deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef record $ Just modes)
+            deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
             modes <- readIORef record
             (modeName . last . fromJust . fromJust) modes `shouldBe` "testmode"
 
@@ -151,8 +151,8 @@ spec = do
             ctx <- loadDefaultContext
             deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx $ exitLastMode
-            deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef record $ Just modes)
+            deferredRunner ctx exitLastMode
+            deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
             modes <- readIORef record
             (length . fromJust . fromJust) modes `shouldBe` 0
 
@@ -171,7 +171,7 @@ spec = do
             deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
-            deferredRunner ctx $ exitLastMode
+            deferredRunner ctx exitLastMode
             invoked <- readIORef record
             invoked `shouldBe` True
 

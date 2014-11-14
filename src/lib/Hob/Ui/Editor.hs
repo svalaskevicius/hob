@@ -71,7 +71,7 @@ newEditorForText targetNotebook filePath text = do
     editor <- liftIO $ createNewEditor ctx
     liftIO $ setEditorId editor newId
     liftIO $ setEditorModes editor []
-    S.put ctx{editors = (editors ctx)++[Editor $ GtkEditor editor]}
+    S.put ctx{editors = editors ctx ++ [Editor $ GtkEditor editor]}
     where
         title = tabTitleForFile filePath
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
@@ -167,9 +167,9 @@ getEditorFilePath editor = do
     objectGetAttributeUnsafe quark editor
 
 setEditorId :: SourceView -> Int -> IO ()
-setEditorId editor id = do
+setEditorId editor identifier = do
     quark <- editorIdQuark
-    objectSetAttribute quark editor $ Just id
+    objectSetAttribute quark editor $ Just identifier
 
 getEditorId :: SourceView -> IO Int
 getEditorId editor = do
@@ -184,7 +184,7 @@ setEditorModes editor modes = do
     quark <- editorModesQuark
     objectSetAttribute quark editor $ Just modes
 
-getEditorModes :: SourceView -> IO ([Mode])
+getEditorModes :: SourceView -> IO [Mode]
 getEditorModes editor = do
     quark <- editorModesQuark
     mRet <- objectGetAttributeUnsafe quark editor

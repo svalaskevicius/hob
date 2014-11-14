@@ -97,7 +97,7 @@ spec =
       editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
       widgetGrabFocus editor
       deferredRunner ctx $ enterMode $ Mode "testmode" mempty (S.liftIO $ writeIORef record True)
-      deferredRunner ctx $ exitLastMode
+      deferredRunner ctx exitLastMode
       cleanupInvoked <- readIORef record
       cleanupInvoked `shouldBe` True
 

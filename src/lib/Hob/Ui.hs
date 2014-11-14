@@ -74,12 +74,12 @@ loadGui fileCtx styleCtx = do
             newSideBarFileTreeSearch ctx
         initCommandEntry ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
-            let cmdMatcher = baseCommands $ ctx
+            let cmdMatcher = baseCommands ctx
             widgetSetName cmdEntry "commandEntry"
             deferredRunner ctx $ newCommandEntry cmdEntry cmdMatcher
         initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
-            let cmdMatcher = baseCommands $ ctx
+            let cmdMatcher = baseCommands ctx
             lastPressedKeyRef <- newIORef ""
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
@@ -87,8 +87,7 @@ loadGui fileCtx styleCtx = do
                 keyT <- eventKeyName
                 let key = unpack keyT
                 liftIO $ writeIORef lastPressedKeyRef key
-                if key == "Control_L" then do
-                    return False
+                if key == "Control_L" then return False
                 else maybe (return False)
                            (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
                            matchKeyBinding cmdMatcher (modifier, key)
@@ -103,12 +102,12 @@ loadGui fileCtx styleCtx = do
                           matchKeyBinding cmdMatcher (modifier, key)
                 else return False
             return ()
-        initActiveModesMonitor ctx = do
+        initActiveModesMonitor ctx =
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
                 activeCtx <- S.get
                 modes <- activeModes
                 let modesUi = activeModesLabel . uiContext $ activeCtx
-                let modesToString = (intercalate " | ") . (filter $ not . null) . (map modeName)
+                let modesToString = intercalate " | " . filter (not . null) . map modeName
                 liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
         defaultCommands = mconcat $ [
                                     -- default:

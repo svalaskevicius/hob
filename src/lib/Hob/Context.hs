@@ -128,7 +128,7 @@ emitEvent :: Event -> App()
 emitEvent event = do
     ctx <- get
     let handlers = findEvent $ eventListeners ctx
-    sequence_ $ handlers
+    sequence_ handlers
     where findEvent [] = []
           findEvent ((evt, handlers):xs) = if evt == event then handlers
                                            else findEvent xs
@@ -151,7 +151,7 @@ enterMode mode = updateActiveEditor (\editor -> do
 activeModes :: App (Maybe [Mode])
 activeModes = do
     active <- currentEditor
-    maybe (return Nothing) (\editor -> modeStack editor >>= return . Just) active
+    maybe (return Nothing) (modeStack >=> return . Just) active
 
 exitLastMode :: App()
 exitLastMode = updateActiveEditor (\editor -> do
@@ -163,11 +163,10 @@ updateActiveEditor :: (Editor -> App Editor) -> App()
 updateActiveEditor actions = do
     ctx <- get
     (e1, e2) <- splitBeforeFirstActive $ editors ctx
-    if not . null $ e2 then do
+    unless (null e2) $ do
         let active = head e2
         active' <- actions active
-        put ctx{editors = e1 ++ [active'] ++ (tail e2)}
-    else return()
+        put ctx{editors = e1 ++ [active'] ++ tail e2}
     where splitBeforeFirstActive [] = return ([], [])
           splitBeforeFirstActive (x:xs) = do
             active <- isCurrentlyActive x
