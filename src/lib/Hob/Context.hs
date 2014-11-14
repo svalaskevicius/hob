@@ -28,7 +28,6 @@ module Hob.Context (
 
 import Control.Concurrent.MVar
 import Control.Monad.State
-import Control.Monad (filterM)
 import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
