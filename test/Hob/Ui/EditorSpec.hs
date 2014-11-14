@@ -9,8 +9,9 @@ import Data.Text                  (pack, unpack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
                                    sourceBufferUndo)
+import Data.Monoid
 
-import qualified Hob.Context           as HC
+import  Hob.Context           
 import qualified Hob.Context.UiContext as HC
 import           Hob.Ui
 import           Hob.Ui.Editor
@@ -52,9 +53,9 @@ spec =
       ctx <- loadDefaultContext
       _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
       retRef <- newIORef Nothing
-      HC.deferredRunner ctx $ S.get >>= (\ctx' -> S.liftIO $ writeIORef retRef (Just . HC.editors $ ctx'))
-      editors <- readIORef retRef
-      (length . fromJust) editors `shouldBe` 1
+      deferredRunner ctx $ S.get >>= (\ctx' -> S.liftIO $ writeIORef retRef (Just . editors $ ctx'))
+      registeredEditors <- readIORef retRef
+      (length . fromJust) registeredEditors `shouldBe` 1
 
     it "retrieves editor text" $ do
       ctx <- loadDefaultContext
@@ -89,7 +90,18 @@ spec =
       filePath1 `shouldBe` Just "/xxx/testName.hs"
       filePath2 `shouldBe` Just "/tmp/xxx"
 
-launchNewFileAndSetModified :: IO HC.Context
+
+    it "invokes mode teardown on exitMode" $ do
+      record <- newIORef False
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      widgetGrabFocus editor
+      deferredRunner ctx $ enterMode $ Mode "testmode" mempty (S.liftIO $ writeIORef record True)
+      deferredRunner ctx $ exitLastMode
+      cleanupInvoked <- readIORef record
+      cleanupInvoked `shouldBe` True
+
+launchNewFileAndSetModified :: IO Context
 launchNewFileAndSetModified = do
     ctx <- loadDefaultContext
     _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
@@ -97,16 +109,16 @@ launchNewFileAndSetModified = do
     textBufferSetModified buffer True
     return ctx
 
-launchEditorTab :: HC.Context -> Maybe FilePath -> IO SourceView
+launchEditorTab :: Context -> Maybe FilePath -> IO SourceView
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
-    HC.deferredRunner ctx $ newEditorForText notebook file $ pack "initial text"
+    let notebook = HC.mainNotebook . uiContext $ ctx
+    deferredRunner ctx $ newEditorForText notebook file $ pack "initial text"
     mEditor <- getActiveEditor ctx
     return $ fromJust mEditor
 
-getActiveEditorTabText :: HC.Context  -> IO String
+getActiveEditorTabText :: Context  -> IO String
 getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text

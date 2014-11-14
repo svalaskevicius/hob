@@ -156,15 +156,6 @@ spec = do
             modes <- readIORef record
             (length . fromJust . fromJust) modes `shouldBe` 0
 
-{-
-        it "invokes mode teardown on exitMode" $ do
-            record <- newIORef False
-            ctx <- loadDefaultContext
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
-            deferredRunner ctx $ exitLastMode
-            cleanupInvoked <- readIORef record
-            cleanupInvoked `shouldBe` True
--}
         it "emits mode change event on entering a mode" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
