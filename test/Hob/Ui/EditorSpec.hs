@@ -2,16 +2,16 @@ module Hob.Ui.EditorSpec (main, spec) where
 
 import Test.Hspec
 
-import qualified Control.Monad.State as S
-import Data.IORef
-import Data.Maybe
-import Data.Text                  (pack, unpack)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
-                                   sourceBufferUndo)
-import Data.Monoid
+import qualified Control.Monad.State        as S
+import           Data.IORef
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Text                  (pack, unpack)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
+                                             sourceBufferUndo)
 
-import  Hob.Context           
+import           Hob.Context
 import qualified Hob.Context.UiContext as HC
 import           Hob.Ui
 import           Hob.Ui.Editor

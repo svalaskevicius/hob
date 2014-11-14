@@ -4,17 +4,17 @@ module Hob.Ui (loadGui,
                getEditorText,
                getActiveEditor) where
 
+import qualified Control.Monad.State                  as S
 import           Control.Monad.Trans                  (liftIO)
-import Data.IORef
 import           Data.Char                            (intToDigit)
+import           Data.IORef
+import           Data.List                            (intercalate)
 import           Data.Monoid                          (mconcat)
 import           Data.Text                            (unpack)
-import           Data.List                            (intercalate)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
-import qualified Control.Monad.State as S
 
 import Hob.Command.CloseCurrentTab
 import Hob.Command.FindText

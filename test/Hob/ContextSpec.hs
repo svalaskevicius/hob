@@ -127,7 +127,7 @@ spec = do
                     deferCommand countingCommand))
             invokeCount <- readIORef record
             invokeCount `shouldBe` (3::Int)
-            
+
     describe "context commands" $ do
         it "returns Nothing for list of modes if there are no editors" $ do
             record <- newIORef Nothing
@@ -174,7 +174,7 @@ spec = do
             deferredRunner ctx $ exitLastMode
             invoked <- readIORef record
             invoked `shouldBe` True
-            
+
 
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
@@ -184,7 +184,7 @@ spec = do
             deferredRunner ctx $ emitEvent (Event "test.event")
             invoked <- readIORef record
             invoked `shouldBe` True
-            
+
         it "does not invoke an event handler with different name" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
@@ -192,7 +192,7 @@ spec = do
             deferredRunner ctx $ emitEvent (Event "test.event2")
             invoked <- readIORef record
             invoked `shouldBe` False
-            
+
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do

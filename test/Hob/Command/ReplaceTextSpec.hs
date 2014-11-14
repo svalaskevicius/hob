@@ -11,7 +11,7 @@ import           Test.Hspec
 import           Hob.Command.ReplaceText
 import           Hob.Context
 import qualified Hob.Context.UiContext   as HC
-import           Hob.Ui.Editor           (newEditorForText, getActiveEditor)
+import           Hob.Ui.Editor           (getActiveEditor, newEditorForText)
 
 import HobTest.Context.Default
 

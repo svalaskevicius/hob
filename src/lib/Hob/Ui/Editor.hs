@@ -10,30 +10,30 @@ module Hob.Ui.Editor (
                updateEditorTitle
                ) where
 
-import           Control.Monad.Trans (liftIO)
-import qualified Control.Monad.State as S
-import Control.Monad              ((<=<))
-import Data.Text                  (Text)
-import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
-                                   castToSourceView,
-                                   sourceBufferBeginNotUndoableAction,
-                                   sourceBufferEndNotUndoableAction,
-                                   sourceBufferNew,
-                                   sourceBufferSetHighlightSyntax,
-                                   sourceBufferSetLanguage,
-                                   sourceBufferSetStyleScheme,
-                                   sourceViewNewWithBuffer,
-                                   sourceViewSetAutoIndent,
-                                   sourceViewSetDrawSpaces,
-                                   sourceViewSetHighlightCurrentLine,
-                                   sourceViewSetIndentOnTab,
-                                   sourceViewSetIndentWidth,
-                                   sourceViewSetInsertSpacesInsteadOfTabs,
-                                   sourceViewSetShowLineNumbers,
-                                   sourceViewSetTabWidth)
-import System.Glib.GObject        (Quark)
+import           Control.Monad              ((<=<))
+import qualified Control.Monad.State        as S
+import           Control.Monad.Trans        (liftIO)
+import           Data.Text                  (Text)
+import           Filesystem.Path.CurrentOS  (decodeString, encodeString,
+                                             filename)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..),
+                                             SourceView, castToSourceView,
+                                             sourceBufferBeginNotUndoableAction,
+                                             sourceBufferEndNotUndoableAction,
+                                             sourceBufferNew,
+                                             sourceBufferSetHighlightSyntax,
+                                             sourceBufferSetLanguage,
+                                             sourceBufferSetStyleScheme,
+                                             sourceViewNewWithBuffer,
+                                             sourceViewSetAutoIndent,
+                                             sourceViewSetDrawSpaces,
+                                             sourceViewSetHighlightCurrentLine,
+                                             sourceViewSetIndentOnTab,
+                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
+                                             sourceViewSetShowLineNumbers,
+                                             sourceViewSetTabWidth)
+import           System.Glib.GObject        (Quark)
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -62,8 +62,8 @@ instance EditorClass GtkEditor where
     modeStack   (GtkEditor editor) = liftIO $ getEditorModes editor
 
     isCurrentlyActive (GtkEditor editor) = liftIO $ widgetGetIsFocus editor
-    
-    
+
+
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
     newId <- generateNewId
@@ -111,7 +111,7 @@ newEditorForText targetNotebook filePath text = do
 
             setEditorFilePath editor filePath
             return editor
-            
+
 
 getActiveEditorText :: Context -> IO (Maybe Text)
 getActiveEditorText ctx = do

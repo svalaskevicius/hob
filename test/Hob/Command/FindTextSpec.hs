@@ -1,12 +1,12 @@
 module Hob.Command.FindTextSpec (main, spec) where
 
+import Control.Monad       (replicateM_)
 import Control.Monad.State (liftIO)
-import Control.Monad   (replicateM_)
+import Data.IORef
 import Data.Maybe
-import Data.Text       (pack)
+import Data.Text           (pack)
 import Graphics.UI.Gtk
 import Test.Hspec
-import Data.IORef
 
 import           Hob.Command.FindText
 import           Hob.Context
@@ -68,7 +68,7 @@ spec = do
       (ctx, _) <- loadGuiAndExecuteSearch
       editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
       editorFocused `shouldBe` True
-      
+
     it "enters the search mode" $ do
       (ctx, _) <- loadGuiAndExecuteSearch
       ref <- newIORef Nothing

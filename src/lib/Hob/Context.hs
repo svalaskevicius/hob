@@ -49,7 +49,7 @@ class EditorClass a where
     exitLastEditorMode :: a -> App a
     modeStack      :: a -> App [Mode]
     isCurrentlyActive :: a -> App Bool
-    
+
 
 data Editor = forall a. (EditorClass a) => Editor a
 
@@ -59,7 +59,7 @@ instance EditorClass Editor where
     exitLastEditorMode (Editor subj) = return . Editor =<< exitLastEditorMode subj
     modeStack      (Editor subj) = modeStack subj
     isCurrentlyActive (Editor subj) = isCurrentlyActive subj
-    
+
 
 data Context = Context {
     styleContext   :: StyleContext,
@@ -107,7 +107,7 @@ initContext styleCtx fileCtx uiCtx treeModel initCommands = do
         flushMessageQueue deferredMessagesRef ctx = do
             messages <- swapMVar deferredMessagesRef []
             if null messages then return ctx
-            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef        
+            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
         queueMessage deferredMessagesRef message = modifyMVar_ deferredMessagesRef (\messages -> return $ messages ++ [message])
 
 
@@ -120,10 +120,10 @@ registerEventHandler event handler = do
     put ctx{eventListeners = addEventHandler $ eventListeners ctx}
     where addEventHandler :: [(Event, [App()])] -> [(Event, [App()])]
           addEventHandler [] = [(event, [handler])]
-          addEventHandler (x@(evt, initHandlers):xs) = 
+          addEventHandler (x@(evt, initHandlers):xs) =
                 if evt == event then (evt, handler:initHandlers) : xs
                 else x : addEventHandler xs
-                                    
+
 emitEvent :: Event -> App()
 emitEvent event = do
     ctx <- get
@@ -138,7 +138,7 @@ currentEditor :: App (Maybe Editor)
 currentEditor = do
     ctx <- get
     active <- filterM isCurrentlyActive $ editors ctx
-    return $ 
+    return $
         if null active then Nothing
         else Just $ head active
 
