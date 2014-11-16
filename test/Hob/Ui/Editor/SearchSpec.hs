@@ -201,8 +201,7 @@ loadGuiAndExecute actions = do
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
     withActiveEditor ctx actions
-    ctx' <- currentContext ctx
-    return (ctx', buffer)
+    return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)
 getSelectionOffsets buffer = do

@@ -60,7 +60,6 @@ data Context = Context {
     baseCommands   :: CommandMatcher,
     editors        :: [Editor],
     messageLoop    :: Message -> IO(),
-    currentContext :: IO Context,
     eventListeners :: [(Event, [App()])],
     lastGeneratdId :: Int
 }
@@ -85,7 +84,7 @@ initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore Directo
 initContext styleCtx fileCtx uiCtx treeModel initCommands = do
     ctxRef <- newEmptyMVar
     deferredMessagesRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) (readMVar ctxRef) [] 0
+    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) [] 0
     putMVar ctxRef ctx
     return ctx
     where

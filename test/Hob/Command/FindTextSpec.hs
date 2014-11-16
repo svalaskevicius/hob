@@ -59,8 +59,7 @@ loadGuiAndExecuteSearch = do
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
     deferredRunner ctx $ commandExecute (searchCommandHandler "text")
-    ctx' <- currentContext ctx
-    return (ctx', buffer)
+    return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)
 getSelectionOffsets buffer = do
