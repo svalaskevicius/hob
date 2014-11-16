@@ -1,12 +1,12 @@
 module Hob.Command.ReplaceTextSpec (main, spec) where
 
 import           Control.Monad       (replicateM_)
-import qualified Control.Monad.State as S
-import           Data.IORef
 import           Data.Maybe
 import           Data.Text           (pack)
 import           Graphics.UI.Gtk
 import           Test.Hspec
+import Control.Monad.State (liftIO)
+import Data.IORef
 
 import           Hob.Command.ReplaceText
 import           Hob.Context
@@ -77,33 +77,11 @@ spec = do
         deferredRunner ctx $ commandExecute (fromJust matchResult)
 
   describe "replace text command handler" $ do
-    it "invokes the configured preview for the command handler" $ do
-        (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
-        ctx <- loadDefaultContext
-        deferredRunner ctx $ (previewExecute . fromJust . commandPreview) (replaceHandler "text" "newtext")
-        invokes <- readPreviews
-        invokes `shouldBe` (["text"], 0)
-
-    it "invokes the configured preview reset for the command handler" $ do
-        (replaceHandler, readPreviews, _) <- mockedReplaceCommandHandler
-        ctx <- loadDefaultContext
-        deferredRunner ctx $ (previewReset . fromJust . commandPreview) (replaceHandler "text" "newtext")
-        invokes <- readPreviews
-        invokes `shouldBe` ([], 1)
-
-    it "invokes the configured command on execute" $ do
-        (replaceHandler, _, readExecutes) <- mockedReplaceCommandHandler
-        ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (replaceHandler "text" "newtext")
-        invokes <- readExecutes
-        invokes `shouldBe` ["text"]
-
-    it "invokes the configured command on execute next" $ do
-        (replaceNextHandler, readExecutes) <- mockedReplaceNextCommandHandler
-        ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute replaceNextHandler
-        invokes <- readExecutes
-        invokes `shouldBe` 1
+    it "focuses editor on execute" $ do
+        (ctx, _) <- loadGuiWithEditor
+        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
+        editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
+        editorFocused `shouldBe` True
 
     it "does not replace if there is no highlighted text" $ do
         (ctx, buffer) <- loadGuiWithEditor
@@ -126,6 +104,14 @@ spec = do
         text <- replaceNext ctx buffer
         text `shouldBe` "text - initial text! text"
 
+    it "sets replace mode" $ do
+        (ctx, _) <- loadGuiWithEditor
+        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
+        ref <- newIORef Nothing
+        deferredRunner ctx $ activeModes >>= (liftIO . writeIORef ref)
+        modes <- readIORef ref
+        (map modeName . fromJust) modes `shouldBe` ["replace"]
+
 replaceNext :: TextBufferClass o => Context -> o -> IO String
 replaceNext ctx buffer = do
     processGtkEvents
@@ -142,44 +128,6 @@ loadGuiWithEditor = do
     let editor = fromJust mEditor
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
-
-mockedReplaceCommandHandler :: IO (String -> String -> CommandHandler, IO ([String], Int), IO [String])
-mockedReplaceCommandHandler = do
-    (mockedPreview, readPreviews) <- mockedPreviewCommandHandler
-    (mockedExecute, readExecutes) <- mockedStringCommand
-    let replaceHandler = generateReplaceCommandHandler mockedPreview mockedExecute
-    return (replaceHandler, readPreviews, readExecutes)
-
-mockedReplaceNextCommandHandler :: IO (CommandHandler, IO Int)
-mockedReplaceNextCommandHandler = do
-    (replaceNextCommand, readExecutes) <- mockedCounterCommand
-    return (generateReplaceNextCommandHandler replaceNextCommand, readExecutes)
-
-mockedPreviewCommandHandler :: IO (String -> PreviewCommandHandler, IO ([String], Int))
-mockedPreviewCommandHandler = do
-    (mockedPreview, readPreviews) <- mockedStringCommand
-    (mockedReset, readResets) <- mockedCounterCommand
-    let handler searchText = PreviewCommandHandler (mockedPreview searchText) mockedReset
-    return (handler, do
-        previews <- readPreviews
-        resets <- readResets
-        return (previews, resets))
-
-mockedStringCommand :: IO (String -> App(), IO [String])
-mockedStringCommand = do
-    recorder <- newIORef []
-    return (\v -> S.liftIO $ do
-            currentValues <- readIORef recorder
-            writeIORef recorder $ currentValues ++ [v],
-        readIORef recorder)
-
-mockedCounterCommand :: IO (App(), IO Int)
-mockedCounterCommand = do
-    recorder <- newIORef 0
-    return (S.liftIO $ do
-            currentValue <- readIORef recorder
-            writeIORef recorder $ currentValue + 1,
-        readIORef recorder)
 
 processGtkEvents :: IO ()
 processGtkEvents = replicateM_ 500 $ mainIterationDo False

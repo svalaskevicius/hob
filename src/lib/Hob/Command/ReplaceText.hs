@@ -2,15 +2,13 @@ module Hob.Command.ReplaceText (
         createMatcherForReplace,
         replaceCommandHandler,
         replaceNextCommandHandler,
-        generateReplaceCommandHandler,
-        generateReplaceNextCommandHandler,
     ) where
 
 import           Control.Monad              (when)
 import qualified Control.Monad.State        as S
 import           Control.Monad.Trans        (liftIO)
-import           Data.Maybe                 (fromJust)
 import           Graphics.UI.Gtk
+import           Data.Monoid                (mconcat)
 import           Graphics.UI.Gtk.SourceView (SourceView)
 import           System.Glib.GObject        (Quark)
 
@@ -18,6 +16,7 @@ import Hob.Command.FindText
 import Hob.Context
 import Hob.Control
 import Hob.Ui.Editor
+import Hob.Ui.Editor.Search
 
 createMatcherForReplace :: Char -> (String -> String -> CommandHandler) -> CommandMatcher
 createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
@@ -47,46 +46,42 @@ createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
            | separator == x = Just $ handler search accumReplace
            | otherwise = matchSearchAndReplaceFromReplace separator xs search (accumReplace++[x])
 
-generateReplaceCommandHandler :: (String -> PreviewCommandHandler) -> (String -> App()) -> String -> String -> CommandHandler
-generateReplaceCommandHandler previewCmdHandler decoratedCmdHandler searchText replaceText =
-    CommandHandler (Just $ previewCmdHandler searchText) executeHandler
-    where executeHandler = decoratedCmdHandler searchText >> replaceStart searchText replaceText
-
-generateReplaceNextCommandHandler :: App() -> CommandHandler
-generateReplaceNextCommandHandler decoratedCmdHandler = CommandHandler Nothing executeHandler
-    where executeHandler = replaceBeforeNext >> decoratedCmdHandler
-
 replaceCommandHandler :: String -> String -> CommandHandler
-replaceCommandHandler = generateReplaceCommandHandler
-                            (fromJust . commandPreview . searchCommandHandler)
-                            (commandExecute . searchCommandHandler)
+replaceCommandHandler searchText replaceText = CommandHandler (Just $ PreviewCommandHandler (searchPreview searchText) searchResetPreview) (replaceStart searchText replaceText)
 
 replaceNextCommandHandler :: CommandHandler
-replaceNextCommandHandler = generateReplaceNextCommandHandler (commandExecute searchNextCommandHandler)
+replaceNextCommandHandler = CommandHandler Nothing replaceNext
 
 replaceStart :: String -> String -> App()
-replaceStart _ replaceText = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo replaceStartOnEditor editor
-    where replaceStartOnEditor editor = setEditorReplaceString editor (Just replaceText)
+replaceStart searchText replaceText = do
+    invokeOnActiveEditor $ \editor -> do
+        setEditorReplaceString editor (Just replaceText)
+        findFirstFromCursor editor searchText
+        widgetGrabFocus editor
+    enterMode replaceMode
 
-replaceBeforeNext :: App()
-replaceBeforeNext = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo replaceContinueOnEditor editor
-    where replaceContinueOnEditor editor = maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
-          replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
-          replaceSearchSelectionWith editor replaceText searchText = do
-              buffer <- textViewGetBuffer editor
-              (s, e) <- textBufferGetSelectionBounds buffer
-              selectedText <- textBufferGetText buffer s e False
-              when (searchText == selectedText) $ do
-                  textBufferDelete buffer s e
-                  textBufferInsert buffer s replaceText
+replaceNext :: App()
+replaceNext = invokeOnActiveEditor $ \editor -> do
+    maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
+    findNext editor
+    where
+        replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
+        replaceSearchSelectionWith editor replaceText searchText = do
+            buffer <- textViewGetBuffer editor
+            (s, e) <- textBufferGetSelectionBounds buffer
+            selectedText <- textBufferGetText buffer s e False
+            when (searchText == selectedText) $ do
+                textBufferDelete buffer s e
+                textBufferInsert buffer s replaceText
 
+replaceReset :: App()
+replaceReset = invokeOnActiveEditor $ resetSearch -- reset replace oo
 
+replaceMode :: Mode
+replaceMode = Mode "replace" matcher replaceReset
+    where matcher = mconcat [ commandMatcher searchMode
+                            , createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
+                            ]
 
 setEditorReplaceString :: SourceView -> Maybe String -> IO ()
 setEditorReplaceString editor replaceString = do
@@ -98,7 +93,11 @@ getEditorReplaceString editor = do
     quark <- replaceStringQuark
     objectGetAttributeUnsafe quark editor
 
-
-
 replaceStringQuark :: IO Quark
 replaceStringQuark = quarkFromString "activeReplaceString"
+
+invokeOnActiveEditor :: (SourceView -> IO()) -> App ()
+invokeOnActiveEditor actions = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo actions editor
