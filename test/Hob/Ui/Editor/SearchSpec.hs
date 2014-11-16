@@ -1,15 +1,15 @@
 module Hob.Ui.Editor.SearchSpec (main, spec) where
 
-import Control.Monad       (replicateM_)
+import Control.Monad              (replicateM_)
 import Data.Maybe
-import Data.Text           (pack)
+import Data.Text                  (pack)
 import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView)
 import Test.Hspec
-import           Graphics.UI.Gtk.SourceView (SourceView)
 
 import           Hob.Context
 import qualified Hob.Context.UiContext as HC
-import           Hob.Ui.Editor         (newEditorForText, getActiveEditor)
+import           Hob.Ui.Editor         (getActiveEditor, newEditorForText)
 import           Hob.Ui.Editor.Search
 
 import HobTest.Context.Default

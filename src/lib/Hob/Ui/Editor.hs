@@ -43,14 +43,14 @@ import Hob.Context.UiContext
 import Hob.Control
 
 gtkEditor :: SourceView -> Editor
-gtkEditor sourceView = Editor 
+gtkEditor sourceView = Editor
             { editorId = const . liftIO $ getEditorId sourceView
-            
+
             , enterEditorMode = \editor mode -> do
                 modes <- liftIO $ getEditorModes sourceView
                 liftIO $ setEditorModes sourceView $ modes++[mode]
                 return editor
-                
+
             , exitLastEditorMode = \editor -> do
                 modes <- liftIO $ getEditorModes sourceView
                 if null modes then return editor
@@ -131,7 +131,7 @@ invokeOnActiveEditor actions = do
     ctx <- S.get
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo actions editor
-    
+
 getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
 getEditorFromNotebookTab currentlyActiveEditor =
     if currentlyActiveEditor `isA` gTypeScrolledWindow then do

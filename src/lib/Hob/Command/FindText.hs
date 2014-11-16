@@ -7,9 +7,9 @@ module Hob.Command.FindText (
         searchMode,
     ) where
 
-import           Control.Monad.Trans        (liftIO)
-import           Data.Monoid                (mconcat)
-import           Graphics.UI.Gtk
+import Control.Monad.Trans (liftIO)
+import Data.Monoid         (mconcat)
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Ui.Editor
@@ -25,23 +25,23 @@ searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
 searchPreview :: String -> App()
-searchPreview text = invokeOnActiveEditor $ (`highlightSearchPreview` text)
+searchPreview text = invokeOnActiveEditor (`highlightSearchPreview` text)
 
 searchReset :: App()
-searchReset = invokeOnActiveEditor $ resetSearch
+searchReset = invokeOnActiveEditor resetSearch
 
 searchResetPreview :: App()
-searchResetPreview = invokeOnActiveEditor $ resetSearchPreview
+searchResetPreview = invokeOnActiveEditor resetSearchPreview
 
 searchNext :: App()
-searchNext = (invokeOnActiveEditor $ findNext) >> (liftIO $ putStrLn "AAA")
+searchNext = invokeOnActiveEditor findNext
 
 searchPrevious :: App()
-searchPrevious = invokeOnActiveEditor $ findPrevious
+searchPrevious = invokeOnActiveEditor findPrevious
 
 searchStart :: String -> App()
 searchStart text = do
-    invokeOnActiveEditor $ (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor )
+    invokeOnActiveEditor (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor)
     enterMode searchMode
 
 searchMode :: Mode

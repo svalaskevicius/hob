@@ -8,10 +8,10 @@ module Hob.Ui.Editor.Search (
         getEditorSearchString,
     ) where
 
-import           Data.Text                  (pack)
-import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceView)
-import           System.Glib.GObject        (Quark)
+import Data.Text                  (pack)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView)
+import System.Glib.GObject        (Quark)
 
 import Hob.Control
 

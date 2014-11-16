@@ -1,12 +1,12 @@
 module Hob.Command.ReplaceTextSpec (main, spec) where
 
-import           Control.Monad       (replicateM_)
-import           Data.Maybe
-import           Data.Text           (pack)
-import           Graphics.UI.Gtk
-import           Test.Hspec
+import Control.Monad       (replicateM_)
 import Control.Monad.State (liftIO)
 import Data.IORef
+import Data.Maybe
+import Data.Text           (pack)
+import Graphics.UI.Gtk
+import Test.Hspec
 
 import           Hob.Command.ReplaceText
 import           Hob.Context

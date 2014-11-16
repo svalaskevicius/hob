@@ -44,11 +44,11 @@ type App = StateT Context IO
 newtype Event = Event String deriving (Eq)
 
 data Editor = Editor {
-    editorId :: Editor -> App Int,
-    enterEditorMode :: Editor -> Mode -> App Editor,
+    editorId           :: Editor -> App Int,
+    enterEditorMode    :: Editor -> Mode -> App Editor,
     exitLastEditorMode :: Editor -> App Editor,
-    modeStack      :: Editor -> App [Mode],
-    isCurrentlyActive :: Editor -> App Bool
+    modeStack          :: Editor -> App [Mode],
+    isCurrentlyActive  :: Editor -> App Bool
 }
 
 runOnEditor :: (Editor -> Editor -> a) -> Editor -> a

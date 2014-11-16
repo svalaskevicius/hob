@@ -4,11 +4,11 @@ module Hob.Command.ReplaceText (
         replaceNextCommandHandler,
     ) where
 
-import           Control.Monad              (when)
-import           Graphics.UI.Gtk
-import           Data.Monoid                (mconcat)
-import           Graphics.UI.Gtk.SourceView (SourceView)
-import           System.Glib.GObject        (Quark)
+import Control.Monad              (when)
+import Data.Monoid                (mconcat)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView)
+import System.Glib.GObject        (Quark)
 
 import Hob.Command.FindText
 import Hob.Context
@@ -73,7 +73,7 @@ replaceNext = invokeOnActiveEditor $ \editor -> do
                 textBufferInsert buffer s replaceText
 
 replaceReset :: App()
-replaceReset = invokeOnActiveEditor $ resetSearch -- reset replace oo
+replaceReset = invokeOnActiveEditor resetSearch -- reset replace oo
 
 replaceMode :: Mode
 replaceMode = Mode "replace" matcher replaceReset
