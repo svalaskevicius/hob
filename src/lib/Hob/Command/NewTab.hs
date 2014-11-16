@@ -25,8 +25,8 @@ editNewFileCommandHandler = CommandHandler Nothing editNewFile
 launchNewFileEditor :: Context -> Notebook -> NewFileEditorLauncher
 launchNewFileEditor ctx targetNotebook filePath = do
     let fileLoader = contextFileLoader . fileContext $ ctx
-    editors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
-    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
+    currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
+    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts currentEditors
     case alreadyLoadedPage editorsForFile of
         Just nr -> notebookSetCurrentPage targetNotebook nr
         Nothing -> maybeDo launchEditor =<< fileLoader filePath

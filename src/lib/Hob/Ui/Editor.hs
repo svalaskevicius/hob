@@ -41,28 +41,27 @@ import Hob.Context.StyleContext
 import Hob.Context.UiContext
 import Hob.Control
 
-data GtkEditor = GtkEditor SourceView
+gtkEditor :: SourceView -> Editor
+gtkEditor sourceView = Editor 
+            { editorId = const . liftIO $ getEditorId sourceView
+            
+            , enterEditorMode = \editor mode -> do
+                modes <- liftIO $ getEditorModes sourceView
+                liftIO $ setEditorModes sourceView $ modes++[mode]
+                return editor
+                
+            , exitLastEditorMode = \editor -> do
+                modes <- liftIO $ getEditorModes sourceView
+                if null modes then return editor
+                else do
+                    cleanup $ last modes
+                    liftIO $ setEditorModes sourceView $ init modes
+                    return editor
 
-instance EditorClass GtkEditor where
-    editorId (GtkEditor editor) = liftIO $ getEditorId editor
+            , modeStack  = const . liftIO $ getEditorModes sourceView
 
-    enterEditorMode (GtkEditor editor) mode = do
-        modes <- liftIO $ getEditorModes editor
-        liftIO $ setEditorModes editor $ modes++[mode]
-        return $ GtkEditor editor
-
-    exitLastEditorMode (GtkEditor editor) = do
-        modes <- liftIO $ getEditorModes editor
-        if null modes then return $ GtkEditor editor
-        else do
-            cleanup $ last modes
-            liftIO $ setEditorModes editor $ init modes
-            return $ GtkEditor editor
-
-    modeStack   (GtkEditor editor) = liftIO $ getEditorModes editor
-
-    isCurrentlyActive (GtkEditor editor) = liftIO $ widgetGetIsFocus editor
-
+            , isCurrentlyActive = const . liftIO $ widgetGetIsFocus sourceView
+            }
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
@@ -71,7 +70,7 @@ newEditorForText targetNotebook filePath text = do
     editor <- liftIO $ createNewEditor ctx
     liftIO $ setEditorId editor newId
     liftIO $ setEditorModes editor []
-    S.put ctx{editors = editors ctx ++ [Editor $ GtkEditor editor]}
+    S.put ctx{editors = editors ctx ++ [gtkEditor editor]}
     where
         title = tabTitleForFile filePath
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True

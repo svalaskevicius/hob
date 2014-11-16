@@ -13,14 +13,19 @@ import Test.Hspec
 import HobTest.Context.Default
 
 
-data DummyEditor = DummyEditor [Mode]
+dummyEditor :: Editor
+dummyEditor = Editor
+            { editorId = \_ -> return 1
+            , enterEditorMode = \editor mode -> do
+                    currentModes <- runOnEditor modeStack editor
+                    return $ editor{modeStack = \_ -> return (currentModes ++ [mode])}
+            , exitLastEditorMode = \editor -> do
+                    currentModes <- runOnEditor modeStack editor
+                    return $ editor{modeStack = \_ -> return (init currentModes)}
+            , modeStack      = \_ -> return []
+            , isCurrentlyActive  = \_ -> return True
+            }
 
-instance EditorClass DummyEditor where
-    editorId _ = return 1
-    enterEditorMode (DummyEditor dummy) mode = return $ DummyEditor $ dummy ++ [mode]
-    exitLastEditorMode (DummyEditor dummy) = return $ DummyEditor $ init dummy
-    modeStack      (DummyEditor dummy) = return dummy
-    isCurrentlyActive _ = return True
 
 main :: IO ()
 main = hspec spec
@@ -140,7 +145,7 @@ spec = do
         it "enters given mode to the active editor" $ do
             record <- newIORef Nothing
             ctx <- loadDefaultContext
-            deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
+            deferredRunner ctx $ put ctx{editors = [dummyEditor]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
             modes <- readIORef record
@@ -149,7 +154,7 @@ spec = do
         it "removes mode from the active editor on exitMode" $ do
             record <- newIORef Nothing
             ctx <- loadDefaultContext
-            deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
+            deferredRunner ctx $ put ctx{editors = [dummyEditor]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             deferredRunner ctx exitLastMode
             deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
@@ -159,7 +164,7 @@ spec = do
         it "emits mode change event on entering a mode" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
-            deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
+            deferredRunner ctx $ put ctx{editors = [dummyEditor]}
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             invoked <- readIORef record
@@ -168,7 +173,7 @@ spec = do
         it "emits mode change event on exiting a mode" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
-            deferredRunner ctx $ put ctx{editors = [Editor $ DummyEditor []]}
+            deferredRunner ctx $ put ctx{editors = [dummyEditor]}
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
             deferredRunner ctx exitLastMode

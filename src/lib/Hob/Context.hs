@@ -12,8 +12,8 @@ module Hob.Context (
     Mode(..),
     Event(..),
     Editor(..),
-    EditorClass(..),
     initContext,
+    runOnEditor,
     enterMode,
     exitLastMode,
     activeModes,
@@ -43,23 +43,16 @@ type App = StateT Context IO
 
 newtype Event = Event String deriving (Eq)
 
-class EditorClass a where
-    editorId :: a -> App Int
-    enterEditorMode :: a -> Mode -> App a
-    exitLastEditorMode :: a -> App a
-    modeStack      :: a -> App [Mode]
-    isCurrentlyActive :: a -> App Bool
+data Editor = Editor {
+    editorId :: Editor -> App Int,
+    enterEditorMode :: Editor -> Mode -> App Editor,
+    exitLastEditorMode :: Editor -> App Editor,
+    modeStack      :: Editor -> App [Mode],
+    isCurrentlyActive :: Editor -> App Bool
+}
 
-
-data Editor = forall a. (EditorClass a) => Editor a
-
-instance EditorClass Editor where
-    editorId (Editor subj) = editorId subj
-    enterEditorMode (Editor subj) mode = return . Editor =<< enterEditorMode subj mode
-    exitLastEditorMode (Editor subj) = return . Editor =<< exitLastEditorMode subj
-    modeStack      (Editor subj) = modeStack subj
-    isCurrentlyActive (Editor subj) = isCurrentlyActive subj
-
+runOnEditor :: (Editor -> Editor -> a) -> Editor -> a
+runOnEditor f editor = f editor editor
 
 data Context = Context {
     styleContext   :: StyleContext,
@@ -137,7 +130,7 @@ emitEvent event = do
 currentEditor :: App (Maybe Editor)
 currentEditor = do
     ctx <- get
-    active <- filterM isCurrentlyActive $ editors ctx
+    active <- filterM (\e -> isCurrentlyActive e e) $ editors ctx
     return $
         if null active then Nothing
         else Just $ head active
@@ -145,18 +138,18 @@ currentEditor = do
 enterMode :: Mode -> App()
 enterMode mode = updateActiveEditor (\editor -> do
         emitEvent $ Event "core.mode.change"
-        enterEditorMode editor mode
+        runOnEditor enterEditorMode editor mode
     )
 
 activeModes :: App (Maybe [Mode])
 activeModes = do
     active <- currentEditor
-    maybe (return Nothing) (modeStack >=> return . Just) active
+    maybe (return Nothing) (runOnEditor modeStack >=> return . Just) active
 
 exitLastMode :: App()
 exitLastMode = updateActiveEditor (\editor -> do
         emitEvent $ Event "core.mode.change"
-        exitLastEditorMode editor
+        runOnEditor exitLastEditorMode editor
     )
 
 updateActiveEditor :: (Editor -> App Editor) -> App()
@@ -169,7 +162,7 @@ updateActiveEditor actions = do
         put ctx{editors = e1 ++ [active'] ++ tail e2}
     where splitBeforeFirstActive [] = return ([], [])
           splitBeforeFirstActive (x:xs) = do
-            active <- isCurrentlyActive x
+            active <- runOnEditor isCurrentlyActive x
             if active then return ([], x:xs)
             else do
                 (n, ns) <- splitBeforeFirstActive xs
