@@ -6,9 +6,13 @@ module Hob.Ui.Editor.Search (
         findPrevious,
         resetSearch,
         getEditorSearchString,
+        startReplace,
+        replaceNext,
+        resetReplace,
     ) where
 
 import Data.Text                  (pack)
+import Control.Monad              (when)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
 import System.Glib.GObject        (Quark)
@@ -63,10 +67,36 @@ findPrevious editor = do
 
 findFirstFromCursor :: SourceView -> String -> IO()
 findFirstFromCursor editor text = do
-    setEditorSearchString editor (Just text)
+    setEditorSearchString editor $ Just text
     highlightSearchPreview editor text
     searchExecute editor text
 
+
+startReplace :: SourceView -> String -> String -> IO()
+startReplace editor textFrom textTo = do
+    findFirstFromCursor editor textFrom
+    setEditorReplaceString editor $ Just textTo
+
+replaceNext :: SourceView -> IO()
+replaceNext editor = do
+    maybeDo replaceSelectionWith =<< getEditorReplaceString editor
+    findNext editor
+    where
+        replaceSelectionWith replaceText = maybeDo (replaceSearchSelectionWith replaceText) =<< getEditorSearchString editor
+        replaceSearchSelectionWith replaceText searchText = do
+            buffer <- textViewGetBuffer editor
+            (s, e) <- textBufferGetSelectionBounds buffer
+            selectedText <- textBufferGetText buffer s e False
+            when (searchText == selectedText) $ do
+                textBufferDelete buffer s e
+                textBufferInsert buffer s replaceText
+
+resetReplace :: SourceView -> IO()
+resetReplace editor = do
+    resetSearch editor
+    setEditorReplaceString editor Nothing
+
+    
 searchExecute :: SourceView -> String -> IO()
 searchExecute editor text = do
     buffer <- textViewGetBuffer editor
@@ -107,3 +137,17 @@ getEditorSearchString editor = do
 
 searchStringQuark :: IO Quark
 searchStringQuark = quarkFromString "activeSearchString"
+
+setEditorReplaceString :: SourceView -> Maybe String -> IO ()
+setEditorReplaceString editor replaceString = do
+    quark <- replaceStringQuark
+    objectSetAttribute quark editor replaceString
+
+getEditorReplaceString :: SourceView -> IO (Maybe String)
+getEditorReplaceString editor = do
+    quark <- replaceStringQuark
+    objectGetAttributeUnsafe quark editor
+
+replaceStringQuark :: IO Quark
+replaceStringQuark = quarkFromString "activeReplaceString"
+

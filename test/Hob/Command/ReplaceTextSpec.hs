@@ -1,6 +1,5 @@
 module Hob.Command.ReplaceTextSpec (main, spec) where
 
-import Control.Monad       (replicateM_)
 import Control.Monad.State (liftIO)
 import Data.IORef
 import Data.Maybe
@@ -83,27 +82,6 @@ spec = do
         editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
         editorFocused `shouldBe` True
 
-    it "does not replace if there is no highlighted text" $ do
-        (ctx, buffer) <- loadGuiWithEditor
-        deferredRunner ctx $ commandExecute replaceNextCommandHandler
-        text <- buffer `get` textBufferText
-        text `shouldBe` "text - initial text! text"
-
-    it "replaces previously highlighted text" $ do
-        (ctx, buffer) <- loadGuiWithEditor
-        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
-        text <- replaceNext ctx buffer
-        text `shouldBe` ":) - initial text! text"
-
-    it "does not replace if the highlighted text doesnt match the search string" $ do
-        (ctx, buffer) <- loadGuiWithEditor
-        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
-        (s, _) <- textBufferGetSelectionBounds buffer
-        e <- textBufferGetIterAtOffset buffer 7
-        textBufferSelectRange buffer s e
-        text <- replaceNext ctx buffer
-        text `shouldBe` "text - initial text! text"
-
     it "sets replace mode" $ do
         (ctx, _) <- loadGuiWithEditor
         deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
@@ -111,13 +89,6 @@ spec = do
         deferredRunner ctx $ activeModes >>= (liftIO . writeIORef ref)
         modes <- readIORef ref
         (map modeName . fromJust) modes `shouldBe` ["replace"]
-
-replaceNext :: TextBufferClass o => Context -> o -> IO String
-replaceNext ctx buffer = do
-    processGtkEvents
-    deferredRunner ctx $ commandExecute replaceNextCommandHandler
-    processGtkEvents
-    buffer `get` textBufferText
 
 loadGuiWithEditor :: IO (Context, TextBuffer)
 loadGuiWithEditor = do
@@ -128,6 +99,3 @@ loadGuiWithEditor = do
     let editor = fromJust mEditor
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
-
-processGtkEvents :: IO ()
-processGtkEvents = replicateM_ 500 $ mainIterationDo False

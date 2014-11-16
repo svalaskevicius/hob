@@ -19,52 +19,10 @@ main = hspec spec
 
 spec :: Spec
 spec = do
-  describe "search for the first match" $ do
-    it "creates search tag on preview" $ do
-      (_, buffer) <- loadGuiAndPreviewSearch
-      tagTable <- textBufferGetTagTable buffer
-      tag <- textTagTableLookup tagTable "search"
-      isNothing tag `shouldBe` False
-
-    it "applies search tag for matches on preview" $ do
-      (_, buffer) <- loadGuiAndPreviewSearch
-      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
-      tagStates `shouldBe` [(True, True), (True, True)]
-
-    it "removes all search tags on preview reset" $ do
-      (ctx, buffer) <- loadGuiAndPreviewSearch
-      Just editor <- getActiveEditor ctx
-      resetSearchPreview editor
-      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
-      tagStates `shouldBe` [(False, False), (False, False)]
-
-    it "applies search tag for matches on execute" $ do
-      (_, buffer) <- loadGuiAndExecuteSearch
-      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
-      tagStates `shouldBe` [(True, True), (True, True)]
-
-    it "highlights the first match on execute" $ do
-      (_, buffer) <- loadGuiAndExecuteSearch
-      (start, end) <- getSelectionOffsets buffer
-      (start, end) `shouldBe` (0, 4)
-
-    it "highlights the next match from cursor on execute" $ do
-      (ctx, buffer) <- loadGuiAndExecuteSearch
-      Just editor <- getActiveEditor ctx
-      findFirstFromCursor editor "text"
-      (start, end) <- getSelectionOffsets buffer
-      (start, end) `shouldBe` (15, 19)
-
-    it "wraps the search from start if there are no matches till the end on execute" $ do
-      (ctx, buffer) <- loadGuiAndExecuteSearch
-      Just editor <- getActiveEditor ctx
-      replicateM_ 3 $ findFirstFromCursor editor "text"
-      (start, end) <- getSelectionOffsets buffer
-      (start, end) `shouldBe` (0, 4)
-
-    it "scrolls to the current match on execute" $
-      ensureCursorVisibleAfter $ \editor -> findFirstFromCursor editor "customised search string at the end"
-
+  describeSearchPreview loadGuiAndPreviewSearch resetSearchPreview
+  describeSearchExecute loadGuiAndExecuteSearch findFirstFromCursor
+  describeSearchExecute loadGuiAndInitReplace (\editor text -> startReplace editor text "-")
+  
   describe "search for the next match" $ do
     it "highlights the next match from cursor on execute" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
@@ -124,6 +82,103 @@ spec = do
             findPrevious editor
       ensureCursorVisibleAfter commands
 
+  describe "replace next" $ do
+    it "does not replace if there is no highlighted text" $ do
+      (ctx, buffer) <- loadGuiWithEditor
+      Just editor <- getActiveEditor ctx
+      replaceNext editor
+      text <- buffer `get` textBufferText
+      text `shouldBe` "text - initial text! text"
+
+    it "replaces previously highlighted text" $ do
+      (ctx, buffer) <- loadGuiAndInitReplace
+      Just editor <- getActiveEditor ctx
+      replaceNext editor
+      text <- buffer `get` textBufferText
+      text `shouldBe` "New:TEXT:New - initial text! text"
+
+    it "does not replace if the highlighted text doesnt match the search string" $ do
+      (ctx, buffer) <- loadGuiAndInitReplace
+      (s, _) <- textBufferGetSelectionBounds buffer
+      e <- textBufferGetIterAtOffset buffer 7
+      textBufferSelectRange buffer s e
+      Just editor <- getActiveEditor ctx
+      replaceNext editor
+      text <- buffer `get` textBufferText
+      text `shouldBe` "text - initial text! text"
+
+    it "stops the next search" $ do
+      (ctx, buffer) <- loadGuiAndInitReplace
+      Just editor <- getActiveEditor ctx
+      resetReplace editor
+      findNext editor
+      (start, end) <- getSelectionOffsets buffer
+      (start, end) `shouldBe` (0, 4)
+
+    it "stops the next replace" $ do
+      (ctx, buffer) <- loadGuiAndInitReplace
+      Just editor <- getActiveEditor ctx
+      resetReplace editor
+      findFirstFromCursor editor "text"
+      replaceNext editor
+      text <- buffer `get` textBufferText
+      text `shouldBe` "text - initial text! text"
+
+describeSearchPreview :: IO (Context, TextBuffer) -> (SourceView -> IO ()) -> Spec
+describeSearchPreview initialize resetFnc = 
+  describe "search preview for the first match" $ do
+    it "creates search tag on preview" $ do
+      (_, buffer) <- initialize
+      tagTable <- textBufferGetTagTable buffer
+      tag <- textTagTableLookup tagTable "search"
+      isNothing tag `shouldBe` False
+
+    it "applies search tag for matches on preview" $ do
+      (_, buffer) <- initialize
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(True, True), (True, True)]
+
+    it "removes all search tags on preview reset" $ do
+      (ctx, buffer) <- initialize
+      Just editor <- getActiveEditor ctx
+      resetFnc editor
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(False, False), (False, False)]
+
+describeSearchExecute :: IO (Context, TextBuffer) -> (SourceView -> String -> IO ()) -> Spec
+describeSearchExecute initialize invokeFirstFnc = 
+  describe "search execute for the first match" $ do
+    it "applies search tag for matches on execute" $ do
+      (_, buffer) <- initialize
+      tagStates <- checkSearchPreviewTagsAtRanges buffer [(0, 4), (15, 19)]
+      tagStates `shouldBe` [(True, True), (True, True)]
+
+    it "highlights the first match on execute" $ do
+      (_, buffer) <- initialize
+      (start, end) <- getSelectionOffsets buffer
+      (start, end) `shouldBe` (0, 4)
+
+    it "highlights the next match from cursor on execute" $ do
+      (ctx, buffer) <- initialize
+      Just editor <- getActiveEditor ctx
+      invokeFirstFnc editor "text"
+      (start, end) <- getSelectionOffsets buffer
+      (start, end) `shouldBe` (15, 19)
+
+    it "wraps the search from start if there are no matches till the end on execute" $ do
+      (ctx, buffer) <- initialize
+      Just editor <- getActiveEditor ctx
+      replicateM_ 3 $ invokeFirstFnc editor "text"
+      (start, end) <- getSelectionOffsets buffer
+      (start, end) `shouldBe` (0, 4)
+
+    it "scrolls to the current match on execute" $
+      ensureCursorVisibleAfter $ \editor -> invokeFirstFnc editor "customised search string at the end"
+
+
+
+
+
 ensureCursorVisibleAfter :: (SourceView -> IO()) -> IO ()
 ensureCursorVisibleAfter commands = do
     ctx <- loadDefaultContext
@@ -151,13 +206,22 @@ loadGuiAndPreviewSearch = do
     return (ctx, buffer)
 
 loadGuiAndExecuteSearch :: IO (Context, TextBuffer)
-loadGuiAndExecuteSearch = do
+loadGuiAndExecuteSearch = loadGuiAndExecute $ \editor -> findFirstFromCursor editor "text"
+
+loadGuiAndInitReplace:: IO (Context, TextBuffer)
+loadGuiAndInitReplace = loadGuiAndExecute $ \editor -> startReplace editor "text" "New:TEXT:New"
+
+loadGuiWithEditor :: IO (Context, TextBuffer)
+loadGuiWithEditor = loadGuiAndExecute $ const $ return ()
+
+loadGuiAndExecute :: (SourceView -> IO()) -> IO (Context, TextBuffer)
+loadGuiAndExecute actions = do
     (ctx, buffer) <- loadGuiAndPreviewSearch
     Just editor <- getActiveEditor ctx
     resetSearchPreview editor
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
-    findFirstFromCursor editor "text"
+    actions editor
     ctx' <- currentContext ctx
     return (ctx', buffer)
 

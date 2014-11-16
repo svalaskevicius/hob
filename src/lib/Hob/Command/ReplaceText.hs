@@ -4,15 +4,11 @@ module Hob.Command.ReplaceText (
         replaceNextCommandHandler,
     ) where
 
-import Control.Monad              (when)
 import Data.Monoid                (mconcat)
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView)
-import System.Glib.GObject        (Quark)
 
 import Hob.Command.FindText
 import Hob.Context
-import Hob.Control
 import Hob.Ui.Editor
 import Hob.Ui.Editor.Search
 
@@ -48,50 +44,24 @@ replaceCommandHandler :: String -> String -> CommandHandler
 replaceCommandHandler searchText replaceText = CommandHandler (Just $ PreviewCommandHandler (searchPreview searchText) searchResetPreview) (replaceStart searchText replaceText)
 
 replaceNextCommandHandler :: CommandHandler
-replaceNextCommandHandler = CommandHandler Nothing replaceNext
+replaceNextCommandHandler = CommandHandler Nothing invokeReplaceNext
 
 replaceStart :: String -> String -> App()
 replaceStart searchText replaceText = do
     invokeOnActiveEditor $ \editor -> do
-        setEditorReplaceString editor (Just replaceText)
-        findFirstFromCursor editor searchText
+        startReplace editor searchText replaceText
         widgetGrabFocus editor
     enterMode replaceMode
 
-replaceNext :: App()
-replaceNext = invokeOnActiveEditor $ \editor -> do
-    maybeDo (replaceSelectionWith editor) =<< getEditorReplaceString editor
-    findNext editor
-    where
-        replaceSelectionWith editor replaceText = maybeDo (replaceSearchSelectionWith editor replaceText) =<< getEditorSearchString editor
-        replaceSearchSelectionWith editor replaceText searchText = do
-            buffer <- textViewGetBuffer editor
-            (s, e) <- textBufferGetSelectionBounds buffer
-            selectedText <- textBufferGetText buffer s e False
-            when (searchText == selectedText) $ do
-                textBufferDelete buffer s e
-                textBufferInsert buffer s replaceText
+invokeReplaceNext :: App()
+invokeReplaceNext = invokeOnActiveEditor replaceNext
 
 replaceReset :: App()
-replaceReset = invokeOnActiveEditor resetSearch -- reset replace oo
+replaceReset = invokeOnActiveEditor resetReplace
 
 replaceMode :: Mode
 replaceMode = Mode "replace" matcher replaceReset
     where matcher = mconcat [ commandMatcher searchMode
                             , createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
                             ]
-
-setEditorReplaceString :: SourceView -> Maybe String -> IO ()
-setEditorReplaceString editor replaceString = do
-    quark <- replaceStringQuark
-    objectSetAttribute quark editor replaceString
-
-getEditorReplaceString :: SourceView -> IO (Maybe String)
-getEditorReplaceString editor = do
-    quark <- replaceStringQuark
-    objectGetAttributeUnsafe quark editor
-
-replaceStringQuark :: IO Quark
-replaceStringQuark = quarkFromString "activeReplaceString"
-
 
