@@ -26,29 +26,23 @@ searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
 searchPreview :: String -> App()
-searchPreview text = searchOnEditorCallback $ liftIO . (`highlightSearchPreview` text)
+searchPreview text = searchOnEditorCallback $ (`highlightSearchPreview` text)
 
 searchReset :: App()
-searchReset = searchOnEditorCallback $ liftIO . resetSearch
+searchReset = searchOnEditorCallback $ resetSearch
 
 searchResetPreview :: App()
-searchResetPreview = searchOnEditorCallback $ liftIO . resetSearchPreview
+searchResetPreview = searchOnEditorCallback $ resetSearchPreview
 
 searchNext :: App()
-searchNext = searchOnEditorCallback $ liftIO . findNext
+searchNext = searchOnEditorCallback $ findNext
 
 searchPrevious :: App()
-searchPrevious = searchOnEditorCallback $ liftIO . findPrevious
-
-searchOnEditorCallback :: (SourceView -> App ()) -> App ()
-searchOnEditorCallback searchOnEditor = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    maybeDo searchOnEditor editor
+searchPrevious = searchOnEditorCallback $ findPrevious
 
 searchStart :: String -> App()
 searchStart text = do
-    searchOnEditorCallback $ liftIO . (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor )
+    searchOnEditorCallback $ (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor )
     enterMode searchMode
 
 searchMode :: Mode
@@ -56,3 +50,10 @@ searchMode = Mode "search" matcher searchReset
     where matcher = mconcat [
                               createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
                               createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler]
+
+searchOnEditorCallback :: (SourceView -> IO()) -> App ()
+searchOnEditorCallback searchOnEditor = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo searchOnEditor editor
+
