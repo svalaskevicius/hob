@@ -180,7 +180,6 @@ spec = do
             invoked <- readIORef record
             invoked `shouldBe` True
 
-
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
             record <- newIORef False
