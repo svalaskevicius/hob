@@ -96,7 +96,7 @@ loadGui fileCtx styleCtx = do
                 keyT <- eventKeyName
                 lastPressedKey <- liftIO $ readIORef lastPressedKeyRef
                 let key = unpack keyT
-                if lastPressedKey == key then
+                if (lastPressedKey == key) && (key == "Control_L") then
                     maybe (return False)
                           (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
                           matchKeyBinding cmdMatcher (modifier, key)
