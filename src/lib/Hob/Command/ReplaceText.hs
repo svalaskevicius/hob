@@ -5,8 +5,6 @@ module Hob.Command.ReplaceText (
     ) where
 
 import           Control.Monad              (when)
-import qualified Control.Monad.State        as S
-import           Control.Monad.Trans        (liftIO)
 import           Graphics.UI.Gtk
 import           Data.Monoid                (mconcat)
 import           Graphics.UI.Gtk.SourceView (SourceView)
@@ -96,8 +94,4 @@ getEditorReplaceString editor = do
 replaceStringQuark :: IO Quark
 replaceStringQuark = quarkFromString "activeReplaceString"
 
-invokeOnActiveEditor :: (SourceView -> IO()) -> App ()
-invokeOnActiveEditor actions = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo actions editor
+

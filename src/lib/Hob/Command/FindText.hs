@@ -7,14 +7,11 @@ module Hob.Command.FindText (
         searchMode,
     ) where
 
-import qualified Control.Monad.State        as S
 import           Control.Monad.Trans        (liftIO)
 import           Data.Monoid                (mconcat)
 import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceView)
 
 import Hob.Context
-import Hob.Control
 import Hob.Ui.Editor
 import Hob.Ui.Editor.Search
 
@@ -28,23 +25,23 @@ searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
 searchPreview :: String -> App()
-searchPreview text = searchOnEditorCallback $ (`highlightSearchPreview` text)
+searchPreview text = invokeOnActiveEditor $ (`highlightSearchPreview` text)
 
 searchReset :: App()
-searchReset = searchOnEditorCallback $ resetSearch
+searchReset = invokeOnActiveEditor $ resetSearch
 
 searchResetPreview :: App()
-searchResetPreview = searchOnEditorCallback $ resetSearchPreview
+searchResetPreview = invokeOnActiveEditor $ resetSearchPreview
 
 searchNext :: App()
-searchNext = searchOnEditorCallback $ findNext
+searchNext = (invokeOnActiveEditor $ findNext) >> (liftIO $ putStrLn "AAA")
 
 searchPrevious :: App()
-searchPrevious = searchOnEditorCallback $ findPrevious
+searchPrevious = invokeOnActiveEditor $ findPrevious
 
 searchStart :: String -> App()
 searchStart text = do
-    searchOnEditorCallback $ (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor )
+    invokeOnActiveEditor $ (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor )
     enterMode searchMode
 
 searchMode :: Mode
@@ -53,9 +50,4 @@ searchMode = Mode "search" matcher searchReset
                               createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
                               createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler]
 
-searchOnEditorCallback :: (SourceView -> IO()) -> App ()
-searchOnEditorCallback searchOnEditor = do
-    ctx <- S.get
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo searchOnEditor editor
 

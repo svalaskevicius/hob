@@ -3,6 +3,7 @@ module Hob.Ui.Editor (
                getActiveEditorText,
                getActiveEditorTab,
                getActiveEditor,
+               invokeOnActiveEditor,
                getEditorText,
                getEditorFilePath,
                setEditorFilePath,
@@ -125,6 +126,12 @@ getEditorText textEdit = do
 getActiveEditor :: Context -> IO (Maybe SourceView)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
+invokeOnActiveEditor :: (SourceView -> IO()) -> App ()
+invokeOnActiveEditor actions = do
+    ctx <- S.get
+    editor <- liftIO $ getActiveEditor ctx
+    liftIO $ maybeDo actions editor
+    
 getEditorFromNotebookTab :: Widget -> IO (Maybe SourceView)
 getEditorFromNotebookTab currentlyActiveEditor =
     if currentlyActiveEditor `isA` gTypeScrolledWindow then do
