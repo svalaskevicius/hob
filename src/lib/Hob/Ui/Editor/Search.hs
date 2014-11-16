@@ -11,8 +11,8 @@ module Hob.Ui.Editor.Search (
         resetReplace,
     ) where
 
-import Data.Text                  (pack)
 import Control.Monad              (when)
+import Data.Text                  (pack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView)
 import System.Glib.GObject        (Quark)
@@ -96,7 +96,7 @@ resetReplace editor = do
     resetSearch editor
     setEditorReplaceString editor Nothing
 
-    
+
 searchExecute :: SourceView -> String -> IO()
 searchExecute editor text = do
     buffer <- textViewGetBuffer editor

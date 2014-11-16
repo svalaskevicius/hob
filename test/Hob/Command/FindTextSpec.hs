@@ -33,7 +33,7 @@ spec = do
       modes <- readIORef ref
       (modeName . last . fromJust) modes `shouldBe` "search"
 
-  describe "search reset command on mode exit" $ do
+  describe "search reset command on mode exit" $
     it "stops the next search" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
       deferredRunner ctx exitLastMode

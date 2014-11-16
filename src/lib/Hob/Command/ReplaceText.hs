@@ -4,7 +4,7 @@ module Hob.Command.ReplaceText (
         replaceNextCommandHandler,
     ) where
 
-import Data.Monoid                (mconcat)
+import Data.Monoid     (mconcat)
 import Graphics.UI.Gtk
 
 import Hob.Command.FindText

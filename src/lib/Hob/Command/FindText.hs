@@ -7,7 +7,7 @@ module Hob.Command.FindText (
         searchMode,
     ) where
 
-import Data.Monoid         (mconcat)
+import Data.Monoid     (mconcat)
 import Graphics.UI.Gtk
 
 import Hob.Context
