@@ -1,7 +1,6 @@
 module Hob.Ui.CommandEntry (newCommandEntry, newCommandEntryDetached) where
 
-import qualified Control.Monad.State                  as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Reader
 import           Data.IORef
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
@@ -25,7 +24,7 @@ commandPreviewResetState = do
 
 newCommandEntry :: Entry -> CommandMatcher -> App ()
 newCommandEntry cmdEntry cmdMatcher = do
-    ctx <- S.get
+    ctx <- ask
     (onChange, onReturn) <- newCommandEntryDetached cmdEntry cmdMatcher
     let liftedOn a b c = liftIO $ on a b c
     _ <- cmdEntry `liftedOn` editableChanged $ deferredRunner ctx onChange

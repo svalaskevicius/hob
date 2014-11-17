@@ -2,14 +2,14 @@ module Hob.Ui.EditorSpec (main, spec) where
 
 import Test.Hspec
 
-import qualified Control.Monad.State        as S
-import           Data.IORef
-import           Data.Maybe
-import           Data.Monoid
-import           Data.Text                  (pack, unpack)
-import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
-                                             sourceBufferUndo)
+import Control.Monad.Reader
+import Data.IORef
+import Data.Maybe
+import Data.Monoid
+import Data.Text                  (pack, unpack)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
+                                   sourceBufferUndo)
 
 import           Hob.Context
 import qualified Hob.Context.UiContext as HC
@@ -52,10 +52,8 @@ spec =
     it "registers the new editor in the context on creation" $ do
       ctx <- loadDefaultContext
       _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
-      retRef <- newIORef Nothing
-      deferredRunner ctx $ S.get >>= (\ctx' -> S.liftIO $ writeIORef retRef (Just . editors $ ctx'))
-      registeredEditors <- readIORef retRef
-      (length . fromJust) registeredEditors `shouldBe` 1
+      registeredEditors <- getEditors $ editors ctx
+      length registeredEditors `shouldBe` 1
 
     it "retrieves editor text" $ do
       ctx <- loadDefaultContext
@@ -96,7 +94,7 @@ spec =
       ctx <- loadDefaultContext
       editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
       widgetGrabFocus editor
-      deferredRunner ctx $ enterMode $ Mode "testmode" mempty (S.liftIO $ writeIORef record True)
+      deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
       deferredRunner ctx exitLastMode
       cleanupInvoked <- readIORef record
       cleanupInvoked `shouldBe` True

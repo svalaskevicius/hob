@@ -1,10 +1,10 @@
 module Hob.ContextSpec (main, spec) where
 
-import Control.Monad.State
+import Control.Monad.Reader
 import Data.IORef
-import Data.Maybe          (fromJust, isNothing)
+import Data.Maybe           (fromJust, isNothing)
 import Data.Monoid
-import Graphics.UI.Gtk     (Modifier (..))
+import Graphics.UI.Gtk      (Modifier (..))
 
 import Hob.Context
 
@@ -188,9 +188,9 @@ spec = do
             invoked `shouldBe` False
 
 loadContextWithEditors :: [Editor] -> IO Context
-loadContextWithEditors editorList = do
+loadContextWithEditors newEditors = do
     ctx <- loadDefaultContext
-    deferredRunner ctx $ put ctx{editors = editorList}
+    updateEditors (editors ctx) $ const $ return newEditors
     return ctx
 
 getActiveModes :: Context -> IO (Maybe [Mode])

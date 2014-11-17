@@ -1,6 +1,6 @@
 module Hob.Ui.CommandEntrySpec (main, spec) where
 
-import Control.Monad.State
+import Control.Monad.Reader
 import Data.IORef
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.General.StyleContext
@@ -112,9 +112,8 @@ loadDefaultGuiWithMockedCommand = do
     ctx <- loadDefaultContext
     entry <- entryNew
     (matcher, readHandledCommands) <- mockedMatcher "cmd->"
-    ret <- runStateT (newCommandEntryDetached entry matcher) ctx
-    let entryApi = fst ret
-    return (snd ret, entry, entryApi, readHandledCommands)
+    ret <- runReaderT (newCommandEntryDetached entry matcher) ctx
+    return (ctx, entry, ret, readHandledCommands)
 
 mockedMatcher :: String -> IO (CommandMatcher, CommandHandlerReaders)
 mockedMatcher prefix = do

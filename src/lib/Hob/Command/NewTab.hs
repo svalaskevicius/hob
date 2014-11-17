@@ -5,11 +5,10 @@ module Hob.Command.NewTab (
             NewFileEditorLauncher) where
 
 
-import           Control.Monad       (filterM, (<=<))
-import qualified Control.Monad.State as S
-import           Data.Maybe          (mapMaybe)
-import           Data.Text           (pack)
-import           Graphics.UI.Gtk
+import Control.Monad.Reader
+import Data.Maybe           (mapMaybe)
+import Data.Text            (pack)
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -40,7 +39,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
 
 editNewFile :: App()
 editNewFile = do
-    ctx <- S.get
+    ctx <- ask
     let tabbed = mainNotebook.uiContext $ ctx
     newEditorForText tabbed Nothing $ pack ""
 

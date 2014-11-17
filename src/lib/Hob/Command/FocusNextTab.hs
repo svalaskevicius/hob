@@ -1,8 +1,7 @@
 module Hob.Command.FocusNextTab (focusNextTabCommandHandler) where
 
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
-import           Graphics.UI.Gtk
+import Control.Monad.Trans (liftIO)
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -12,8 +11,8 @@ focusNextTabCommandHandler = CommandHandler Nothing focusNextTab
 
 focusNextTab :: App()
 focusNextTab = do
-    ctx <- S.get
-    let notebook = mainNotebook.uiContext $ ctx
+    ui <- fromContext uiContext
+    let notebook = mainNotebook ui
     pages <- liftIO $ notebookGetNPages notebook
     currentPage <- liftIO $ notebookGetCurrentPage notebook
     liftIO $ notebookSetCurrentPage notebook (nextPage currentPage pages)

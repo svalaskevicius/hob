@@ -11,30 +11,28 @@ module Hob.Ui.Editor (
                updateEditorTitle
                ) where
 
-import           Control.Monad              ((<=<))
-import qualified Control.Monad.State        as S
-import           Control.Monad.Trans        (liftIO)
-import           Data.Text                  (Text)
-import           Filesystem.Path.CurrentOS  (decodeString, encodeString,
-                                             filename)
-import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..),
-                                             SourceView, castToSourceView,
-                                             sourceBufferBeginNotUndoableAction,
-                                             sourceBufferEndNotUndoableAction,
-                                             sourceBufferNew,
-                                             sourceBufferSetHighlightSyntax,
-                                             sourceBufferSetLanguage,
-                                             sourceBufferSetStyleScheme,
-                                             sourceViewNewWithBuffer,
-                                             sourceViewSetAutoIndent,
-                                             sourceViewSetDrawSpaces,
-                                             sourceViewSetHighlightCurrentLine,
-                                             sourceViewSetIndentOnTab,
-                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
-                                             sourceViewSetShowLineNumbers,
-                                             sourceViewSetTabWidth)
-import           System.Glib.GObject        (Quark)
+import Control.Monad.Reader
+import Data.Text                  (Text)
+import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
+                                   castToSourceView,
+                                   sourceBufferBeginNotUndoableAction,
+                                   sourceBufferEndNotUndoableAction,
+                                   sourceBufferNew,
+                                   sourceBufferSetHighlightSyntax,
+                                   sourceBufferSetLanguage,
+                                   sourceBufferSetStyleScheme,
+                                   sourceViewNewWithBuffer,
+                                   sourceViewSetAutoIndent,
+                                   sourceViewSetDrawSpaces,
+                                   sourceViewSetHighlightCurrentLine,
+                                   sourceViewSetIndentOnTab,
+                                   sourceViewSetIndentWidth,
+                                   sourceViewSetInsertSpacesInsteadOfTabs,
+                                   sourceViewSetShowLineNumbers,
+                                   sourceViewSetTabWidth)
+import System.Glib.GObject        (Quark)
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -66,12 +64,13 @@ gtkEditor sourceView = Editor
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
-    newId <- generateNewId
-    ctx <- S.get
-    editor <- liftIO $ createNewEditor ctx
-    liftIO $ setEditorId editor newId
-    liftIO $ setEditorModes editor []
-    S.put ctx{editors = editors ctx ++ [gtkEditor editor]}
+    ctx <- ask
+    liftIO $ do
+        newId <- idGenerator ctx
+        editor <- createNewEditor ctx
+        setEditorId editor newId
+        setEditorModes editor []
+        updateEditors (editors ctx) $ \oldEditors -> (return $ oldEditors ++ [gtkEditor editor])
     where
         title = tabTitleForFile filePath
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True
@@ -128,7 +127,7 @@ getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveE
 
 invokeOnActiveEditor :: (SourceView -> IO()) -> App ()
 invokeOnActiveEditor actions = do
-    ctx <- S.get
+    ctx <- ask
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo actions editor
 

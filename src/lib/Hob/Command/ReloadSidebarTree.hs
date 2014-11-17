@@ -1,6 +1,5 @@
 module Hob.Command.ReloadSidebarTree (reloadSidebarTreeCommandHandler) where
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
+import Control.Monad.Reader
 
 import Hob.Context
 import Hob.Ui.Sidebar
@@ -10,6 +9,6 @@ reloadSidebarTreeCommandHandler = CommandHandler Nothing reloadCmd
 
 reloadCmd :: App()
 reloadCmd = do
-    ctx <- S.get
+    ctx <- ask
     liftIO $ reloadSidebarTree ctx
 

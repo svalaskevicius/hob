@@ -4,8 +4,7 @@ module Hob.Ui (loadGui,
                getEditorText,
                getActiveEditor) where
 
-import qualified Control.Monad.State                  as S
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Reader
 import           Data.Char                            (intToDigit)
 import           Data.IORef
 import           Data.List                            (intercalate)
@@ -104,7 +103,7 @@ loadGui fileCtx styleCtx = do
             return ()
         initActiveModesMonitor ctx =
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
-                activeCtx <- S.get
+                activeCtx <- ask
                 modes <- activeModes
                 let modesUi = activeModesLabel . uiContext $ activeCtx
                 let modesToString = intercalate " | " . filter (not . null) . map modeName

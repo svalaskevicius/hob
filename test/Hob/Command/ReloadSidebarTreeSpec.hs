@@ -1,9 +1,8 @@
 module Hob.Command.ReloadSidebarTreeSpec (main, spec) where
 
-import qualified Control.Monad.State as S
-import           Data.Maybe
-import           Data.Tree
-import           Graphics.UI.Gtk
+import Data.Maybe
+import Data.Tree
+import Graphics.UI.Gtk
 
 import           Hob.Command.ReloadSidebarTree
 import           Hob.Context
@@ -25,9 +24,9 @@ spec =
       ctx <- loadStubbedContext
       values <- getDirectoryListingSidebarRootItems ctx
       values `shouldBe` ["a","c","-"]
-      deferredRunner ctx $ S.put $ replaceStubbedTree ctx
-      deferredRunner ctx $ commandExecute reloadSidebarTreeCommandHandler
-      values' <- getDirectoryListingSidebarRootItems ctx
+      let ctx' = replaceStubbedTree ctx
+      deferredRunner ctx' $ commandExecute reloadSidebarTreeCommandHandler
+      values' <- getDirectoryListingSidebarRootItems ctx'
       values' `shouldBe` ["b","c"]
 
 replaceStubbedTree :: Context -> Context

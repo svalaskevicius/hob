@@ -1,3 +1,7 @@
+{-# LANGUAGE KindSignatures        #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes            #-}
+
 module Hob.Context (
     App,
     Context(..),
@@ -10,6 +14,7 @@ module Hob.Context (
     Mode(..),
     Event(..),
     Editor(..),
+    EditorList(..),
     initContext,
     runOnEditor,
     enterMode,
@@ -21,11 +26,11 @@ module Hob.Context (
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
-    generateNewId,
+    fromContext,
 ) where
 
 import Control.Concurrent.MVar
-import Control.Monad.State
+import Control.Monad.Reader
 import Data.Maybe               (isJust)
 import Data.Monoid
 import Graphics.UI.Gtk          (Modifier)
@@ -37,7 +42,7 @@ import Hob.Context.UiContext
 import Hob.DirectoryTree
 
 
-type App = StateT Context IO
+type App = ReaderT Context IO
 
 newtype Event = Event String deriving (Eq)
 
@@ -52,16 +57,26 @@ data Editor = Editor {
 runOnEditor :: (Editor -> Editor -> a) -> Editor -> a
 runOnEditor f editor = f editor editor
 
+data EventBus = EventBus {
+    addListener       :: Event -> App() -> IO(),
+    listenersForEvent :: Event -> IO [App()]
+}
+
+data EditorList = EditorList {
+    updateEditors :: ([Editor] -> IO [Editor]) -> IO(),
+    getEditors    :: IO [Editor]
+}
+
 data Context = Context {
-    styleContext   :: StyleContext,
-    fileContext    :: FileContext,
-    uiContext      :: UiContext,
-    fileTreeStore  :: LTS.TreeStore DirectoryTreeElement,
-    baseCommands   :: CommandMatcher,
-    editors        :: [Editor],
-    messageLoop    :: Message -> IO(),
-    eventListeners :: [(Event, [App()])],
-    lastGeneratdId :: Int
+    styleContext  :: StyleContext,
+    fileContext   :: FileContext,
+    uiContext     :: UiContext,
+    fileTreeStore :: LTS.TreeStore DirectoryTreeElement,
+    baseCommands  :: CommandMatcher,
+    editors       :: EditorList,
+    messageLoop   :: Context -> Message -> IO(),
+    eventBus      :: EventBus,
+    idGenerator   :: IO Int
 }
 
 data Mode = Mode {
@@ -73,70 +88,96 @@ data Mode = Mode {
 data Message = AppAction (App())
 
 runApp :: Context -> App () -> IO Context
-runApp ctx appSteps =  do
-    ret <- runStateT appSteps ctx
-    return $ snd ret
+runApp ctx appSteps = runReaderT appSteps ctx >> return ctx
 
 runMessage :: Context -> Message -> IO Context
 runMessage  ctx (AppAction action) = runApp ctx action
 
 initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> CommandMatcher -> IO Context
 initContext styleCtx fileCtx uiCtx treeModel initCommands = do
-    ctxRef <- newEmptyMVar
+    actionSync <- newMVar True
     deferredMessagesRef <- newMVar []
-    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands [] (messageRunner ctxRef deferredMessagesRef) [] 0
-    putMVar ctxRef ctx
+    bus <- initEventBus
+    editorList <- initEditors
+    initialisedIdGenerator <- initIdGenerator
+    let ctx = Context styleCtx fileCtx uiCtx treeModel initCommands editorList (messageRunner actionSync deferredMessagesRef) bus initialisedIdGenerator
     return ctx
     where
-        messageRunner ctxRef deferredMessagesRef message = do
+        messageRunner actionSync deferredMessagesRef ctx message = do
             queueMessage deferredMessagesRef message
-            mCtx <- tryTakeMVar ctxRef
-            case mCtx of
-                Just ctx -> flushMessageQueue deferredMessagesRef ctx >>= putMVar ctxRef
+            sync <- tryTakeMVar actionSync
+            case sync of
+                Just _ -> flushMessageQueue deferredMessagesRef ctx >> putMVar actionSync True
                 Nothing -> return()
         flushMessageQueue deferredMessagesRef ctx = do
             messages <- swapMVar deferredMessagesRef []
-            if null messages then return ctx
+            if null messages then return()
             else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
         queueMessage deferredMessagesRef message = modifyMVar_ deferredMessagesRef (\messages -> return $ messages ++ [message])
 
+initEventBus :: IO EventBus
+initEventBus = do
+    bus <- newMVar []
+    return $ EventBus (addEventListener bus) (lookupEvent bus)
+    where
+        addEventListener bus event action = do
+            listeners <- takeMVar bus
+            putMVar bus $ combineEventListeners event action listeners
+
+        combineEventListeners :: Event -> App() -> [(Event, [App()])] -> [(Event, [App()])]
+        combineEventListeners event action [] = [(event, [action])]
+        combineEventListeners event action (x@(evt, initHandlers):xs) =
+            if evt == event then (evt, action:initHandlers) : xs
+            else x : combineEventListeners event action xs
+
+        lookupEvent bus event = do
+            listeners <- readMVar bus
+            return $ findEvent event listeners
+
+        findEvent _ [] = []
+        findEvent event ((evt, handlers):xs) = if evt == event then handlers
+                                               else findEvent event xs
+
+initEditors :: IO EditorList
+initEditors = do
+    editorList <- newMVar []
+    return $ EditorList (updateEditorsHandler editorList) (getEditorsHandler editorList)
+    where
+        updateEditorsHandler editorList updater = do
+            oldEditors <- takeMVar editorList
+            newEditors <- updater oldEditors
+            putMVar editorList newEditors
+        getEditorsHandler = readMVar
 
 deferredRunner :: Context -> App() -> IO()
-deferredRunner ctx actions = messageLoop ctx $ AppAction actions
+deferredRunner ctx actions = messageLoop ctx ctx $ AppAction actions
 
 registerEventHandler :: Event -> App() -> App()
 registerEventHandler event handler = do
-    ctx <- get
-    put ctx{eventListeners = addEventHandler $ eventListeners ctx}
-    where addEventHandler :: [(Event, [App()])] -> [(Event, [App()])]
-          addEventHandler [] = [(event, [handler])]
-          addEventHandler (x@(evt, initHandlers):xs) =
-                if evt == event then (evt, handler:initHandlers) : xs
-                else x : addEventHandler xs
+    bus <- fromContext eventBus
+    liftIO $ addListener bus event handler
 
 emitEvent :: Event -> App()
 emitEvent event = do
-    ctx <- get
-    let handlers = findEvent $ eventListeners ctx
+    bus <- fromContext eventBus
+    handlers <- liftIO $ listenersForEvent bus event
     sequence_ handlers
-    where findEvent [] = []
-          findEvent ((evt, handlers):xs) = if evt == event then handlers
-                                           else findEvent xs
 
+fromContext :: forall r a (m :: * -> *). MonadReader r m => (r -> a) -> m a
+fromContext field = asks field
 
 currentEditor :: App (Maybe Editor)
 currentEditor = do
-    ctx <- get
-    active <- filterM (\e -> isCurrentlyActive e e) $ editors ctx
+    editorList <- fromContext editors
+    active <- filterM (\e -> isCurrentlyActive e e) =<< (liftIO $ getEditors editorList)
     return $
         if null active then Nothing
         else Just $ head active
 
 enterMode :: Mode -> App()
-enterMode mode = updateActiveEditor (\editor -> do
-        emitEvent $ Event "core.mode.change"
-        runOnEditor enterEditorMode editor mode
-    )
+enterMode mode = do
+    updateActiveEditor $ \editor -> runOnEditor enterEditorMode editor mode
+    emitEvent $ Event "core.mode.change"
 
 activeModes :: App (Maybe [Mode])
 activeModes = do
@@ -144,21 +185,25 @@ activeModes = do
     maybe (return Nothing) (runOnEditor modeStack >=> return . Just) active
 
 exitLastMode :: App()
-exitLastMode = updateActiveEditor (\editor -> do
-        emitEvent $ Event "core.mode.change"
-        runOnEditor exitLastEditorMode editor
-    )
+exitLastMode = do
+    updateActiveEditor $ \editor -> runOnEditor exitLastEditorMode editor
+    emitEvent $ Event "core.mode.change"
 
 updateActiveEditor :: (Editor -> App Editor) -> App()
 updateActiveEditor actions = do
-    ctx <- get
-    (e1, e2) <- splitBeforeFirstActive $ editors ctx
-    unless (null e2) $ do
-        let active = head e2
-        active' <- actions active
-        put ctx{editors = e1 ++ [active'] ++ tail e2}
-    where splitBeforeFirstActive [] = return ([], [])
-          splitBeforeFirstActive (x:xs) = do
+    ctx <- ask
+    editorList <- fromContext editors
+    liftIO $ updateEditors editorList $ \oldEditors -> runReaderT (updateActiveEditorHandler oldEditors) ctx
+    where
+        updateActiveEditorHandler oldEditors = do
+            (e1, e2) <- splitBeforeFirstActive oldEditors
+            if (null e2) then return oldEditors
+            else do
+                let active = head e2
+                active' <- actions active
+                return $ e1 ++ [active'] ++ tail e2
+        splitBeforeFirstActive [] = return ([], [])
+        splitBeforeFirstActive (x:xs) = do
             active <- runOnEditor isCurrentlyActive x
             if active then return ([], x:xs)
             else do
@@ -196,12 +241,14 @@ combineMatcher combiner l r cmd = if isJust rightResult then rightResult else le
     where leftResult = combiner l cmd
           rightResult = combiner r cmd
 
-generateNewId :: App Int
-generateNewId = do
-    ctx <- get
-    let newId = lastGeneratdId ctx
-    put $ ctx{lastGeneratdId = newId}
-    return newId
+initIdGenerator :: IO (IO Int)
+initIdGenerator = do
+    generatorStorage <- newMVar 0
+    return $ do
+        lastGeneratdId <- takeMVar generatorStorage
+        let newId = lastGeneratdId + 1
+        putMVar generatorStorage newId
+        return newId
 
 createMatcherForPrefix :: String -> (String -> CommandHandler) -> CommandMatcher
 createMatcherForPrefix prefix handler = CommandMatcher (const Nothing) (matchHandler prefix)

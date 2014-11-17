@@ -4,9 +4,8 @@ module Hob.Command.FocusCommandEntry (
     focusCommandEntryCommandHandler,
     ) where
 
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
-import           Graphics.UI.Gtk
+import Control.Monad.Reader
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -25,20 +24,20 @@ toggleFocusOnCommandEntryCommandHandler = CommandHandler Nothing toggleFocusOnCo
 
 focusCommandEntry :: App()
 focusCommandEntry = do
-    ctx <- S.get
+    ctx <- ask
     liftIO $ widgetGrabFocus $ cmdEntry ctx
     where cmdEntry ctx = commandEntry.uiContext $ ctx
 
 focusActiveEditorAndExitLastMode :: App()
 focusActiveEditorAndExitLastMode = do
     exitLastMode
-    ctx <- S.get
+    ctx <- ask
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo widgetGrabFocus editor
 
 toggleFocusOnCommandEntry :: App()
 toggleFocusOnCommandEntry = do
-    ctx <- S.get
+    ctx <- ask
     isFocused <- liftIO $ widgetGetIsFocus $ cmdEntry ctx
     if isFocused then do
         editor <- liftIO $ getActiveEditor ctx
