@@ -59,10 +59,12 @@ loadGui fileCtx styleCtx = do
             treeModel <- LTS.treeStoreNew []
             let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch activeModesObject
             initContext styleCtx fileCtx uiCtx treeModel initCommands
+
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx
             return builder
+
         initSidebar ctx = do
             let treeView = sidebarTree . uiContext $ ctx
             let treeViewSearch = sidebarTreeSearch . uiContext $ ctx
@@ -71,14 +73,14 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
+
         initCommandEntry ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
-            let cmdMatcher = baseCommands ctx
             widgetSetName cmdEntry "commandEntry"
-            deferredRunner ctx $ newCommandEntry cmdEntry cmdMatcher
+            deferredRunner ctx $ newCommandEntry cmdEntry
+
         initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
-            let cmdMatcher = baseCommands ctx
             lastPressedKeyRef <- newIORef ""
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
@@ -87,20 +89,22 @@ loadGui fileCtx styleCtx = do
                 let key = unpack keyT
                 liftIO $ writeIORef lastPressedKeyRef key
                 if key == "Control_L" then return False
-                else maybe (return False)
-                           (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
-                           matchKeyBinding cmdMatcher (modifier, key)
+                else invokeKeyCommand ctx (modifier, key)
             _ <- window `on` keyReleaseEvent $ do
                 modifier <- eventModifier
                 keyT <- eventKeyName
                 lastPressedKey <- liftIO $ readIORef lastPressedKeyRef
                 let key = unpack keyT
-                if (lastPressedKey == key) && (key == "Control_L") then
-                    maybe (return False)
-                          (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
-                          matchKeyBinding cmdMatcher (modifier, key)
+                if (lastPressedKey == key) && (key == "Control_L") then invokeKeyCommand ctx (modifier, key)
                 else return False
             return ()
+
+        invokeKeyCommand ctx command = liftIO . (runApp ctx) $ do
+                                         activeCommands <- getActiveCommands
+                                         maybe (return False)
+                                           (\cmd -> (commandExecute cmd) >> return True) $
+                                           matchKeyBinding activeCommands command
+
         initActiveModesMonitor ctx =
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
                 activeCtx <- ask
@@ -108,6 +112,7 @@ loadGui fileCtx styleCtx = do
                 let modesUi = activeModesLabel . uiContext $ activeCtx
                 let modesToString = intercalate " | " . filter (not . null) . map modeName
                 liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
+
         defaultCommands = mconcat $ [
                                     -- default:
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,

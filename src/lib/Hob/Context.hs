@@ -27,6 +27,8 @@ module Hob.Context (
     createMatcherForCommand,
     createMatcherForKeyBinding,
     fromContext,
+    runApp,
+    getActiveCommands,
 ) where
 
 import Control.Concurrent.MVar
@@ -87,11 +89,11 @@ data Mode = Mode {
 
 data Message = AppAction (App())
 
-runApp :: Context -> App () -> IO Context
-runApp ctx appSteps = runReaderT appSteps ctx >> return ctx
+runApp :: Context -> App a -> IO a
+runApp ctx appSteps = runReaderT appSteps ctx
 
 runMessage :: Context -> Message -> IO Context
-runMessage  ctx (AppAction action) = runApp ctx action
+runMessage  ctx (AppAction action) = runApp ctx action >> return ctx
 
 initContext :: StyleContext -> FileContext -> UiContext -> LTS.TreeStore DirectoryTreeElement -> CommandMatcher -> IO Context
 initContext styleCtx fileCtx uiCtx treeModel initCommands = do
@@ -209,6 +211,15 @@ updateActiveEditor actions = do
             else do
                 (n, ns) <- splitBeforeFirstActive xs
                 return (x:n, ns)
+
+
+getActiveCommands :: App CommandMatcher
+getActiveCommands = do
+    base <- asks baseCommands
+    maybeModes <- activeModes
+    maybe (return base)
+          (\modes -> return $ base `mappend` (mconcat $ fmap commandMatcher modes))
+          maybeModes
 
 data PreviewCommandHandler = PreviewCommandHandler {
                     previewExecute :: App(),

@@ -22,10 +22,10 @@ commandPreviewResetState = do
             liftIO $ writeIORef state Nothing
         )
 
-newCommandEntry :: Entry -> CommandMatcher -> App ()
-newCommandEntry cmdEntry cmdMatcher = do
+newCommandEntry :: Entry -> App ()
+newCommandEntry cmdEntry = do
     ctx <- ask
-    (onChange, onReturn) <- newCommandEntryDetached cmdEntry cmdMatcher
+    (onChange, onReturn) <- newCommandEntryDetached cmdEntry
     let liftedOn a b c = liftIO $ on a b c
     _ <- cmdEntry `liftedOn` editableChanged $ deferredRunner ctx onChange
     _ <- cmdEntry `liftedOn` keyPressEvent $ do
@@ -36,20 +36,21 @@ newCommandEntry cmdEntry cmdMatcher = do
             _ -> return False
     return ()
 
-newCommandEntryDetached :: Entry -> CommandMatcher -> App (App(), App())
-newCommandEntryDetached cmdEntry cmdMatcher = do
+newCommandEntryDetached :: Entry -> App (App(), App())
+newCommandEntryDetached cmdEntry = do
     previewResetState <- commandPreviewResetState
     return (onChanged previewResetState, onReturn previewResetState)
     where
         onChanged =
-            previewCmd cmdEntry cmdMatcher
+            previewCmd cmdEntry
         onReturn previewResetState = do
-            runCmd cmdEntry cmdMatcher previewResetState
+            runCmd cmdEntry previewResetState
             liftIO $ entrySetText cmdEntry ""
 
 
-previewCmd :: Entry -> CommandMatcher -> PreviewResetState -> App ()
-previewCmd cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset) = do
+previewCmd :: Entry -> PreviewResetState -> App ()
+previewCmd cmdEntry (setLastPreviewCmd, dispatchLastPreviewReset) = do
+    cmdMatcher <- getActiveCommands
     dispatchLastPreviewReset
     text <- liftIO $ entryGetText cmdEntry
     if text == "" then
@@ -66,8 +67,9 @@ previewCmd cmdEntry cmdMatcher (setLastPreviewCmd, dispatchLastPreviewReset) = d
             previewExecute prev
             setLastPreviewCmd prev
 
-runCmd :: Entry -> CommandMatcher -> PreviewResetState -> App ()
-runCmd cmdEntry cmdMatcher (_, dispatchLastPreviewReset) = do
+runCmd :: Entry -> PreviewResetState -> App ()
+runCmd cmdEntry (_, dispatchLastPreviewReset) = do
+    cmdMatcher <- getActiveCommands
     dispatchLastPreviewReset
     text <- liftIO $ entryGetText cmdEntry
     let command = matchCommand cmdMatcher text

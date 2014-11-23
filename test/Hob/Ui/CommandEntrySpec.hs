@@ -109,10 +109,11 @@ invokeCommand entry api text = do
 
 loadDefaultGuiWithMockedCommand :: IO (Context, Entry, EntryApi, CommandHandlerReaders)
 loadDefaultGuiWithMockedCommand = do
-    ctx <- loadDefaultContext
-    entry <- entryNew
+    defaultCtx <- loadDefaultContext
     (matcher, readHandledCommands) <- mockedMatcher "cmd->"
-    ret <- runReaderT (newCommandEntryDetached entry matcher) ctx
+    let ctx = defaultCtx{baseCommands = matcher}
+    entry <- entryNew
+    ret <- runApp ctx (newCommandEntryDetached entry)
     return (ctx, entry, ret, readHandledCommands)
 
 mockedMatcher :: String -> IO (CommandMatcher, CommandHandlerReaders)

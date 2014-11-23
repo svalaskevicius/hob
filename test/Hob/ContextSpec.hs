@@ -2,7 +2,7 @@ module Hob.ContextSpec (main, spec) where
 
 import Control.Monad.Reader
 import Data.IORef
-import Data.Maybe           (fromJust, isNothing)
+import Data.Maybe           (fromJust, isJust, isNothing)
 import Data.Monoid
 import Graphics.UI.Gtk      (Modifier (..))
 
@@ -169,6 +169,38 @@ spec = do
             deferredRunner ctx exitLastMode
             invoked <- readIORef record
             invoked `shouldBe` True
+
+    describe "active command matcher retriever" $ do
+        it "retains base command matcher" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            commands <- runApp ctx $ getActiveCommands
+            let cmd = matchKeyBinding commands ([Control], "Tab")
+            isJust cmd `shouldBe` True
+
+        it "retrieves active mode command matcher" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            (handler, readHandledText) <- recordingHandler
+            let matcher = createMatcherForCommand "hi" $ handler "test"
+            deferredRunner ctx $ enterMode $ Mode "testmode" matcher $ return()
+            commands <- runApp ctx $ getActiveCommands
+            let cmd = matchCommand commands "hi"
+            handledText <- executeRecordingHandler ctx cmd readHandledText
+            handledText `shouldBe` Just "test"
+
+        it "retrieves last active mode command first" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            (handler1, _) <- recordingHandler
+            let matcher1 = createMatcherForCommand "hi" $ handler1 "test1"
+            deferredRunner ctx $ enterMode $ Mode "testmode1" matcher1 $ return()
+            (handler2, readHandledText) <- recordingHandler
+            let matcher2 = createMatcherForCommand "hi" $ handler2 "test2"
+            deferredRunner ctx $ enterMode $ Mode "testmode2" matcher2 $ return()
+            commands <- runApp ctx $ getActiveCommands
+            let cmd = matchCommand commands "hi"
+            handledText <- executeRecordingHandler ctx cmd readHandledText
+            handledText `shouldBe` Just "test2"
+
 
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
