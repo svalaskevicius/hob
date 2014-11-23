@@ -70,7 +70,7 @@ newEditorForText targetNotebook filePath text = do
         editor <- createNewEditor ctx
         setEditorId editor newId
         setEditorModes editor []
-        updateEditors (editors ctx) $ \oldEditors -> (return $ oldEditors ++ [gtkEditor editor])
+        updateEditors (editors ctx) $ \oldEditors -> return $ oldEditors ++ [gtkEditor editor]
     where
         title = tabTitleForFile filePath
         setBufferLanguage buffer (Just lang) = sourceBufferSetLanguage buffer (Just lang) >> sourceBufferSetHighlightSyntax buffer True

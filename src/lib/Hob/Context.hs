@@ -113,8 +113,7 @@ initContext styleCtx fileCtx uiCtx treeModel initCommands = do
                 Nothing -> return()
         flushMessageQueue deferredMessagesRef ctx = do
             messages <- swapMVar deferredMessagesRef []
-            if null messages then return()
-            else foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
+            unless (null messages) $ foldM runMessage ctx messages >>= flushMessageQueue deferredMessagesRef
         queueMessage deferredMessagesRef message = modifyMVar_ deferredMessagesRef (\messages -> return $ messages ++ [message])
 
 initEventBus :: IO EventBus
@@ -166,12 +165,12 @@ emitEvent event = do
     sequence_ handlers
 
 fromContext :: forall r a (m :: * -> *). MonadReader r m => (r -> a) -> m a
-fromContext field = asks field
+fromContext = asks
 
 currentEditor :: App (Maybe Editor)
 currentEditor = do
     editorList <- fromContext editors
-    active <- filterM (\e -> isCurrentlyActive e e) =<< (liftIO $ getEditors editorList)
+    active <- filterM (\e -> isCurrentlyActive e e) =<< liftIO (getEditors editorList)
     return $
         if null active then Nothing
         else Just $ head active
@@ -199,7 +198,7 @@ updateActiveEditor actions = do
     where
         updateActiveEditorHandler oldEditors = do
             (e1, e2) <- splitBeforeFirstActive oldEditors
-            if (null e2) then return oldEditors
+            if null e2 then return oldEditors
             else do
                 let active = head e2
                 active' <- actions active
@@ -218,7 +217,7 @@ getActiveCommands = do
     base <- asks baseCommands
     maybeModes <- activeModes
     maybe (return base)
-          (\modes -> return $ base `mappend` (mconcat $ fmap commandMatcher modes))
+          (\modes -> return $ base `mappend` mconcat (fmap commandMatcher modes))
           maybeModes
 
 data PreviewCommandHandler = PreviewCommandHandler {

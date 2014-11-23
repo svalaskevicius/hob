@@ -99,10 +99,10 @@ loadGui fileCtx styleCtx = do
                 else return False
             return ()
 
-        invokeKeyCommand ctx command = liftIO . (runApp ctx) $ do
+        invokeKeyCommand ctx command = liftIO . runApp ctx $ do
                                          activeCommands <- getActiveCommands
                                          maybe (return False)
-                                           (\cmd -> (commandExecute cmd) >> return True) $
+                                           (\cmd -> commandExecute cmd >> return True) $
                                            matchKeyBinding activeCommands command
 
         initActiveModesMonitor ctx =

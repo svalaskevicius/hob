@@ -174,33 +174,22 @@ spec = do
         it "retains base command matcher" $ do
             ctx <- loadContextWithEditors [dummyEditor]
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            commands <- runApp ctx $ getActiveCommands
+            commands <- runApp ctx getActiveCommands
             let cmd = matchKeyBinding commands ([Control], "Tab")
             isJust cmd `shouldBe` True
 
         it "retrieves active mode command matcher" $ do
             ctx <- loadContextWithEditors [dummyEditor]
-            (handler, readHandledText) <- recordingHandler
-            let matcher = createMatcherForCommand "hi" $ handler "test"
-            deferredRunner ctx $ enterMode $ Mode "testmode" matcher $ return()
-            commands <- runApp ctx $ getActiveCommands
-            let cmd = matchCommand commands "hi"
-            handledText <- executeRecordingHandler ctx cmd readHandledText
+            readHandledText <- enterRecordingMode ctx "testMode1" "hi" "test"
+            handledText <- executeActiveRecordingHandler ctx "hi" readHandledText
             handledText `shouldBe` Just "test"
 
         it "retrieves last active mode command first" $ do
             ctx <- loadContextWithEditors [dummyEditor]
-            (handler1, _) <- recordingHandler
-            let matcher1 = createMatcherForCommand "hi" $ handler1 "test1"
-            deferredRunner ctx $ enterMode $ Mode "testmode1" matcher1 $ return()
-            (handler2, readHandledText) <- recordingHandler
-            let matcher2 = createMatcherForCommand "hi" $ handler2 "test2"
-            deferredRunner ctx $ enterMode $ Mode "testmode2" matcher2 $ return()
-            commands <- runApp ctx $ getActiveCommands
-            let cmd = matchCommand commands "hi"
-            handledText <- executeRecordingHandler ctx cmd readHandledText
+            _ <- enterRecordingMode ctx "testMode1" "hi" "test1"
+            readHandledText <- enterRecordingMode ctx "testMode2" "hi" "test2"
+            handledText <- executeActiveRecordingHandler ctx "hi" readHandledText
             handledText `shouldBe` Just "test2"
-
 
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
@@ -270,4 +259,17 @@ executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) 
 executeRecordingHandler ctx handler readHandledText = do
     deferredRunner ctx $ commandExecute $ fromJust handler
     readHandledText
+
+executeActiveRecordingHandler :: Context -> String -> IO (Maybe String) -> IO (Maybe String)
+executeActiveRecordingHandler ctx cmd readHandledText = do
+    commands <- runApp ctx getActiveCommands
+    let command = matchCommand commands cmd
+    executeRecordingHandler ctx command readHandledText
+
+enterRecordingMode :: Context -> String -> String -> String -> IO (IO (Maybe String))
+enterRecordingMode ctx modename cmd resp = do
+    (handler, readHandledText) <- recordingHandler
+    let matcher = createMatcherForCommand cmd $ handler resp
+    runApp ctx $ enterMode $ Mode modename matcher $ return()
+    return readHandledText
 

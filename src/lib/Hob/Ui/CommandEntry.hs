@@ -50,12 +50,12 @@ newCommandEntryDetached cmdEntry = do
 
 previewCmd :: Entry -> PreviewResetState -> App ()
 previewCmd cmdEntry (setLastPreviewCmd, dispatchLastPreviewReset) = do
-    cmdMatcher <- getActiveCommands
     dispatchLastPreviewReset
     text <- liftIO $ entryGetText cmdEntry
     if text == "" then
         setOkStatus cmdEntry
     else do
+        cmdMatcher <- getActiveCommands
         let command = matchCommand cmdMatcher text
         maybe notifyFailure handleCommand command
     where
@@ -69,9 +69,9 @@ previewCmd cmdEntry (setLastPreviewCmd, dispatchLastPreviewReset) = do
 
 runCmd :: Entry -> PreviewResetState -> App ()
 runCmd cmdEntry (_, dispatchLastPreviewReset) = do
-    cmdMatcher <- getActiveCommands
     dispatchLastPreviewReset
     text <- liftIO $ entryGetText cmdEntry
+    cmdMatcher <- getActiveCommands
     let command = matchCommand cmdMatcher text
     maybeDo commandExecute command
 
