@@ -126,7 +126,7 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForPrefix "/" searchCommandHandler,
                                     createMatcherForReplace 's' replaceCommandHandler,
                                     createMatcherForKeyBinding ([Control], "Control_L") focusCommandEntryCommandHandler,
-                                    createMatcherForKeyBinding ([], "Escape") focusActiveEditorAndExitLastModeCommandHandler,
+                                    createMatcherForKeyBinding ([], "Escape") focusActiveEditorAndExitLastModeCommandHandler
                                 ] ++
                                 [
                                     createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
