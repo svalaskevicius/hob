@@ -114,7 +114,6 @@ loadGui fileCtx styleCtx = do
                 liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
 
         defaultCommands = mconcat $ [
-                                    -- default:
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
                                     createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
                                     createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
@@ -128,14 +127,8 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForReplace 's' replaceCommandHandler,
                                     createMatcherForKeyBinding ([Control], "Control_L") focusCommandEntryCommandHandler,
                                     createMatcherForKeyBinding ([], "Escape") focusActiveEditorAndExitLastModeCommandHandler,
-                                    -- search / replace
-                                    createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
-                                    createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
-                                    -- replace
-                                    createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler
                                 ] ++
                                 [
-                                    -- default
                                     createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
                                         | position <- [0..9]
                                 ]
