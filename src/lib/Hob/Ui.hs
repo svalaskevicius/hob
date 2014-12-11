@@ -4,8 +4,10 @@ module Hob.Ui (loadGui,
                getEditorText,
                getActiveEditor) where
 
-import           Control.Monad.Trans                  (liftIO)
+import           Control.Monad.Reader
 import           Data.Char                            (intToDigit)
+import           Data.IORef
+import           Data.List                            (intercalate)
 import           Data.Monoid                          (mconcat)
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
@@ -40,25 +42,30 @@ loadGui fileCtx styleCtx = do
         builder <- loadUiBuilder
         setGtkStyle styleCtx
 
-        ctx <- initCtx builder defaultMode
+        ctx <- initCtx builder defaultCommands
         initMainWindow ctx
+        initEditingArea ctx
         initSidebar ctx
         initCommandEntry ctx
+        initActiveModesMonitor ctx
         return ctx
     where
-        initCtx builder initMode = do
+        initCtx builder initCommands = do
             window <- builderGetObject builder castToWindow "mainWindow"
             notebook <- builderGetObject builder castToNotebook "tabbedEditArea"
             cmdEntry <- builderGetObject builder castToEntry "command"
             treeView <- builderGetObject builder castToTreeView "directoryListing"
             treeViewSearch <- builderGetObject builder castToEntry "directoryListingSearch"
+            activeModesObject <- builderGetObject builder castToLabel "activeMode"
             treeModel <- LTS.treeStoreNew []
-            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch
-            initContext styleCtx fileCtx uiCtx treeModel initMode
+            let uiCtx = UiContext window notebook cmdEntry treeView treeViewSearch activeModesObject
+            initContext styleCtx fileCtx uiCtx treeModel initCommands
+
         loadUiBuilder = do
             builder <- builderNew
             builderAddFromFile builder $ uiFile styleCtx
             return builder
+
         initSidebar ctx = do
             let treeView = sidebarTree . uiContext $ ctx
             let treeViewSearch = sidebarTreeSearch . uiContext $ ctx
@@ -67,25 +74,55 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             newSideBarFileTree ctx treeView $ launchNewFileEditor ctx mainEditNotebook
             newSideBarFileTreeSearch ctx
+
         initCommandEntry ctx = do
             let cmdEntry = commandEntry . uiContext $ ctx
-            let cmdMatcher = commandMatcher . head . modeStack $ ctx
             widgetSetName cmdEntry "commandEntry"
-            deferredRunner ctx $ newCommandEntry cmdEntry cmdMatcher
+            deferredRunner ctx $ newCommandEntry cmdEntry
+
         initMainWindow ctx = do
             let window = mainWindow . uiContext $ ctx
-            let cmdMatcher = commandMatcher . head . modeStack $ ctx
+            lastPressedKeyRef <- newIORef ""
             widgetSetName window "mainWindow"
             _ <- window `on` keyPressEvent $ do
                 modifier <- eventModifier
-                key <- eventKeyName
-                maybe (return False)
-                      (\cmd -> liftIO $ deferredRunner ctx (commandExecute cmd) >> return True) $
-                      matchKeyBinding cmdMatcher (modifier, unpack key)
+                keyT <- eventKeyName
+                let key = unpack keyT
+                liftIO $ writeIORef lastPressedKeyRef key
+                if key == "Control_L" then return False
+                else invokeKeyCommand ctx (modifier, key)
+            _ <- window `on` keyReleaseEvent $ do
+                modifier <- eventModifier
+                keyT <- eventKeyName
+                lastPressedKey <- liftIO $ readIORef lastPressedKeyRef
+                let key = unpack keyT
+                if (lastPressedKey == key) && (key == "Control_L") then invokeKeyCommand ctx (modifier, key)
+                else return False
             return ()
-        defaultMode =
-                let cmdMatcher = mconcat $ [
-                                    -- default:
+
+        initEditingArea ctx = do
+            let mainEditNotebook = mainNotebook . uiContext $ ctx
+            _ <- mainEditNotebook `on` switchPage $ const $ deferredRunner ctx (emitEvent $ Event "core.editor.focused")
+            return ()
+
+        invokeKeyCommand ctx command = liftIO . runApp ctx $ do
+                                         activeCommands <- getActiveCommands
+                                         maybe (return False)
+                                           (\cmd -> commandExecute cmd >> return True) $
+                                           matchKeyBinding activeCommands command
+
+        initActiveModesMonitor ctx = deferredRunner ctx $ do
+            registerEventHandler (Event "core.editor.focused") refreshModesLabel
+            registerEventHandler (Event "core.mode.change") refreshModesLabel
+
+        refreshModesLabel = do
+            activeCtx <- ask
+            modes <- activeModes
+            let modesUi = activeModesLabel . uiContext $ activeCtx
+            let modesToString = intercalate " | " . filter (not . null) . map modeName
+            liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
+
+        defaultCommands = mconcat $ [
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,
                                     createMatcherForKeyBinding ([Control], "s") saveCurrentEditorTab,
                                     createMatcherForKeyBinding ([Control], "n") editNewFileCommandHandler,
@@ -97,25 +134,13 @@ loadGui fileCtx styleCtx = do
                                     createMatcherForKeyBinding ([Shift, Control], "T") syncFocusSidebarCommandHandler,
                                     createMatcherForPrefix "/" searchCommandHandler,
                                     createMatcherForReplace 's' replaceCommandHandler,
-
-                                    -- + focus cmd on ctrl key press
-                                    -- + pop mode on escape, focuses editor
-
-                                    -- search / replace
-                                    createMatcherForKeyBinding ([Control], "Down") searchNextCommandHandler,
-                                    createMatcherForKeyBinding ([Control], "Up") searchBackwardsCommandHandler,
-                                    -- replace
-                                    createMatcherForKeyBinding ([Shift, Control], "Down") replaceNextCommandHandler,
-
-                                    -- tbc
-                                    createMatcherForKeyBinding ([], "Escape") toggleFocusOnCommandEntryCommandHandler
+                                    createMatcherForKeyBinding ([Control], "Control_L") focusCommandEntryCommandHandler,
+                                    createMatcherForKeyBinding ([], "Escape") focusActiveEditorAndExitLastModeCommandHandler
                                 ] ++
                                 [
-                                    -- default
                                     createMatcherForKeyBinding ([Control], [intToDigit $ (position + 1) `mod` 10]) $ focusNumberedTabCommandHandler position
                                         | position <- [0..9]
                                 ]
-                in Mode "" cmdMatcher $ return()
 
 setGtkStyle :: StyleContext -> IO ()
 setGtkStyle styleCtx = do

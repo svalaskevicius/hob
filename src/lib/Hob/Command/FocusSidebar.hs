@@ -3,10 +3,9 @@ module Hob.Command.FocusSidebar (
     syncFocusSidebarCommandHandler
     ) where
 
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
-import           Data.List
-import           Graphics.UI.Gtk
+import Control.Monad.Reader
+import Data.List
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -22,12 +21,12 @@ syncFocusSidebarCommandHandler = CommandHandler Nothing syncFocusSidebar
 
 focusSidebar :: App()
 focusSidebar = do
-    ctx <- S.get
+    ctx <- ask
     liftIO $ widgetGrabFocus . sidebarTree . uiContext $ ctx
 
 syncActiveEditorPathToSidebar :: App()
 syncActiveEditorPathToSidebar = do
-    ctx <- S.get
+    ctx <- ask
     editor <- liftIO $ getActiveEditor ctx
     liftIO $ maybeDo (syncToEditor ctx) editor
     where syncToEditor ctx editor = maybeDo (syncToFilePath ctx) =<< getEditorFilePath editor

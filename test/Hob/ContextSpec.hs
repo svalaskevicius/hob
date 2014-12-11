@@ -1,16 +1,31 @@
 module Hob.ContextSpec (main, spec) where
 
-import Control.Monad.State
+import Control.Monad.Reader
 import Data.IORef
-import Data.Maybe          (fromJust, isNothing)
+import Data.Maybe           (fromJust, isJust, isNothing)
 import Data.Monoid
-import Graphics.UI.Gtk     (Modifier (..))
+import Graphics.UI.Gtk      (Modifier (..))
 
 import Hob.Context
 
 import Test.Hspec
 
 import HobTest.Context.Default
+
+
+dummyEditor :: Editor
+dummyEditor = Editor
+            { editorId = \_ -> return 1
+            , enterEditorMode = \editor mode -> do
+                    currentModes <- runOnEditor modeStack editor
+                    return $ editor{modeStack = \_ -> return (currentModes ++ [mode])}
+            , exitLastEditorMode = \editor -> do
+                    currentModes <- runOnEditor modeStack editor
+                    return $ editor{modeStack = \_ -> return (init currentModes)}
+            , modeStack      = \_ -> return []
+            , isCurrentlyActive  = \_ -> return True
+            }
+
 
 main :: IO ()
 main = hspec spec
@@ -117,27 +132,30 @@ spec = do
                     deferCommand countingCommand))
             invokeCount <- readIORef record
             invokeCount `shouldBe` (3::Int)
-            
-    describe "context commands" $ do
-        it "enters given mode" $ do
-            record <- newIORef Nothing
-            ctx <- loadDefaultContext
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx $ activeModes >>= (\modes -> liftIO $ writeIORef record $ Just modes)
-            mode <- readIORef record
-            (modeName . last . fromJust) mode `shouldBe` "testmode"
 
-        it "invokes mode teardown on exitMode" $ do
-            record <- newIORef False
-            ctx <- loadDefaultContext
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
-            deferredRunner ctx $ exitLastMode
-            cleanupInvoked <- readIORef record
-            cleanupInvoked `shouldBe` True
+    describe "context commands" $ do
+        it "returns Nothing for list of modes if there are no editors" $ do
+            ctx <- loadContextWithEditors []
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            modes <- getActiveModes ctx
+            isNothing modes `shouldBe` True
+
+        it "enters given mode to the active editor" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            modes <- getActiveModes ctx
+            (modeName . last . fromJust) modes `shouldBe` "testmode"
+
+        it "removes mode from the active editor on exitMode" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            deferredRunner ctx exitLastMode
+            modes <- getActiveModes ctx
+            (length . fromJust) modes `shouldBe` 0
 
         it "emits mode change event on entering a mode" $ do
             record <- newIORef False
-            ctx <- loadDefaultContext
+            ctx <- loadContextWithEditors [dummyEditor]
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             invoked <- readIORef record
@@ -145,13 +163,33 @@ spec = do
 
         it "emits mode change event on exiting a mode" $ do
             record <- newIORef False
-            ctx <- loadDefaultContext
+            ctx <- loadContextWithEditors [dummyEditor]
             deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
             deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
-            deferredRunner ctx $ exitLastMode
+            deferredRunner ctx exitLastMode
             invoked <- readIORef record
             invoked `shouldBe` True
-            
+
+    describe "active command matcher retriever" $ do
+        it "retains base command matcher" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            commands <- runApp ctx getActiveCommands
+            let cmd = matchKeyBinding commands ([Control], "Tab")
+            isJust cmd `shouldBe` True
+
+        it "retrieves active mode command matcher" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            readHandledText <- enterRecordingMode ctx "testMode1" "hi" "test"
+            handledText <- executeActiveRecordingHandler ctx "hi" readHandledText
+            handledText `shouldBe` Just "test"
+
+        it "retrieves last active mode command first" $ do
+            ctx <- loadContextWithEditors [dummyEditor]
+            _ <- enterRecordingMode ctx "testMode1" "hi" "test1"
+            readHandledText <- enterRecordingMode ctx "testMode2" "hi" "test2"
+            handledText <- executeActiveRecordingHandler ctx "hi" readHandledText
+            handledText `shouldBe` Just "test2"
 
     describe "event handler support" $ do
         it "invokes a registered handler on fireEvent" $ do
@@ -161,7 +199,7 @@ spec = do
             deferredRunner ctx $ emitEvent (Event "test.event")
             invoked <- readIORef record
             invoked `shouldBe` True
-            
+
         it "does not invoke an event handler with different name" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
@@ -169,7 +207,19 @@ spec = do
             deferredRunner ctx $ emitEvent (Event "test.event2")
             invoked <- readIORef record
             invoked `shouldBe` False
-            
+
+loadContextWithEditors :: [Editor] -> IO Context
+loadContextWithEditors newEditors = do
+    ctx <- loadDefaultContext
+    updateEditors (editors ctx) $ const $ return newEditors
+    return ctx
+
+getActiveModes :: Context -> IO (Maybe [Mode])
+getActiveModes ctx = do
+    record <- newIORef Nothing
+    deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
+    Just modes <- readIORef record
+    return modes
 
 executeMockedMatcher :: String -> String -> IO (Maybe String)
 executeMockedMatcher prefix text = do
@@ -209,3 +259,17 @@ executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) 
 executeRecordingHandler ctx handler readHandledText = do
     deferredRunner ctx $ commandExecute $ fromJust handler
     readHandledText
+
+executeActiveRecordingHandler :: Context -> String -> IO (Maybe String) -> IO (Maybe String)
+executeActiveRecordingHandler ctx cmd readHandledText = do
+    commands <- runApp ctx getActiveCommands
+    let command = matchCommand commands cmd
+    executeRecordingHandler ctx command readHandledText
+
+enterRecordingMode :: Context -> String -> String -> String -> IO (IO (Maybe String))
+enterRecordingMode ctx modename cmd resp = do
+    (handler, readHandledText) <- recordingHandler
+    let matcher = createMatcherForCommand cmd $ handler resp
+    runApp ctx $ enterMode $ Mode modename matcher $ return()
+    return readHandledText
+

@@ -2,13 +2,16 @@ module Hob.Ui.EditorSpec (main, spec) where
 
 import Test.Hspec
 
+import Control.Monad.Reader
+import Data.IORef
 import Data.Maybe
+import Data.Monoid
 import Data.Text                  (pack, unpack)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.SourceView (SourceView, castToSourceBuffer,
                                    sourceBufferUndo)
 
-import qualified Hob.Context           as HC
+import           Hob.Context
 import qualified Hob.Context.UiContext as HC
 import           Hob.Ui
 import           Hob.Ui.Editor
@@ -46,6 +49,12 @@ spec =
       activeEditor <- getActiveEditor ctx
       fromJust activeEditor == editor `shouldBe` True
 
+    it "registers the new editor in the context on creation" $ do
+      ctx <- loadDefaultContext
+      _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      registeredEditors <- getEditors $ editors ctx
+      length registeredEditors `shouldBe` 1
+
     it "retrieves editor text" $ do
       ctx <- loadDefaultContext
       editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
@@ -79,7 +88,18 @@ spec =
       filePath1 `shouldBe` Just "/xxx/testName.hs"
       filePath2 `shouldBe` Just "/tmp/xxx"
 
-launchNewFileAndSetModified :: IO HC.Context
+
+    it "invokes mode teardown on exitMode" $ do
+      record <- newIORef False
+      ctx <- loadDefaultContext
+      editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
+      widgetGrabFocus editor
+      deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
+      deferredRunner ctx exitLastMode
+      cleanupInvoked <- readIORef record
+      cleanupInvoked `shouldBe` True
+
+launchNewFileAndSetModified :: IO Context
 launchNewFileAndSetModified = do
     ctx <- loadDefaultContext
     _ <- launchEditorTab ctx $ Just "/xxx/testName.hs"
@@ -87,14 +107,16 @@ launchNewFileAndSetModified = do
     textBufferSetModified buffer True
     return ctx
 
-launchEditorTab :: HC.Context -> Maybe FilePath -> IO SourceView
+launchEditorTab :: Context -> Maybe FilePath -> IO SourceView
 launchEditorTab ctx file = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
-    newEditorForText ctx notebook file $ pack "initial text"
+    let notebook = HC.mainNotebook . uiContext $ ctx
+    deferredRunner ctx $ newEditorForText notebook file $ pack "initial text"
+    mEditor <- getActiveEditor ctx
+    return $ fromJust mEditor
 
-getActiveEditorTabText :: HC.Context  -> IO String
+getActiveEditorTabText :: Context  -> IO String
 getActiveEditorTabText ctx = do
-    let notebook = HC.mainNotebook . HC.uiContext $ ctx
+    let notebook = HC.mainNotebook . uiContext $ ctx
     currentlyActiveEditor <- getActiveEditorTab ctx
     text <- notebookGetTabLabelText notebook $ fromJust currentlyActiveEditor
     return $ fromJust text

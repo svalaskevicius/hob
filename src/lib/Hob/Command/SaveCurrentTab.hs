@@ -3,10 +3,9 @@ module Hob.Command.SaveCurrentTab (
         saveCurrentEditorTab,
         saveCurrentEditorTabHandler) where
 
-import qualified Control.Monad.State        as S
-import           Control.Monad.Trans        (liftIO)
-import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceView)
+import Control.Monad.Reader
+import Graphics.UI.Gtk
+import Graphics.UI.Gtk.SourceView (SourceView)
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -18,7 +17,7 @@ type NewFileNameChooser = IO (Maybe FilePath)
 
 saveCurrentEditorTab :: CommandHandler
 saveCurrentEditorTab = CommandHandler Nothing (do
-    ctx <- S.get
+    ctx <- ask
     saveCurrentEditorTabHandler $ fileChooser ctx)
     where
         fileChooser :: Context -> IO (Maybe FilePath)
@@ -31,14 +30,14 @@ saveCurrentEditorTab = CommandHandler Nothing (do
 
 saveCurrentEditorTabHandler :: NewFileNameChooser -> App()
 saveCurrentEditorTabHandler newFileNameChooser = do
-    ctx <- S.get
+    ctx <- ask
     maybeEditor <- liftIO $ getActiveEditor ctx
     maybeDo (saveInContext newFileNameChooser) maybeEditor
 
 
 saveInContext :: NewFileNameChooser -> SourceView -> App ()
 saveInContext newFileNameChooser editor = do
-    ctx <- S.get
+    ctx <- ask
     liftIO $ saveEditor ctx
     where fileWriter ctx = contextFileWriter . fileContext $ ctx
           saveEditor ctx = do

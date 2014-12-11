@@ -5,12 +5,10 @@ module Hob.Command.NewTab (
             NewFileEditorLauncher) where
 
 
-import           Control.Monad       (filterM, (<=<))
-import qualified Control.Monad.State as S
-import           Control.Monad.Trans (liftIO)
-import           Data.Maybe          (mapMaybe)
-import           Data.Text           (pack)
-import           Graphics.UI.Gtk
+import Control.Monad.Reader
+import Data.Maybe           (mapMaybe)
+import Data.Text            (pack)
+import Graphics.UI.Gtk
 
 import Hob.Context
 import Hob.Context.FileContext
@@ -26,15 +24,13 @@ editNewFileCommandHandler = CommandHandler Nothing editNewFile
 launchNewFileEditor :: Context -> Notebook -> NewFileEditorLauncher
 launchNewFileEditor ctx targetNotebook filePath = do
     let fileLoader = contextFileLoader . fileContext $ ctx
-    editors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
-    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts editors
+    currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
+    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts currentEditors
     case alreadyLoadedPage editorsForFile of
         Just nr -> notebookSetCurrentPage targetNotebook nr
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
-    where launchEditor text = do
-              _ <- newEditorForText ctx targetNotebook (Just filePath) text
-              return ()
+    where launchEditor text = deferredRunner ctx $ newEditorForText targetNotebook (Just filePath) text
           isEditorFileMatching editor = do
               f <- getEditorFilePath editor
               return $ maybe False (filePath ==) f
@@ -43,10 +39,9 @@ launchNewFileEditor ctx targetNotebook filePath = do
 
 editNewFile :: App()
 editNewFile = do
-    ctx <- S.get
+    ctx <- ask
     let tabbed = mainNotebook.uiContext $ ctx
-    _ <- liftIO $ newEditorForText ctx tabbed Nothing $ pack ""
-    return ()
+    newEditorForText tabbed Nothing $ pack ""
 
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (x, Just y) = Just (x, y)
