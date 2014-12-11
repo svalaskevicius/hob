@@ -44,6 +44,7 @@ loadGui fileCtx styleCtx = do
 
         ctx <- initCtx builder defaultCommands
         initMainWindow ctx
+        initEditingArea ctx
         initSidebar ctx
         initCommandEntry ctx
         initActiveModesMonitor ctx
@@ -99,19 +100,27 @@ loadGui fileCtx styleCtx = do
                 else return False
             return ()
 
+        initEditingArea ctx = do
+            let mainEditNotebook = mainNotebook . uiContext $ ctx
+            _ <- mainEditNotebook `on` switchPage $ const $ deferredRunner ctx (emitEvent $ Event "core.editor.focused")
+            return ()
+            
         invokeKeyCommand ctx command = liftIO . runApp ctx $ do
                                          activeCommands <- getActiveCommands
                                          maybe (return False)
                                            (\cmd -> commandExecute cmd >> return True) $
                                            matchKeyBinding activeCommands command
 
-        initActiveModesMonitor ctx =
-            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") $ do
-                activeCtx <- ask
-                modes <- activeModes
-                let modesUi = activeModesLabel . uiContext $ activeCtx
-                let modesToString = intercalate " | " . filter (not . null) . map modeName
-                liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
+        initActiveModesMonitor ctx = deferredRunner ctx $ do
+            registerEventHandler (Event "core.editor.focused") refreshModesLabel
+            registerEventHandler (Event "core.mode.change") refreshModesLabel
+            
+        refreshModesLabel = do
+            activeCtx <- ask
+            modes <- activeModes
+            let modesUi = activeModesLabel . uiContext $ activeCtx
+            let modesToString = intercalate " | " . filter (not . null) . map modeName
+            liftIO $ labelSetText modesUi $ maybe "-" modesToString modes
 
         defaultCommands = mconcat $ [
                                     createMatcherForKeyBinding ([Control], "w") closeCurrentEditorTab,

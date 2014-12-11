@@ -59,7 +59,10 @@ gtkEditor sourceView = Editor
 
             , modeStack  = const . liftIO $ getEditorModes sourceView
 
-            , isCurrentlyActive = const . liftIO $ widgetGetIsFocus sourceView
+            , isCurrentlyActive = const $ do
+                ctx <- ask
+                active <- liftIO $ getActiveEditor ctx
+                return $ active == (Just sourceView)
             }
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()

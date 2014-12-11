@@ -32,7 +32,7 @@ import Hob.DirectoryTree
 
 type App = ReaderT Context IO
 
-newtype Event = Event String deriving (Eq)
+newtype Event = Event String deriving (Eq, Show)
 
 data Editor = Editor {
     editorId           :: Editor -> App Int,

@@ -30,6 +30,7 @@ module Hob.Context (
 import Control.Concurrent.MVar
 import Control.Monad.Reader
 import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Graphics.UI.Gtk (postGUIAsync)
 
 import Hob.Context.CommandMatcher
 import Hob.Context.Editor
@@ -70,7 +71,7 @@ runMessage :: Context -> Message -> IO Context
 runMessage  ctx (AppAction action) = runApp ctx action >> return ctx
 
 deferredRunner :: Context -> App() -> IO()
-deferredRunner ctx actions = messageLoop ctx ctx $ AppAction actions
+deferredRunner ctx actions = postGUIAsync $ messageLoop ctx ctx $ AppAction actions
 
 initIdGenerator :: IO (IO Int)
 initIdGenerator = do
