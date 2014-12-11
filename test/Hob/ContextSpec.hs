@@ -11,6 +11,7 @@ import Hob.Context
 import Test.Hspec
 
 import HobTest.Context.Default
+import HobTest.Control
 
 
 dummyEditor :: Editor
@@ -120,13 +121,13 @@ spec = do
     describe "app runner" $ do
         it "runs empty monad" $ do
             ctx <- loadDefaultContext
-            deferredRunner ctx $ return ()
+            runCtxActions ctx $ return ()
 
         it "can defer command execution to IO" $ do
             record <- newIORef (0::Int)
             ctx <- loadDefaultContext
             let countingCommand = liftIO $ modifyIORef record (+1)
-            let deferCommand cmd = liftIO $ deferredRunner ctx cmd
+            let deferCommand cmd = liftIO $ runCtxActions ctx cmd
             deferCommand (countingCommand >>
                 deferCommand (countingCommand >>
                     deferCommand countingCommand))
@@ -136,44 +137,44 @@ spec = do
     describe "context commands" $ do
         it "returns Nothing for list of modes if there are no editors" $ do
             ctx <- loadContextWithEditors []
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
             modes <- getActiveModes ctx
             isNothing modes `shouldBe` True
 
         it "enters given mode to the active editor" $ do
             ctx <- loadContextWithEditors [dummyEditor]
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
             modes <- getActiveModes ctx
             (modeName . last . fromJust) modes `shouldBe` "testmode"
 
         it "removes mode from the active editor on exitMode" $ do
             ctx <- loadContextWithEditors [dummyEditor]
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx exitLastMode
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx exitLastMode
             modes <- getActiveModes ctx
             (length . fromJust) modes `shouldBe` 0
 
         it "emits mode change event on entering a mode" $ do
             record <- newIORef False
             ctx <- loadContextWithEditors [dummyEditor]
-            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
             invoked <- readIORef record
             invoked `shouldBe` True
 
         it "emits mode change event on exiting a mode" $ do
             record <- newIORef False
             ctx <- loadContextWithEditors [dummyEditor]
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
-            deferredRunner ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
-            deferredRunner ctx exitLastMode
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx $ registerEventHandler (Event "core.mode.change") (liftIO $ writeIORef record True)
+            runCtxActions ctx exitLastMode
             invoked <- readIORef record
             invoked `shouldBe` True
 
     describe "active command matcher retriever" $ do
         it "retains base command matcher" $ do
             ctx <- loadContextWithEditors [dummyEditor]
-            deferredRunner ctx $ enterMode $ Mode "testmode" mempty $ return()
+            runCtxActions ctx $ enterMode $ Mode "testmode" mempty $ return()
             commands <- runApp ctx getActiveCommands
             let cmd = matchKeyBinding commands ([Control], "Tab")
             isJust cmd `shouldBe` True
@@ -195,16 +196,16 @@ spec = do
         it "invokes a registered handler on fireEvent" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
-            deferredRunner ctx $ registerEventHandler (Event "test.event") (liftIO $ writeIORef record True)
-            deferredRunner ctx $ emitEvent (Event "test.event")
+            runCtxActions ctx $ registerEventHandler (Event "test.event") (liftIO $ writeIORef record True)
+            runCtxActions ctx $ emitEvent (Event "test.event")
             invoked <- readIORef record
             invoked `shouldBe` True
 
         it "does not invoke an event handler with different name" $ do
             record <- newIORef False
             ctx <- loadDefaultContext
-            deferredRunner ctx $ registerEventHandler (Event "test.event1") (liftIO $ writeIORef record True)
-            deferredRunner ctx $ emitEvent (Event "test.event2")
+            runCtxActions ctx $ registerEventHandler (Event "test.event1") (liftIO $ writeIORef record True)
+            runCtxActions ctx $ emitEvent (Event "test.event2")
             invoked <- readIORef record
             invoked `shouldBe` False
 
@@ -217,7 +218,7 @@ loadContextWithEditors newEditors = do
 getActiveModes :: Context -> IO (Maybe [Mode])
 getActiveModes ctx = do
     record <- newIORef Nothing
-    deferredRunner ctx $ activeModes >>= (liftIO . writeIORef record . Just)
+    runCtxActions ctx $ activeModes >>= (liftIO . writeIORef record . Just)
     Just modes <- readIORef record
     return modes
 
@@ -227,7 +228,7 @@ executeMockedMatcher prefix text = do
     (handler, readHandledText) <- recordingHandler
     let matcher = createMatcherForPrefix prefix handler
     let matchedHandler = matchCommand matcher text
-    deferredRunner ctx $ commandExecute $ fromJust matchedHandler
+    runCtxActions ctx $ commandExecute $ fromJust matchedHandler
     readHandledText
 
 expectCommandHandler :: Maybe CommandHandler -> Expectation
@@ -257,7 +258,7 @@ recordingHandler = do
 
 executeRecordingHandler :: Context -> Maybe CommandHandler -> IO (Maybe String) -> IO (Maybe String)
 executeRecordingHandler ctx handler readHandledText = do
-    deferredRunner ctx $ commandExecute $ fromJust handler
+    runCtxActions ctx $ commandExecute $ fromJust handler
     readHandledText
 
 executeActiveRecordingHandler :: Context -> String -> IO (Maybe String) -> IO (Maybe String)

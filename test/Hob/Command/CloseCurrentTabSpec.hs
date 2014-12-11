@@ -10,6 +10,7 @@ import           Hob.Context
 import qualified Hob.Context.UiContext       as HC
 
 import HobTest.Context.Stubbed
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -20,7 +21,7 @@ spec =
         it "closes the currently active editor tab" $ do
             ctx <- loadStubbedContext
             launchEditorTab ctx "/xxx/testName.hs"
-            deferredRunner ctx $ commandExecute closeCurrentEditorTab
+            runCtxActions ctx $ commandExecute closeCurrentEditorTab
             pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
             pagesAfterActivatingDirectory `shouldBe` 0
 

@@ -11,6 +11,7 @@ import qualified Hob.Context.UiContext        as HC
 import Test.Hspec
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -42,12 +43,12 @@ spec =
 
 focusPreviousTab :: Context -> IO Int
 focusPreviousTab ctx = do
-    deferredRunner ctx $ commandExecute focusPreviousTabCommandHandler
+    runCtxActions ctx $ commandExecute focusPreviousTabCommandHandler
     let notebook = HC.mainNotebook . uiContext $ ctx
     notebookGetCurrentPage notebook
 
 loadGuiWithNTabs :: Int -> IO Context
 loadGuiWithNTabs n = do
     ctx <- loadDefaultContext
-    replicateM_ n $ deferredRunner ctx editNewFile
+    replicateM_ n $ runCtxActions ctx editNewFile
     return ctx

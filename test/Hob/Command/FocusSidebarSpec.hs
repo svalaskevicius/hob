@@ -10,6 +10,7 @@ import Test.Hspec
 
 import HobTest.Context.Default
 import HobTest.Context.Stubbed
+import HobTest.Control
 import HobTest.Editor
 
 main :: IO ()
@@ -37,11 +38,11 @@ sidebarFocusState = widgetGetIsFocus . HC.sidebarTree . uiContext
 
 focusSidebarAndReturnState :: Context -> IO Bool
 focusSidebarAndReturnState ctx = do
-    deferredRunner ctx $ commandExecute focusSidebarCommandHandler
+    runCtxActions ctx $ commandExecute focusSidebarCommandHandler
     sidebarFocusState ctx
 
 syncSidebarAndReturnSelectedPath :: Context -> IO TreePath
 syncSidebarAndReturnSelectedPath ctx = do
-    deferredRunner ctx $ commandExecute syncFocusSidebarCommandHandler
+    runCtxActions ctx $ commandExecute syncFocusSidebarCommandHandler
     pos <- treeViewGetCursor . HC.sidebarTree . uiContext $ ctx
     return $ fst pos

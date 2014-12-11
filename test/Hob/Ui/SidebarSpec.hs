@@ -6,6 +6,7 @@ import Graphics.UI.Gtk
 
 import qualified Hob.Context           as HC
 import qualified Hob.Context.UiContext as HC
+import           Hob.Control
 import           Hob.Ui.Editor
 
 import Test.Hspec
@@ -27,6 +28,7 @@ spec =
     it "opens a file editor" $ do
       ctx <- loadStubbedContext
       activateDirectoryPath ctx [1]
+      flushEvents
       editorText <- getActiveEditorText ctx
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
 

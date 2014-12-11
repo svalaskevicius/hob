@@ -7,11 +7,13 @@ import Graphics.UI.Gtk.General.StyleContext
 
 import Hob.Context
 import Hob.Context.UiContext
+import Hob.Control
 import Hob.Ui.CommandEntry
 
 import Test.Hspec
 
 import HobTest.Context.Default
+import HobTest.Control
 
 type CommandHandlerReaders = (IO (Maybe String), IO (Maybe String), IO (Maybe String))
 type EntryApi = (App(), App())
@@ -36,18 +38,22 @@ spec =
     it "applies error style class if the command is unknown" $ do
       ctx <- loadDefaultContext
       let entry = commandEntry . uiContext $ ctx
+      flushEvents
       entrySetText entry "qweqwe"
       styleCtx <- widgetGetStyleContext entry
+      flushEvents
       hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` True
 
     it "removes error style on empty command" $ do
       ctx <- loadDefaultContext
       let entry = commandEntry . uiContext $ ctx
+      flushEvents
       entrySetText entry "not empty"
       styleCtx <- widgetGetStyleContext entry
       styleContextAddClass styleCtx "error"
       entrySetText entry ""
+      flushEvents
       hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
@@ -55,13 +61,13 @@ spec =
       (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
       styleCtx <- widgetGetStyleContext entry
       styleContextAddClass styleCtx "error"
-      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokePreview entry entryApi "cmd->asd"
       hasErrorClass <- styleContextHasClass styleCtx "error"
       hasErrorClass `shouldBe` False
 
     it "invokes preview on the command" $ do
       (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokePreview entry entryApi "cmd->asd"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "asd"
@@ -69,8 +75,8 @@ spec =
 
     it "resets preview before next preview" $ do
       (ctx, entry, entryApi, (_, previewReader, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      deferredRunner ctx $ invokePreview entry entryApi "cmd->asd"
-      deferredRunner ctx $ invokePreview entry entryApi "cmd->as"
+      runCtxActions ctx $ invokePreview entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokePreview entry entryApi "cmd->as"
       previewText <- previewReader
       previewResetText <- previewResetReader
       previewText `shouldBe` Just "as"
@@ -78,19 +84,19 @@ spec =
 
     it "executes the command" $ do
       (ctx, entry, entryApi, (executeReader, _, _)) <- loadDefaultGuiWithMockedCommand
-      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       executed `shouldBe` Just "asd"
 
     it "clears command entry when executing a command" $ do
       (ctx, entry, entryApi, _) <- loadDefaultGuiWithMockedCommand
-      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokeCommand entry entryApi "cmd->asd"
       text <- entryGetText entry
       text `shouldBe` ""
 
     it "resets the last preview command before executing a command" $ do
       (ctx, entry, entryApi, (executeReader, _, previewResetReader)) <- loadDefaultGuiWithMockedCommand
-      deferredRunner ctx $ invokeCommand entry entryApi "cmd->asd"
+      runCtxActions ctx $ invokeCommand entry entryApi "cmd->asd"
       executed <- executeReader
       previewResetText <- previewResetReader
       executed `shouldBe` Just "asd"

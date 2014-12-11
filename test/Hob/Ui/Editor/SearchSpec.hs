@@ -13,6 +13,7 @@ import           Hob.Ui.Editor         (getActiveEditor, newEditorForText)
 import           Hob.Ui.Editor.Search
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -164,7 +165,7 @@ ensureCursorVisibleAfter commands = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
     let editorText = (concat . replicate 1000  $ "text - initial text! \n") ++ "customised search string at the end\n"
-    deferredRunner ctx $ newEditorForText notebook Nothing $ pack editorText
+    runCtxActions ctx $ newEditorForText notebook Nothing $ pack editorText
     processGtkEvents
     withActiveEditor ctx commands
     processGtkEvents
@@ -179,7 +180,7 @@ loadGuiAndPreviewSearch :: IO (Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
-    deferredRunner ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
+    runCtxActions ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
     Just editor <- getActiveEditor ctx
     highlightSearchPreview editor "text"
     buffer <- textViewGetBuffer editor

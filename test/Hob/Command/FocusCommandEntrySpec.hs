@@ -12,6 +12,7 @@ import           Hob.Ui
 import Test.Hspec
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -26,13 +27,13 @@ spec =
 
     it "focus stays on toggle if there is no editor to focus to" $ do
       ctx <- loadDefaultContext
-      deferredRunner ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
+      runCtxActions ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
       focused <- toggleFocusOnCommandEntryAndReturnState ctx
       focused `shouldBe` True
 
     it "focus moves to editor on toggle" $ do
       ctx <- launchNewFile
-      deferredRunner ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
+      runCtxActions ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
       commandFocused <- toggleFocusOnCommandEntryAndReturnState ctx
       editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
       commandFocused `shouldBe` False
@@ -41,10 +42,10 @@ spec =
 launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
-    deferredRunner ctx editNewFile
+    runCtxActions ctx editNewFile
     return ctx
 
 toggleFocusOnCommandEntryAndReturnState :: Context -> IO Bool
 toggleFocusOnCommandEntryAndReturnState ctx = do
-    deferredRunner ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
+    runCtxActions ctx $ commandExecute toggleFocusOnCommandEntryCommandHandler
     widgetGetIsFocus $ HC.commandEntry . uiContext $ ctx

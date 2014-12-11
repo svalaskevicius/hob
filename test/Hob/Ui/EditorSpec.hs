@@ -17,6 +17,7 @@ import           Hob.Ui
 import           Hob.Ui.Editor
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -94,8 +95,8 @@ spec =
       ctx <- loadDefaultContext
       editor <- launchEditorTab ctx $ Just "/xxx/testName.hs"
       widgetGrabFocus editor
-      deferredRunner ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
-      deferredRunner ctx exitLastMode
+      runCtxActions ctx $ enterMode $ Mode "testmode" mempty (liftIO $ writeIORef record True)
+      runCtxActions ctx exitLastMode
       cleanupInvoked <- readIORef record
       cleanupInvoked `shouldBe` True
 
@@ -110,7 +111,7 @@ launchNewFileAndSetModified = do
 launchEditorTab :: Context -> Maybe FilePath -> IO SourceView
 launchEditorTab ctx file = do
     let notebook = HC.mainNotebook . uiContext $ ctx
-    deferredRunner ctx $ newEditorForText notebook file $ pack "initial text"
+    runCtxActions ctx $ newEditorForText notebook file $ pack "initial text"
     mEditor <- getActiveEditor ctx
     return $ fromJust mEditor
 

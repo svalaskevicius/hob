@@ -13,6 +13,7 @@ import           Hob.DirectoryTree
 import Test.Hspec
 
 import HobTest.Context.Stubbed
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -25,7 +26,7 @@ spec =
       values <- getDirectoryListingSidebarRootItems ctx
       values `shouldBe` ["a","c","-"]
       let ctx' = replaceStubbedTree ctx
-      deferredRunner ctx' $ commandExecute reloadSidebarTreeCommandHandler
+      runCtxActions ctx' $ commandExecute reloadSidebarTreeCommandHandler
       values' <- getDirectoryListingSidebarRootItems ctx'
       values' `shouldBe` ["b","c"]
 

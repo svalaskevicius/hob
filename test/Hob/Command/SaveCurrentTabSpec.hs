@@ -11,12 +11,14 @@ import           Hob.Context
 import qualified Hob.Context.FileContext    as HFC
 import qualified Hob.Context.StyleContext   as HSC
 import qualified Hob.Context.UiContext      as HUC
+import           Hob.Control
 import           Hob.Ui
 
 import Test.Hspec
 
 import HobTest.Context.Default
 import HobTest.Context.Stubbed
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -29,7 +31,7 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader mockedWriter emptyFileTree
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
-      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
+      runCtxActions ctx $ saveCurrentEditorTabHandler emptyFileChooser
       savedFile <- mockReader
       savedFile `shouldBe` Just ("/xxx/testName.hs", pack "file contents for /xxx/testName.hs")
 
@@ -37,15 +39,16 @@ spec =
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext emptyFileLoader failingFileWriter emptyFileTree
       ctx <- loadGui fc sc
-      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
+      runCtxActions ctx $ saveCurrentEditorTabHandler emptyFileChooser
 
     it "marks buffer as unmodified on save" $ do
       sc <- HSC.defaultStyleContext "app-data"
       fc <- HFC.defaultFileContext stubbedFileLoader blackholeFileWriter emptyFileTree
       ctx <- launchFileInContext fc sc "/xxx/testName.hs"
+      flushEvents
       buffer <- textViewGetBuffer . fromJust =<< getActiveEditor ctx
       textBufferSetModified buffer True
-      deferredRunner ctx $ saveCurrentEditorTabHandler emptyFileChooser
+      runCtxActions ctx $ saveCurrentEditorTabHandler emptyFileChooser
       stateAfterSave <- textBufferGetModified buffer
       stateAfterSave `shouldBe` False
 
@@ -77,8 +80,8 @@ launchFileInContext fileCtx styleCtx filename = do
 launchNewFileInContextAndSaveAs :: HFC.FileContext -> HSC.StyleContext -> String -> IO Context
 launchNewFileInContextAndSaveAs fileCtx styleCtx filename = do
     ctx <- loadGui fileCtx styleCtx
-    deferredRunner ctx editNewFile
-    deferredRunner ctx $ saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename)
+    runCtxActions ctx editNewFile
+    runCtxActions ctx $ saveCurrentEditorTabHandler (stubbedFileChooser $ Just filename)
     return ctx
 
 launchEditorTab :: Context -> String -> IO ()

@@ -11,11 +11,12 @@ import Hob.Context
 import Hob.Context.UiContext
 
 import HobTest.Context.Default
+import HobTest.Control
 
 launchNewFile :: IO Context
 launchNewFile = do
     ctx <- loadDefaultContext
-    deferredRunner ctx $ commandExecute editNewFileCommandHandler
+    runCtxActions ctx $ commandExecute editNewFileCommandHandler
     return ctx
 
 launchEditorTab :: Context -> String -> IO ()

@@ -14,6 +14,7 @@ import           Hob.Ui                (getActiveEditor)
 import           Hob.Ui.Editor         (newEditorForText)
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -29,15 +30,15 @@ spec = do
     it "enters the search mode" $ do
       (ctx, _) <- loadGuiAndExecuteSearch
       ref <- newIORef Nothing
-      deferredRunner ctx $ activeModes >>= (liftIO . writeIORef ref)
+      runCtxActions ctx $ activeModes >>= (liftIO . writeIORef ref)
       modes <- readIORef ref
       (modeName . last . fromJust) modes `shouldBe` "search"
 
   describe "search reset command on mode exit" $
     it "stops the next search" $ do
       (ctx, buffer) <- loadGuiAndExecuteSearch
-      deferredRunner ctx exitLastMode
-      deferredRunner ctx $ commandExecute searchNextCommandHandler
+      runCtxActions ctx exitLastMode
+      runCtxActions ctx $ commandExecute searchNextCommandHandler
       (start, end) <- getSelectionOffsets buffer
       (start, end) `shouldBe` (0, 4)
 
@@ -45,20 +46,20 @@ loadGuiAndPreviewSearch :: IO (Context, TextBuffer)
 loadGuiAndPreviewSearch = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
-    deferredRunner ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
+    runCtxActions ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
     mEditor <- getActiveEditor ctx
     let editor = fromJust mEditor
-    deferredRunner ctx $ (previewExecute . fromJust . commandPreview) (searchCommandHandler "text")
+    runCtxActions ctx $ (previewExecute . fromJust . commandPreview) (searchCommandHandler "text")
     buffer <- textViewGetBuffer editor
     return (ctx, buffer)
 
 loadGuiAndExecuteSearch :: IO (Context, TextBuffer)
 loadGuiAndExecuteSearch = do
     (ctx, buffer) <- loadGuiAndPreviewSearch
-    deferredRunner ctx $ (previewReset . fromJust . commandPreview) (searchCommandHandler "text")
+    runCtxActions ctx $ (previewReset . fromJust . commandPreview) (searchCommandHandler "text")
     iterBufferStart <- textBufferGetIterAtOffset buffer 0
     textBufferSelectRange buffer iterBufferStart iterBufferStart
-    deferredRunner ctx $ commandExecute (searchCommandHandler "text")
+    runCtxActions ctx $ commandExecute (searchCommandHandler "text")
     return (ctx, buffer)
 
 getSelectionOffsets :: TextBuffer -> IO (Int, Int)

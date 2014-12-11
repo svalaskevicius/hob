@@ -13,6 +13,7 @@ import qualified Hob.Context.UiContext   as HC
 import           Hob.Ui.Editor           (getActiveEditor, newEditorForText)
 
 import HobTest.Context.Default
+import HobTest.Control
 
 main :: IO ()
 main = hspec spec
@@ -41,7 +42,7 @@ spec = do
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S/R"
         ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (fromJust matchResult)
+        runCtxActions ctx $ commandExecute (fromJust matchResult)
 
     it "ignores options when parsing search and replace strings" $ do
         let handler "S" "R" = CommandHandler Nothing (return())
@@ -49,7 +50,7 @@ spec = do
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x#S#R#options"
         ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (fromJust matchResult)
+        runCtxActions ctx $ commandExecute (fromJust matchResult)
 
     it "matches escaped separator char as text" $ do
         let handler "S/S" "R/R" = CommandHandler Nothing (return())
@@ -57,7 +58,7 @@ spec = do
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S\\/S/R\\/R"
         ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (fromJust matchResult)
+        runCtxActions ctx $ commandExecute (fromJust matchResult)
 
     it "matches escaped any char as escape seq and text" $ do
         let handler "S\\xS" "R\\xR" = CommandHandler Nothing (return())
@@ -65,7 +66,7 @@ spec = do
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S\\xS/R\\xR"
         ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (fromJust matchResult)
+        runCtxActions ctx $ commandExecute (fromJust matchResult)
 
     it "matches escaped end of string as text" $ do
         let handler "S" "R\\" = CommandHandler Nothing (return())
@@ -73,20 +74,20 @@ spec = do
             matcher = createMatcherForReplace 'x' handler
             matchResult = matchCommand matcher "x/S/R\\"
         ctx <- loadDefaultContext
-        deferredRunner ctx $ commandExecute (fromJust matchResult)
+        runCtxActions ctx $ commandExecute (fromJust matchResult)
 
   describe "replace text command handler" $ do
     it "focuses editor on execute" $ do
         (ctx, _) <- loadGuiWithEditor
-        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
+        runCtxActions ctx $ commandExecute (replaceCommandHandler "text" ":)")
         editorFocused <- widgetGetIsFocus . fromJust =<< getActiveEditor ctx
         editorFocused `shouldBe` True
 
     it "sets replace mode" $ do
         (ctx, _) <- loadGuiWithEditor
-        deferredRunner ctx $ commandExecute (replaceCommandHandler "text" ":)")
+        runCtxActions ctx $ commandExecute (replaceCommandHandler "text" ":)")
         ref <- newIORef Nothing
-        deferredRunner ctx $ activeModes >>= (liftIO . writeIORef ref)
+        runCtxActions ctx $ activeModes >>= (liftIO . writeIORef ref)
         modes <- readIORef ref
         (map modeName . fromJust) modes `shouldBe` ["replace"]
 
@@ -94,7 +95,7 @@ loadGuiWithEditor :: IO (Context, TextBuffer)
 loadGuiWithEditor = do
     ctx <- loadDefaultContext
     let notebook = HC.mainNotebook . uiContext $ ctx
-    deferredRunner ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
+    runCtxActions ctx $ newEditorForText notebook Nothing $ pack "text - initial text! text"
     mEditor <- getActiveEditor ctx
     let editor = fromJust mEditor
     buffer <- textViewGetBuffer editor
