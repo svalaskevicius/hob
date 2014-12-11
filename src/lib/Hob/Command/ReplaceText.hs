@@ -48,10 +48,10 @@ replaceNextCommandHandler = CommandHandler Nothing invokeReplaceNext
 
 replaceStart :: String -> String -> App()
 replaceStart searchText replaceText = do
+    enterMode replaceMode
     invokeOnActiveEditor $ \editor -> do
         startReplace editor searchText replaceText
         widgetGrabFocus editor
-    enterMode replaceMode
 
 invokeReplaceNext :: App()
 invokeReplaceNext = invokeOnActiveEditor replaceNext

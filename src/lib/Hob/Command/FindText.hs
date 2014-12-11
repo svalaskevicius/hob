@@ -40,8 +40,10 @@ searchPrevious = invokeOnActiveEditor findPrevious
 
 searchStart :: String -> App()
 searchStart text = do
-    invokeOnActiveEditor (\editor -> findFirstFromCursor editor text >> widgetGrabFocus editor)
     enterMode searchMode
+    invokeOnActiveEditor $ \editor -> do
+        findFirstFromCursor editor text
+        widgetGrabFocus editor
 
 searchMode :: Mode
 searchMode = Mode "search" matcher searchReset
