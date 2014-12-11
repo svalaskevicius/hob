@@ -49,7 +49,7 @@ enterMode mode = do
                   editor' <- runOnEditor exitLastEditorMode editor
                   clearEditorModes editor'
               else return editor
-    
+
 activeModes :: App (Maybe [Mode])
 activeModes = do
     active <- currentEditor

@@ -29,8 +29,8 @@ module Hob.Context (
 
 import Control.Concurrent.MVar
 import Control.Monad.Reader
+import Graphics.UI.Gtk          (postGUIAsync)
 import GtkExtras.LargeTreeStore as LTS (TreeStore)
-import           Graphics.UI.Gtk (postGUIAsync)
 
 import Hob.Context.CommandMatcher
 import Hob.Context.Editor

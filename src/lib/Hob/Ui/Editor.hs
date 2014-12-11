@@ -62,7 +62,7 @@ gtkEditor sourceView = Editor
             , isCurrentlyActive = const $ do
                 ctx <- ask
                 active <- liftIO $ getActiveEditor ctx
-                return $ active == (Just sourceView)
+                return $ active == Just sourceView
             }
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()

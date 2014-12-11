@@ -104,7 +104,7 @@ loadGui fileCtx styleCtx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
             _ <- mainEditNotebook `on` switchPage $ const $ deferredRunner ctx (emitEvent $ Event "core.editor.focused")
             return ()
-            
+
         invokeKeyCommand ctx command = liftIO . runApp ctx $ do
                                          activeCommands <- getActiveCommands
                                          maybe (return False)
@@ -114,7 +114,7 @@ loadGui fileCtx styleCtx = do
         initActiveModesMonitor ctx = deferredRunner ctx $ do
             registerEventHandler (Event "core.editor.focused") refreshModesLabel
             registerEventHandler (Event "core.mode.change") refreshModesLabel
-            
+
         refreshModesLabel = do
             activeCtx <- ask
             modes <- activeModes
