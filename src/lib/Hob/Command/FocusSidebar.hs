@@ -48,12 +48,12 @@ findFilePath :: TreeModelClass self =>
 findFilePath model filePath iter = do
         path <- treeModelGetValue model iter pathColumn
         if path == filePath then return $ Just iter
-        else if path `isPrefixOf` filePath then matchChildren
+        else if (path++"/") `isPrefixOf` filePath then matchChildren
         else matchNextSibling
     where matchChildren = recurseToMaybeIter =<< treeModelIterChildren model iter
           matchNextSibling = recurseToMaybeIter =<< treeModelIterNext model iter
-          recurseToMaybeIter mIter =
-              case mIter of
-                  Nothing -> return Nothing
-                  (Just it) -> findFilePath model filePath it
+          recurseToMaybeIter Nothing = return Nothing
+          recurseToMaybeIter (Just it) = findFilePath model filePath it
+
+
 

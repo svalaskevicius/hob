@@ -32,6 +32,13 @@ spec =
       path `shouldBe` [0, 0]
       focused `shouldBe` True
 
+    it "can sync the open editor path in sidebar when there is a directory named as the file's basename" $ do
+      ctx <- loadStubbedContext
+      launchEditorTab ctx "/xxx/a.b"
+      path <- syncSidebarAndReturnSelectedPath ctx
+      focused <- sidebarFocusState ctx
+      path `shouldBe` [1]
+      focused `shouldBe` True
 
 sidebarFocusState :: Context -> IO Bool
 sidebarFocusState = widgetGetIsFocus . HC.sidebarTree . uiContext

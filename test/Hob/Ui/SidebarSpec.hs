@@ -27,7 +27,7 @@ spec =
 
     it "opens a file editor" $ do
       ctx <- loadStubbedContext
-      activateDirectoryPath ctx [1]
+      activateDirectoryPath ctx [2]
       flushEvents
       editorText <- getActiveEditorText ctx
       (unpack . fromJust $ editorText) `shouldBe` "file contents for /xxx/c"
@@ -46,7 +46,7 @@ spec =
 
     it "does not open a file editor for files it cannot read" $ do
       ctx <- loadStubbedContext
-      activateDirectoryPath ctx [2]
+      activateDirectoryPath ctx [3]
       pagesAfterActivatingDirectory <- getNumberOfEditorPages ctx
       pagesAfterActivatingDirectory `shouldBe` 0
 

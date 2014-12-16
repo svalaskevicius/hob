@@ -3,8 +3,8 @@ module Hob.Control (
     flushEvents
 ) where
 
+import Control.Monad   (when)
 import Graphics.UI.Gtk (eventsPending, mainIteration)
-import Control.Monad (when)
 
 maybeDo :: Monad b => (a -> b ()) -> Maybe a -> b ()
 maybeDo = maybe (return())

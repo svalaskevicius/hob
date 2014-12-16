@@ -24,7 +24,7 @@ spec =
     it "loads new items in the tree" $ do
       ctx <- loadStubbedContext
       values <- getDirectoryListingSidebarRootItems ctx
-      values `shouldBe` ["a","c","-"]
+      values `shouldBe` ["a", "a.b", "c", "-"]
       let ctx' = replaceStubbedTree ctx
       runCtxActions ctx' $ commandExecute reloadSidebarTreeCommandHandler
       values' <- getDirectoryListingSidebarRootItems ctx'
