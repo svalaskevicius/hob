@@ -38,7 +38,6 @@ spec =
     it "applies error style class if the command is unknown" $ do
       ctx <- loadDefaultContext
       let entry = commandEntry . uiContext $ ctx
-      flushEvents
       entrySetText entry "qweqwe"
       styleCtx <- widgetGetStyleContext entry
       flushEvents
@@ -48,7 +47,6 @@ spec =
     it "removes error style on empty command" $ do
       ctx <- loadDefaultContext
       let entry = commandEntry . uiContext $ ctx
-      flushEvents
       entrySetText entry "not empty"
       styleCtx <- widgetGetStyleContext entry
       styleContextAddClass styleCtx "error"
