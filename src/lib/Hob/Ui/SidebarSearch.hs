@@ -8,7 +8,7 @@ module Hob.Ui.SidebarSearch (
     ) where
 
 import           Data.Char                            (isPrint, toLower)
-import           Data.List                            (sortBy, partition, isPrefixOf)
+import           Data.List                            (sortBy, isPrefixOf)
 import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
@@ -25,8 +25,6 @@ import Hob.Control
 import Hob.Ui.Sidebar       
 import Hob.DirectoryTree
 
-import Debug.Trace
-
 {- | index based on suffix arrays -}
 data LetterIndex = LetterIndex (V.Vector Char) (V.Vector Int) deriving Show
 data SearchIndexNode a = PathNode LetterIndex a (SearchIndex a) | LeafNode LetterIndex a deriving Show
@@ -37,13 +35,12 @@ instance Eq a => Eq (SearchIndexNode a) where
     (PathNode _ a _) == (PathNode _ b _) = a == b
     _ == _ = False
 
-type DirectorySearchIndexNode = SearchIndexNode DirectoryTreeElement
 type DirectorySearchIndex = SearchIndex DirectoryTreeElement
 
 mkIndex :: String -> LetterIndex
 mkIndex s = LetterIndex word indices
      where
-        word = V.fromList . map toLower $ s
+        word = V.fromList . map toLower $ '/':s++"/"
         indices = V.fromList . sortBy indexOrdering . take (V.length word) $ [0..]
         indexOrdering i1 i2 = let c1 = word V.! i1
                                   c2 = word V.! i2
@@ -95,14 +92,11 @@ matchQuery index@(LetterIndex word _) = match 0
                     subMatches = catMaybes . map (\from' -> matchSubString from' q) $ findPossibleStarts from q
 
           findPossibleStarts _ [] = []
-          findPossibleStarts from (c:_) = filter (>=from) $ if c == '/' then [0, highBound+1] 
-                                                            else findOccurrences index c
+          findPossibleStarts from (c:_) = filter (>=from) . findOccurrences index $ c
 
           matchSubString from [] = Just from
           matchSubString from (c:cs) 
-            | c == '/' && from == (1+highBound) && null cs = Just from
             | from > highBound = Nothing
-            | c == '/' && from == 0 = matchSubString from cs 
             | (word V.! from) == c = matchSubString (from+1) cs
             | otherwise = Nothing
 
@@ -121,59 +115,67 @@ buildIndex = fmap addNode
 -- findFirstMatch idx = findMatch idx (const True) (const True) id
 
 findNextMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
-findNextMatch idx previous = findMatch idx previous id
+findNextMatch idx previous = findMatch idx previous
 
 findPreviousMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
-findPreviousMatch idx next = findMatch (reverse idx) next reverse
+findPreviousMatch idx next = findMatch (reverseIndex idx) next
+    where
+        reverseIndex index = map reverseNode . reverse $ index 
+            where
+                reverseNode n@(LeafNode _ _) = n
+                reverseNode (PathNode letterIdx el children) = PathNode letterIdx el $ reverseIndex children
 
 -- 1. navigate to the current dir
 --    a. collect parents on the way
 --    b. use take 1 . filter pathCheck to find correct child to go into
 -- 2. start matching
 --    a. use parents list and starting sibling
-findMatch :: DirectorySearchIndex -> FilePath -> (DirectorySearchIndex -> DirectorySearchIndex) -> [String] -> Maybe DirectoryTreeElement
-findMatch index fromPath childrenFilter q = 
-    let p = reverse . findPath index $ fromPath
-    in trace ("FIND IT: "++(show $ length p)) $ findMatch p
+findMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
+findMatch index fromPath q = matcher (filterFromPath index fromPath) q
     where
-        findMatch [] = matcher index q
-        findMatch [n@(LeafNode _ _)] = matcher (dropWhile (\a -> a /= n) $ index) q
-        findMatch [n@(PathNode _ _ children)] = let nestedMatch = matcher (childrenFilter children) $ matchNode n q
-                                         in if isJust nestedMatch then nestedMatch
-                                            else matcher (dropWhile (\a -> a /= n) $ index) q
-        findMatch (_:n'@(LeafNode _ _):ns) = findMatch (n':ns)
-        findMatch (n:n'@(PathNode idx el children):ns) = let q' = matchNodePath (n':ns) q
-                                                             filteredChildren = dropWhile (\a -> a /= n) . childrenFilter $ children
-                                                             res = matcher filteredChildren q'
-                                                         in if isJust res then res else findMatch (n':ns)
-
-        mmm [] q = matcher [] q 
-        mmm (x:xs) q = trace ("matching "++" "++(show q)) $ matcher (x:xs) q
-        
-        findPath :: DirectorySearchIndex -> FilePath -> [DirectorySearchIndexNode]
-        findPath [] _ = []
-        findPath (node@(LeafNode _ el):is) path
-         | trace ("chk if : "++(show $ elementPath el) ++ " == "++(show path)  ) $ elementPath el == path = [node]
-         | otherwise = findPath is path
-        findPath (node@(PathNode _ el children):is) path
-         | ((elementPath el)) `isPrefixOf` path = node:(findPath children path)
-         | otherwise = findPath is path
+        filterFromPath :: DirectorySearchIndex -> FilePath -> DirectorySearchIndex
+        filterFromPath [] _ = []
+        filterFromPath (node@(LeafNode _ el):is) path
+         | elementPath el == path = node:is
+         | otherwise = filterFromPath is path
+        filterFromPath (node@(PathNode lidx el children):is) path
+         | elementPath el == path = node:is
+         | ((elementPath el)++"/") `isPrefixOf` path = (PathNode lidx el $ filterFromPath children path):is
+         | otherwise = filterFromPath is path
          
-        matchNodePath :: [DirectorySearchIndexNode] -> [String] -> [String]
-        matchNodePath nodes queries = foldr matchNode queries nodes
-
-        matchNode (LeafNode idx _) = matchQuery idx
-        matchNode (PathNode idx _ _) = matchQuery idx
-
         matcher [] _ = Nothing
         matcher ((LeafNode idx el):is) queries
-         | matchSuccess = trace ("final match: "++(show el))$ Just el
-         | otherwise = mmm is queries
-         where matchSuccess = null $ matchQuery idx queries
-        matcher ((PathNode idx el childrenI):is) queries = 
-            maybe (mmm is queries) Just childrenMatch
-         where q' = matchQuery idx queries
-               childrenMatch = trace ("matched "++(show el)) $ mmm (childrenFilter childrenI) q'
+         | matchSuccess = Just el
+         | otherwise = matcher is queries
+            where matchSuccess = null $ matchQuery idx queries
+        matcher ((PathNode idx _ children):is) queries = 
+                maybe (matcher is queries) Just childrenMatch
+            where childrenMatch = matcher children $ matchQuery idx queries
+
+
+prepareQueries :: String -> [String]
+prepareQueries = concatMap breakSlashes . breakSpaces . map toLower
+    where
+        breakSpaces s = case break (== ' ') s of
+                            ([], []) -> []
+                            (a, []) -> [a]
+                            ([], ' ':b) -> breakSpaces b
+                            (a, ' ':b) -> a:(breakSpaces b)
+                            (a, b) -> a:(breakSpaces b)
+        breakSlashes s = case break (== '/') s of
+                            ([], []) -> []
+                            (a, []) -> [a]
+                            ([], '/':b) -> prependToFirst '/' $ breakSlashes b
+                            (a, '/':b) -> (a++"/"):(prependToFirst '/' $ breakSlashes b)
+                            (a, b) -> (a++"/"):(prependToFirst '/' $ breakSlashes b)
+        prependToFirst _ [] = []
+        prependToFirst a ([]:xs) = ((a:[]):xs)
+        prependToFirst a (x@(q:_):xs)
+         | a == q = ([a]:x:xs)
+         | otherwise = ((a:x):xs)
+
+
+
 
 
 newSideBarFileTreeSearch :: Context -> IO ()
@@ -235,7 +237,6 @@ updateSidebarSearch index = invokeOnTreeViewAndModel continueSearch
         continueSearch treeView model = do
             ctx <- ask
             let searchEntry = sidebarTreeSearch.uiContext $ ctx
-            liftIO $ putStrLn "UPDATE!"
             searchString <- liftIO $ entryGetText searchEntry
             maybeFirstIter <- liftIO $ iterOnSelection treeView model
             maybeDo (selectNextMatch index model searchEntry searchString) maybeFirstIter
@@ -282,35 +283,11 @@ invokeOnTreeViewAndModel fnc = do
     model <- liftIO $ treeViewGetModel treeView
     maybeDo (fnc treeView) model
 
-prepareQueries :: String -> [String]
-prepareQueries = concatMap breakSlashes . breakSpaces . map toLower
-    where
-        breakSpaces s = case break (== ' ') s of
-                            ([], []) -> []
-                            (a, []) -> [a]
-                            ([], ' ':b) -> breakSpaces b
-                            (a, ' ':b) -> a:(breakSpaces b)
-                            (a, b) -> a:(breakSpaces b)
-        breakSlashes ('/':'/':s) = "/" : (prependToFirst '/' $ breakSlashes s)
-        breakSlashes s = case break (== '/') s of
-                            ([], []) -> []
-                            (a, []) -> [a]
-                            ([], '/':b) -> prependToFirst '/' $ breakSlashes b
-                            (a, '/':b) -> (a++"/"):(prependToFirst '/' $ breakSlashes b)
-                            (a, b) -> (a++"/"):(prependToFirst '/' $ breakSlashes b)
-        prependToFirst _ [] = []
-        prependToFirst a ([]:xs) = ((a:[]):xs)
-        prependToFirst a (x@(q:qs):xs)
-         | a == q = (x:xs)
-         | otherwise = ((a:x):xs)
-
 selectNextMatch :: (TreeModelClass tm, EntryClass e) => DirectorySearchIndex -> tm -> e -> String -> TreeIter -> App ()
 selectNextMatch index treeModel searchEntry searchString currentIter = do
     path <- liftIO $ treeModelGetValue treeModel currentIter pathColumn
-    liftIO $ putStrLn $ "--- selectNextMatch-! for "++searchString++ " after " ++path
-    case trace "calling findNExt Match" $ findNextMatch index path (prepareQueries searchString) of
+    case findNextMatch index path (prepareQueries searchString) of
         Just match -> do
-            liftIO $ putStrLn $ "--- matched!" ++ (show match)
             liftIO $ unsetErrorState searchEntry 
             syncPathToSidebar $ elementPath match
         Nothing -> liftIO $ setErrorState searchEntry
@@ -318,7 +295,7 @@ selectNextMatch index treeModel searchEntry searchString currentIter = do
 selectPreviousMatch :: (TreeModelClass tm, EntryClass e) => DirectorySearchIndex -> tm -> e -> String -> TreeIter -> App ()
 selectPreviousMatch index treeModel searchEntry searchString currentIter = do
     path <- liftIO $ treeModelGetValue treeModel currentIter pathColumn
-    case findPreviousMatch index path [searchString] of
+    case findPreviousMatch index path (prepareQueries searchString) of
         Just match -> do
             liftIO $ unsetErrorState searchEntry 
             syncPathToSidebar $ elementPath match

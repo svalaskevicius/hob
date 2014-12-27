@@ -88,7 +88,7 @@ spec =
 
     it "focuses next multi-level path match when requested" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//r d e" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/ Dir//r d e" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "collapses previously matched path after searching in next subtree" $ do
       ctx <- sideBarSearchContext
@@ -100,11 +100,11 @@ spec =
 
     it "allows case insensitive search" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/DIR//R D E" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/ DIR//R D E" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "green file" [[1], [3,0,0,0], [5]]
 
     it "applies error style class if there are no matches" $ do
       ctx <- sideBarSearchContext
@@ -176,10 +176,10 @@ sideBarSearchFileTreeStub = return [
         Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder" True) [
             Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder/blueFolder" True) [
                 Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueFolder/blueFolder/redFile" False) []]],
-        Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir" True) [
-            Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir/blueDir" True) [
-                Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]],
-    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
+        Node (DirectoryTreeElement "blueDir" "/xxx/blueFolder/blueDir" True) [
+            Node (DirectoryTreeElement "blueDir" "/xxx/blueFolder/blueDir/blueDir" True) [
+                Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueDir/blueDir/redFile" False) []]]],
+    Node (DirectoryTreeElement "greenFile2" "/xxx/greenFile2" False) [],
     Node (DirectoryTreeElement "greegreenFileZ" "/xxx/greegreenFileZ" False) []]
 
 sideBarSearchContext :: IO HC.Context
