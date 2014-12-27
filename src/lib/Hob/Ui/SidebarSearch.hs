@@ -25,7 +25,19 @@ import Hob.Control
 import Hob.DirectoryTree
 import Hob.Ui.Sidebar
 
-{- | index based on suffix arrays -}
+{-| Index based on suffix arrays
+
+The two vectors contain the path element surrounded by slashes '/'
+and a sorted symbol positions respectively. The index is generated
+by a function 'mkIndex'.
+
+Example:
+
+@
+mkIndex "example"
+LetterIndex (fromList "/example/") (fromList [0,8,3,1,7,6,4,5,2])
+@
+-}
 data LetterIndex = LetterIndex (V.Vector Char) (V.Vector Int) deriving Show
 data SearchIndexNode a = PathNode LetterIndex a (SearchIndex a) | LeafNode LetterIndex a deriving Show
 type SearchIndex a = [SearchIndexNode a]
@@ -47,6 +59,7 @@ mkIndex s = LetterIndex word indices
                                   cmp = compare c1 c2
                               in if cmp == EQ then compare i1 i2 else cmp
 
+{-| Find all positions for a character -}
 findOccurrences :: LetterIndex -> Char -> [Int]
 findOccurrences (LetterIndex word idx) c = range mid
     where
@@ -76,7 +89,21 @@ findOccurrences (LetterIndex word idx) c = range mid
                 s = startFrom x
         highBound = V.length word
 
-{- | match query against the index in return the non matching part of the query (or empty string if match was complete -}
+{-| Match query against the index
+
+A query is a list for strings.
+Each string is matched as a substring of the given index.
+Then the next query string is matched.
+Once there is a match failure, the rest of the query is returned as the result.
+
+Example:
+
+@
+matchQuery (mkIndex "example") ["/ex", "ple"] = []
+matchQuery (mkIndex "example") ["/ex", "pla"] = ["pla"]
+matchQuery (mkIndex "example") ["/ex", "pla", "the rest"] = ["pla", "the rest"]
+@
+-}
 matchQuery :: LetterIndex -> [String] -> [String]
 matchQuery index@(LetterIndex word _) = match 0
     where
@@ -111,9 +138,6 @@ buildIndex = fmap addNode
                 leafNode = LeafNode index element
                 index = mkIndex $ elementLabel element
 
--- findFirstMatch :: DirectorySearchIndex -> [String] -> Maybe DirectoryTreeElement
--- findFirstMatch idx = findMatch idx (const True) (const True) id
-
 findNextMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
 findNextMatch index previous = findMatch $ filterFromPath index previous
 
@@ -145,7 +169,19 @@ findMatch (LeafNode idx el : is) queries
 findMatch (PathNode idx _ children : is) queries = mplus childrenMatch $ findMatch is queries
     where childrenMatch = findMatch children $ matchQuery idx queries
 
+{-| Prepare the query string
 
+Parse the query into a query for matching.
+
+Example:
+@
+prepareQueries "example" = ["example"]
+prepareQueries "exam ple" = ["exam","ple"]
+prepareQueries "exam/ple" = ["exam/","/ple"]
+prepareQueries "exam//ple" = ["exam/","/","/ple"]
+prepareQueries "exam/ ple" = ["exam/","ple"]
+@
+-}
 prepareQueries :: String -> [String]
 prepareQueries = concatMap breakSlashes . breakSpaces . map toLower
     where
@@ -166,10 +202,6 @@ prepareQueries = concatMap breakSlashes . breakSpaces . map toLower
         prependToFirst a (x@(q:_):xs)
          | a == q = [a]:x:xs
          | otherwise = (a:x):xs
-
-
-
-
 
 newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
