@@ -52,10 +52,6 @@ spec =
       treeViewSetCursor (HC.sidebarTree . HC.uiContext $ ctx) [1] Nothing
       cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
 
-    it "allows searching by absolute path" $ do
-      ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "/xxx/greenFile" [1]
-
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
       cursorShouldBeOnAfterSearch ctx "red" [0, 0]
