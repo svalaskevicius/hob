@@ -1,4 +1,11 @@
-module Hob.DirectoryTree where
+module Hob.DirectoryTree (
+    DirectoryForest,
+    DirectoryTreeLoader,
+    DirectoryReader,
+    IsDirectoryCheck,
+    DirectoryTreeElement(..),
+    fileTreeGenerator
+) where
 
 import Control.Monad   (forM)
 import Data.List       (sortBy)
@@ -15,7 +22,8 @@ instance Show (DirectoryTreeElement) where
 instance  Eq (DirectoryTreeElement)  where
     (DirectoryTreeElement label path isDir) == (DirectoryTreeElement label' path' isDir') = (label == label') && (path == path') && (isDir == isDir')
 
-type DirectoryTreeLoader = FilePath -> IO (Forest DirectoryTreeElement)
+type DirectoryForest = Forest DirectoryTreeElement
+type DirectoryTreeLoader = FilePath -> IO DirectoryForest
 type DirectoryReader = FilePath -> IO [FilePath]
 type IsDirectoryCheck = FilePath -> IO Bool
 

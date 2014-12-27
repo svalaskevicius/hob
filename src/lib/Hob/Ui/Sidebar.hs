@@ -2,6 +2,7 @@ module Hob.Ui.Sidebar (
     newSideBarFileTree,
     reloadSidebarTree,
     activateSidebarPath,
+    syncPathToSidebar,
     nameColumn,
     pathColumn
     ) where
@@ -10,8 +11,11 @@ import Control.Monad             (void)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 import GtkExtras.LargeTreeStore  as LTS
+import Data.List (isPrefixOf)
+import Control.Monad.Reader
 
-
+import Hob.Control
+import Hob.Context.UiContext
 import Hob.Command.NewTab
 import Hob.Context
 import Hob.Context.FileContext
@@ -71,3 +75,33 @@ activateSidebarPath treeView path = do
     treeViewCollapseAll treeView
     treeViewExpandToPath treeView path
     treeViewSetCursor treeView path Nothing
+
+
+
+
+syncPathToSidebar :: FilePath -> App()
+syncPathToSidebar filePath = do
+    ctx <- ask
+    let treeView = sidebarTree.uiContext $ ctx
+    liftIO $ (maybeDo (syncTreeViewModel treeView) =<< treeViewGetModel treeView)
+    where
+        syncTreeViewModel treeView model = do
+            mStartIter <- treeModelGetIterFirst model
+            maybeDo (syncToMatchingPath treeView model) mStartIter
+        syncToMatchingPath treeView model startingIter =
+            maybeDo (syncToIter treeView model) =<< findFilePath model filePath startingIter
+        syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
+
+findFilePath :: TreeModelClass self =>
+                self -> FilePath -> TreeIter -> IO (Maybe TreeIter)
+findFilePath model filePath iter = do
+        path <- treeModelGetValue model iter pathColumn
+        if path == filePath then return $ Just iter
+        else if (path++"/") `isPrefixOf` filePath then matchChildren
+        else matchNextSibling
+    where matchChildren = recurseToMaybeIter =<< treeModelIterChildren model iter
+          matchNextSibling = recurseToMaybeIter =<< treeModelIterNext model iter
+          recurseToMaybeIter Nothing = return Nothing
+          recurseToMaybeIter (Just it) = findFilePath model filePath it
+
+

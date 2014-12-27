@@ -97,7 +97,8 @@ spec =
     it "collapses previously matched path after searching in next subtree" $ do
       ctx <- sideBarSearchContext
       startSidebarSearch ctx "/Dir//r d e"
-      continueSidebarSearch ctx
+      idx <- HC.runApp ctx initFileTreeIndex
+      HC.runApp ctx $ continueSidebarSearch idx
       expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [3]
       expanded `shouldBe` False
 
@@ -147,11 +148,13 @@ cursorShouldBeOnAfterSearchAndContinue ctx search expectedPaths = do
       startSidebarSearch ctx search
       ctx `cursorShouldBeOn` head expectedPaths
       mapM_ (\path -> do
-              continueSidebarSearch ctx
+              idx <- HC.runApp ctx initFileTreeIndex
+              HC.runApp ctx $ continueSidebarSearch idx
               ctx `cursorShouldBeOn` path)
             $ tail expectedPaths
       mapM_ (\path -> do
-              continueSidebarSearchBackwards ctx
+              idx <- HC.runApp ctx initFileTreeIndex
+              HC.runApp ctx $ continueSidebarSearchBackwards idx
               ctx `cursorShouldBeOn` path)
             $ reverse $ init expectedPaths
 
