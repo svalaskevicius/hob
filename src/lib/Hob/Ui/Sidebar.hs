@@ -7,17 +7,17 @@ module Hob.Ui.Sidebar (
     pathColumn
     ) where
 
+import Control.Monad.Reader
+import Data.List                 (isPrefixOf)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 import GtkExtras.LargeTreeStore  as LTS
-import Data.List (isPrefixOf)
-import Control.Monad.Reader
 
-import Hob.Control
-import Hob.Context.UiContext
 import Hob.Command.NewTab
 import Hob.Context
 import Hob.Context.FileContext
+import Hob.Context.UiContext
+import Hob.Control
 import Hob.DirectoryTree
 
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
@@ -82,7 +82,7 @@ syncPathToSidebar :: FilePath -> App()
 syncPathToSidebar filePath = do
     ctx <- ask
     let treeView = sidebarTree.uiContext $ ctx
-    liftIO $ (maybeDo (syncTreeViewModel treeView) =<< treeViewGetModel treeView)
+    liftIO (maybeDo (syncTreeViewModel treeView) =<< treeViewGetModel treeView)
     where
         syncTreeViewModel treeView model = do
             mStartIter <- treeModelGetIterFirst model

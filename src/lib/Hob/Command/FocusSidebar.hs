@@ -28,8 +28,8 @@ syncActiveEditorPathToSidebar = do
     ctx <- ask
     editor <- liftIO $ getActiveEditor ctx
     maybeDo syncToEditor editor
-    where syncToEditor editor = maybeDo syncPathToSidebar =<< (liftIO $ getEditorFilePath editor)
-          
+    where syncToEditor editor = maybeDo syncPathToSidebar =<< liftIO (getEditorFilePath editor)
+
 
 syncFocusSidebar :: App()
 syncFocusSidebar = syncActiveEditorPathToSidebar >> focusSidebar
