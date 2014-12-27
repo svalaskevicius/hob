@@ -23,7 +23,7 @@ import Hob.DirectoryTree
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do
     let treeStore = fileTreeStore ctx
-    reloadSidebarTree ctx
+    runApp ctx reloadSidebarTree
     initNameColumn treeStore
 
     treeViewSetHeadersVisible treeView False
@@ -60,13 +60,15 @@ nameColumn = makeColumnIdString 0
 pathColumn :: ColumnId row FilePath
 pathColumn = makeColumnIdString 1
 
-reloadSidebarTree :: Context -> IO ()
-reloadSidebarTree ctx = do
+reloadSidebarTree :: App ()
+reloadSidebarTree = do
+    ctx <- ask
     let treeStore = fileTreeStore ctx
     let fileCtx = fileContext ctx
     let fileTreeLoader = contextFileTreeLoader fileCtx
-    LTS.treeStoreClear treeStore
-    LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+    liftIO $ LTS.treeStoreClear treeStore
+    liftIO $ LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+    emitEvent $ Event "core.sidebar.reload"
 
 
 activateSidebarPath :: TreeViewClass tv => tv -> TreePath -> IO ()

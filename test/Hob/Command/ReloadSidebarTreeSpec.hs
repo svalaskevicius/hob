@@ -14,13 +14,14 @@ import Test.Hspec
 
 import HobTest.Context.Stubbed
 import HobTest.Control
+import HobTest.Sidebar
 
 main :: IO ()
 main = hspec spec
 
 spec :: Spec
 spec =
-  describe "reload sidebar tree command" $
+  describe "reload sidebar tree command" $ do
     it "loads new items in the tree" $ do
       ctx <- loadStubbedContext
       values <- getDirectoryListingSidebarRootItems ctx
@@ -30,6 +31,13 @@ spec =
       values' <- getDirectoryListingSidebarRootItems ctx'
       values' `shouldBe` ["b","c"]
 
+    it "reload sidebar search index" $ do
+      ctx <- loadStubbedContext
+      cursorShouldBeOnAfterSearch ctx "/new/" []
+      let ctx' = replaceStubbedTree ctx
+      runCtxActions ctx' $ commandExecute reloadSidebarTreeCommandHandler
+      cursorShouldBeOnAfterSearch ctx "/new/" [1, 0]
+
 replaceStubbedTree :: Context -> Context
 replaceStubbedTree ctx = ctx{fileContext = newFileContext}
     where
@@ -37,8 +45,10 @@ replaceStubbedTree ctx = ctx{fileContext = newFileContext}
 
 altFileTreeStub :: IO (Forest DirectoryTreeElement)
 altFileTreeStub = return [
-    Node (DirectoryTreeElement "b" "/xxx/b" True) [],
-    Node (DirectoryTreeElement "c" "/xxx/c" False) []]
+    Node (DirectoryTreeElement "b" "/xxx/b" False) [],
+    Node (DirectoryTreeElement "c" "/xxx/c" True) [
+        Node (DirectoryTreeElement "new" "/xxx/c/new" False) []
+    ]]
 
 getDirectoryListingSidebarRootItems :: Context -> IO [String]
 getDirectoryListingSidebarRootItems ctx = do

@@ -7,6 +7,8 @@ module Hob.Ui.SidebarSearch (
         initFileTreeIndex,
     ) where
 
+import           Control.Concurrent.MVar              (newMVar, readMVar,
+                                                       swapMVar)
 import           Control.Monad.Reader
 import           Data.Char                            (isPrint, toLower)
 import           Data.List                            (isPrefixOf, sortBy)
@@ -207,19 +209,20 @@ newSideBarFileTreeSearch :: Context -> IO ()
 newSideBarFileTreeSearch ctx = do
     let treeView = sidebarTree.uiContext $ ctx
     let searchEntry = sidebarTreeSearch.uiContext $ ctx
-    index <- runApp ctx initFileTreeIndex
+    index <- newMVar =<< runApp ctx initFileTreeIndex
+    runApp ctx $ registerEventHandler (Event "core.sidebar.reload") (initFileTreeIndex >>= (liftIO . swapMVar index) >> return())
     _ <- treeView `on` keyPressEvent $ do
         key <- eventKeyVal
         maybe (return False) startSearch $ keyToChar key
-    _ <- searchEntry `on` editableChanged $ runApp ctx $ updateSidebarSearch index
+    _ <- searchEntry `on` editableChanged $ runApp ctx $ liftIO (readMVar index) >>= updateSidebarSearch
     _ <- searchEntry `on` focusOutEvent $ liftIO $ widgetHide searchEntry >> return False
     _ <- searchEntry `on` keyPressEvent $ do
         modifier <- eventModifier
         if Prelude.null modifier then do
             key <- eventKeyName
             case unpack key of
-                "Down" -> liftIO $ runApp ctx $ continueSidebarSearch index >> return True
-                "Up" -> liftIO $ runApp ctx $ continueSidebarSearchBackwards index >> return True
+                "Down" -> liftIO $ runApp ctx $ liftIO (readMVar index) >>= continueSidebarSearch >> return True
+                "Up" -> liftIO $ runApp ctx $ liftIO (readMVar index) >>= continueSidebarSearchBackwards >> return True
                 "Return" -> stopSearchAndActivateResult treeView searchEntry
                 _ -> return False
         else return False
