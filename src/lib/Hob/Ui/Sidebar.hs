@@ -2,25 +2,28 @@ module Hob.Ui.Sidebar (
     newSideBarFileTree,
     reloadSidebarTree,
     activateSidebarPath,
+    syncPathToSidebar,
     nameColumn,
     pathColumn
     ) where
 
-import Control.Monad             (void)
+import Control.Monad.Reader
+import Data.List                 (isPrefixOf)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 import GtkExtras.LargeTreeStore  as LTS
 
-
 import Hob.Command.NewTab
 import Hob.Context
 import Hob.Context.FileContext
+import Hob.Context.UiContext
+import Hob.Control
 import Hob.DirectoryTree
 
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do
     let treeStore = fileTreeStore ctx
-    reloadSidebarTree ctx
+    runApp ctx reloadSidebarTree
     initNameColumn treeStore
 
     treeViewSetHeadersVisible treeView False
@@ -57,13 +60,15 @@ nameColumn = makeColumnIdString 0
 pathColumn :: ColumnId row FilePath
 pathColumn = makeColumnIdString 1
 
-reloadSidebarTree :: Context -> IO ()
-reloadSidebarTree ctx = do
+reloadSidebarTree :: App ()
+reloadSidebarTree = do
+    ctx <- ask
     let treeStore = fileTreeStore ctx
     let fileCtx = fileContext ctx
     let fileTreeLoader = contextFileTreeLoader fileCtx
-    LTS.treeStoreClear treeStore
-    LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+    liftIO $ LTS.treeStoreClear treeStore
+    liftIO $ LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
+    emitEvent $ Event "core.sidebar.reload"
 
 
 activateSidebarPath :: TreeViewClass tv => tv -> TreePath -> IO ()
@@ -71,3 +76,33 @@ activateSidebarPath treeView path = do
     treeViewCollapseAll treeView
     treeViewExpandToPath treeView path
     treeViewSetCursor treeView path Nothing
+
+
+
+
+syncPathToSidebar :: FilePath -> App()
+syncPathToSidebar filePath = do
+    ctx <- ask
+    let treeView = sidebarTree.uiContext $ ctx
+    liftIO (maybeDo (syncTreeViewModel treeView) =<< treeViewGetModel treeView)
+    where
+        syncTreeViewModel treeView model = do
+            mStartIter <- treeModelGetIterFirst model
+            maybeDo (syncToMatchingPath treeView model) mStartIter
+        syncToMatchingPath treeView model startingIter =
+            maybeDo (syncToIter treeView model) =<< findFilePath model filePath startingIter
+        syncToIter treeView model iter = activateSidebarPath treeView =<< treeModelGetPath model iter
+
+findFilePath :: TreeModelClass self =>
+                self -> FilePath -> TreeIter -> IO (Maybe TreeIter)
+findFilePath model filePath iter = do
+        path <- treeModelGetValue model iter pathColumn
+        if path == filePath then return $ Just iter
+        else if (path++"/") `isPrefixOf` filePath then matchChildren
+        else matchNextSibling
+    where matchChildren = recurseToMaybeIter =<< treeModelIterChildren model iter
+          matchNextSibling = recurseToMaybeIter =<< treeModelIterNext model iter
+          recurseToMaybeIter Nothing = return Nothing
+          recurseToMaybeIter (Just it) = findFilePath model filePath it
+
+

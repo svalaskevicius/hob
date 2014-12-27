@@ -1,9 +1,7 @@
 module Hob.Ui.SidebarSearchSpec (main, spec) where
 
-import Data.Maybe
 import Data.Tree
 import Graphics.UI.Gtk
-import Graphics.UI.Gtk.General.StyleContext
 
 import qualified Hob.Context              as HC
 import qualified Hob.Context.FileContext  as HFC
@@ -16,6 +14,7 @@ import           Hob.Ui.SidebarSearch
 import Test.Hspec
 
 import HobTest.Context.Default
+import HobTest.Sidebar
 
 main :: IO ()
 main = hspec spec
@@ -51,10 +50,6 @@ spec =
       cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
       treeViewSetCursor (HC.sidebarTree . HC.uiContext $ ctx) [1] Nothing
       cursorShouldBeOnAfterSearch ctx "redFile" [0, 0]
-
-    it "allows searching by absolute path" $ do
-      ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearch ctx "/xxx/greenFile" [1]
 
     it "only looks for the leaf nodes" $ do
       ctx <- sideBarSearchContext
@@ -92,22 +87,23 @@ spec =
 
     it "focuses next multi-level path match when requested" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/Dir//r d e" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/ Dir//r d e" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "collapses previously matched path after searching in next subtree" $ do
       ctx <- sideBarSearchContext
       startSidebarSearch ctx "/Dir//r d e"
-      continueSidebarSearch ctx
+      idx <- HC.runApp ctx initFileTreeIndex
+      HC.runApp ctx $ continueSidebarSearch idx
       expanded <- treeViewRowExpanded (HC.sidebarTree . HC.uiContext $ ctx) [3]
       expanded `shouldBe` False
 
     it "allows case insensitive search" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "/DIR//R D E" [[3, 0, 0, 0], [4, 1, 0, 0]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "/ DIR//R D E" [[3, 0, 0, 0], [4, 1, 0, 0]]
 
     it "finds next top-level file" $ do
       ctx <- sideBarSearchContext
-      cursorShouldBeOnAfterSearchAndContinue ctx "greenFile" [[1], [3,0,0,0], [5]]
+      cursorShouldBeOnAfterSearchAndContinue ctx "green file" [[1], [3,0,0,0], [5]]
 
     it "applies error style class if there are no matches" $ do
       ctx <- sideBarSearchContext
@@ -126,42 +122,6 @@ spec =
       entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) "red"
       ctx `sidebarTreeSearchErrorStateShouldBe` False
 
-sidebarTreeSearchErrorStateShouldBe :: HC.Context -> Bool -> IO ()
-sidebarTreeSearchErrorStateShouldBe ctx state = do
-      styleContext <- widgetGetStyleContext $ HC.sidebarTreeSearch . HC.uiContext $ ctx
-      hasErrorClass <- styleContextHasClass styleContext "error"
-      hasErrorClass `shouldBe` state
-
-cursorShouldBeOnAfterSearch :: HC.Context -> String -> TreePath -> IO ()
-cursorShouldBeOnAfterSearch ctx search expectedPath = do
-      startSidebarSearch ctx search
-      ctx `cursorShouldBeOn` expectedPath
-
-cursorShouldBeOnAfterRefine :: HC.Context -> String -> TreePath -> IO ()
-cursorShouldBeOnAfterRefine ctx search expectedPath = do
-      entrySetText (HC.sidebarTreeSearch . HC.uiContext $ ctx) search
-      ctx `cursorShouldBeOn` expectedPath
-
-cursorShouldBeOnAfterSearchAndContinue :: HC.Context -> String -> [TreePath] -> IO ()
-cursorShouldBeOnAfterSearchAndContinue ctx search expectedPaths = do
-      startSidebarSearch ctx search
-      ctx `cursorShouldBeOn` head expectedPaths
-      mapM_ (\path -> do
-              continueSidebarSearch ctx
-              ctx `cursorShouldBeOn` path)
-            $ tail expectedPaths
-      mapM_ (\path -> do
-              continueSidebarSearchBackwards ctx
-              ctx `cursorShouldBeOn` path)
-            $ reverse $ init expectedPaths
-
-cursorShouldBeOn :: HC.Context -> TreePath -> IO ()
-cursorShouldBeOn ctx expectedPath = do
-    let sideBar = HC.sidebarTree . HC.uiContext $ ctx
-    (path, column) <- treeViewGetCursor sideBar
-    path `shouldBe` expectedPath
-    isNothing column `shouldBe` True
-
 sideBarSearchFileTreeStub :: IO (Forest DirectoryTreeElement)
 sideBarSearchFileTreeStub = return [
     Node (DirectoryTreeElement "redDir" "/xxx/redDir" True) [
@@ -177,10 +137,10 @@ sideBarSearchFileTreeStub = return [
         Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder" True) [
             Node (DirectoryTreeElement "blueFolder" "/xxx/blueFolder/blueFolder/blueFolder" True) [
                 Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueFolder/blueFolder/redFile" False) []]],
-        Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir" True) [
-            Node (DirectoryTreeElement "blueDir" "/xxx/blueDir/blueDir/blueDir" True) [
-                Node (DirectoryTreeElement "redFile" "/xxx/blueDir/blueDir/blueDir/redFile" False) []]]],
-    Node (DirectoryTreeElement "greenFile" "/xxx/greenFile" False) [],
+        Node (DirectoryTreeElement "blueDir" "/xxx/blueFolder/blueDir" True) [
+            Node (DirectoryTreeElement "blueDir" "/xxx/blueFolder/blueDir/blueDir" True) [
+                Node (DirectoryTreeElement "redFile" "/xxx/blueFolder/blueDir/blueDir/redFile" False) []]]],
+    Node (DirectoryTreeElement "greenFile2" "/xxx/greenFile2" False) [],
     Node (DirectoryTreeElement "greegreenFileZ" "/xxx/greegreenFileZ" False) []]
 
 sideBarSearchContext :: IO HC.Context
