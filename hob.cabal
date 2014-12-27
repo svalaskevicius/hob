@@ -7,7 +7,7 @@ license-file: LICENSE
 copyright: (c) Sarunas Valaskevicius
 maintainer: Sarunas Valaskevicius <rakatan@gmail.com>
 synopsis: A source code editor aiming for the convenience of use
-description: A simple, command based code editor, being developed for the mouse-free workflow.
+description: A simple command based code editor being developed for the mouse-free workflow.
 homepage: http://svalaskevicius.github.io/hob/
 stability: alpha
 bug-reports: http://github.com/svalaskevicius/hob/issues
