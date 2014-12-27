@@ -65,7 +65,7 @@ test-suite spec
       test
   main-is:
       Spec.hs
-  other-modules: Hob.Ui.SidebarSpec, Hob.Ui.EditorSpec, Hob.Ui.CommandEntrySpec, Hob.Ui.Editor.SearchSpec, Hob.Ui.SidebarSearchSpec, Hob.UiSpec, Hob.ContextSpec, Hob.ControlSpec, Hob.DirectoryTreeSpec, Hob.Command.FocusNextTabSpec, Hob.Command.FindTextSpec, Hob.Command.CloseCurrentTabSpec, Hob.Command.FocusSidebarSpec, Hob.Command.SaveCurrentTabSpec, Hob.Command.ReplaceTextSpec, Hob.Command.FocusCommandEntrySpec, Hob.Command.NewTabSpec, Hob.Command.FocusPreviousTabSpec, Hob.Command.FocusNumberedTabSpec, Hob.Command.ReloadSidebarTreeSpec, Hob.Context.FileContextSpec, Hob.Context.StyleContextSpec, HobTest.Sidebar, HobTest.Editor, HobTest.Context.Stubbed, HobTest.Context.Default, HobTest.Control
+  other-modules: ##SPEC_MODULES##
   build-depends:
       base    >= 4.2 && <5, containers -any, mtl >=2.1.0 && <2.2.0,
       hspec   >= 1.11, gtk3 >=0.13.0.1, hob, text >= 1.1.1.0, gtksourceview3 >=0.13.0.0
