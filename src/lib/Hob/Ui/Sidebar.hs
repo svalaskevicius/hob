@@ -7,7 +7,6 @@ module Hob.Ui.Sidebar (
     pathColumn
     ) where
 
-import Control.Monad             (void)
 import Graphics.UI.Gtk
 import Graphics.UI.Gtk.ModelView as Mv
 import GtkExtras.LargeTreeStore  as LTS
