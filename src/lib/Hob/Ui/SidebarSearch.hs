@@ -115,42 +115,36 @@ buildIndex = fmap addNode
 -- findFirstMatch idx = findMatch idx (const True) (const True) id
 
 findNextMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
-findNextMatch idx previous = findMatch idx previous
+findNextMatch index previous = findMatch $ filterFromPath index previous
 
 findPreviousMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
-findPreviousMatch idx next = findMatch (reverseIndex idx) next
+findPreviousMatch index next = findMatch $ filterFromPath (reverseIndex index) next
     where
-        reverseIndex index = map reverseNode . reverse $ index 
+        reverseIndex = map reverseNode . reverse
             where
                 reverseNode n@(LeafNode _ _) = n
                 reverseNode (PathNode letterIdx el children) = PathNode letterIdx el $ reverseIndex children
 
--- 1. navigate to the current dir
---    a. collect parents on the way
---    b. use take 1 . filter pathCheck to find correct child to go into
--- 2. start matching
---    a. use parents list and starting sibling
-findMatch :: DirectorySearchIndex -> FilePath -> [String] -> Maybe DirectoryTreeElement
-findMatch index fromPath q = matcher (filterFromPath index fromPath) q
-    where
-        filterFromPath :: DirectorySearchIndex -> FilePath -> DirectorySearchIndex
-        filterFromPath [] _ = []
-        filterFromPath (node@(LeafNode _ el):is) path
-         | elementPath el == path = node:is
-         | otherwise = filterFromPath is path
-        filterFromPath (node@(PathNode lidx el children):is) path
-         | elementPath el == path = node:is
-         | ((elementPath el)++"/") `isPrefixOf` path = (PathNode lidx el $ filterFromPath children path):is
-         | otherwise = filterFromPath is path
-         
-        matcher [] _ = Nothing
-        matcher ((LeafNode idx el):is) queries
-         | matchSuccess = Just el
-         | otherwise = matcher is queries
-            where matchSuccess = null $ matchQuery idx queries
-        matcher ((PathNode idx _ children):is) queries = 
-                maybe (matcher is queries) Just childrenMatch
-            where childrenMatch = matcher children $ matchQuery idx queries
+filterFromPath :: DirectorySearchIndex -> FilePath -> DirectorySearchIndex
+filterFromPath [] _ = []
+filterFromPath (node@(LeafNode _ el):is) path
+ | elementPath el == path = node:is
+ | otherwise = filterFromPath is path
+filterFromPath (node@(PathNode lidx el children):is) path
+ | elementPath el == path = node:is
+ | ((elementPath el)++"/") `isPrefixOf` path = (PathNode lidx el $ filterFromPath children path):is
+ | otherwise = filterFromPath is path
+
+
+findMatch :: DirectorySearchIndex -> [String] -> Maybe DirectoryTreeElement
+findMatch [] _ = Nothing
+findMatch ((LeafNode idx el):is) queries
+ | matchSuccess = Just el
+ | otherwise = findMatch is queries
+    where matchSuccess = null $ matchQuery idx queries
+findMatch ((PathNode idx _ children):is) queries = 
+        maybe (findMatch is queries) Just childrenMatch
+    where childrenMatch = findMatch children $ matchQuery idx queries
 
 
 prepareQueries :: String -> [String]
