@@ -72,7 +72,6 @@ newEditorForText targetNotebook filePath text = do
         title = tabTitleForFile filePath
         createNewEditor ctx = do
             editorWidget <- drawingAreaNew
-            widgetSetSizeRequest editorWidget 500 500
             newId <- idGenerator ctx
             setEditorId editorWidget newId
             setEditorWidgetFilePath editorWidget filePath
@@ -94,12 +93,20 @@ newEditorForText targetNotebook filePath text = do
                 selectFontFace "Verdana" FontSlantNormal FontWeightNormal
                 setFontSize 18
                 fontSizeInfo <- fontExtents
+                let linesToDraw = textLines $ sourceData fancyEditorData
+                lineSizes <- sequence . map textExtents $ linesToDraw
                 let fontHeight = fontExtentsHeight fontSizeInfo
                     lineHeight = fontHeight + 5
-                    posWithText = zip [i*lineHeight | i <- [0..]] (textLines $ sourceData fancyEditorData)
-                    
+                    posWithText = zip [i*lineHeight | i <- [0..]] linesToDraw
+                    textLeft = 7
+                    textTop = 5 + (fontExtentsAscent fontSizeInfo)
+                    textBottom = textTop + (if null posWithText then 0 else lineHeight + (fst . last $ posWithText))
+                    textRight = textLeft + (if null lineSizes then 0 else maximum . map textExtentsXadvance $ lineSizes)
+
+                liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
+
                 save
-                translate 7 (5 + (fontExtentsAscent fontSizeInfo))
+                translate textLeft textTop
                 sequence_ $ map (\(yPos, line) -> do
                         moveTo 0 yPos
                         showText line
