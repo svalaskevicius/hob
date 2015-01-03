@@ -22,6 +22,7 @@ data SourceData = SourceData {
 data FancyEditor = FancyEditor {
     sourceData         :: SourceData,
     cursorPos          :: (Int, Int),
+    navigationPos      :: (Int, Int),
     getFilePath        :: IO (Maybe FilePath)
 }
 
@@ -35,6 +36,7 @@ toFancyEditor :: DrawingArea -> Text -> FancyEditor
 toFancyEditor widget text = FancyEditor
             { sourceData = newSourceData text
             , cursorPos = (0, 0)
+            , navigationPos = (0, 0)
             , getFilePath = getEditorWidgetFilePath widget
             }
 
@@ -88,10 +90,33 @@ newEditorForText targetNotebook filePath text = do
             notebookSetShowTabs targetNotebook True
 
             fancyEditorDataHolder <- newMVar $ toFancyEditor editorWidget text
-            let updateCursor delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+            
+            let nrOfCharsOnCursorLine fancyEditorData = maybe 0 length . listToMaybe . take 1 . drop yPos $ editorTextLines
+                    where
+                        yPos = snd $ cursorPos fancyEditorData
+                        editorTextLines = textLines $ sourceData fancyEditorData
+                clampCursorX fancyEditorData pos
+                 | pos < 0 = 0
+                 | pos > nrOfChars = nrOfChars
+                 | otherwise = pos
+                 where 
+                    nrOfChars = nrOfCharsOnCursorLine fancyEditorData
+                clampCursorY fancyEditorData pos
+                 | pos < 0 = 0
+                 | pos > nrOfLines = nrOfLines
+                 | otherwise = pos
+                 where 
+                    nrOfLines = length . textLines . sourceData $ fancyEditorData
+            let updateCursorX delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
                                             let oldPos = cursorPos fancyEditorData
-                                                newPos = ((fst oldPos) + (fst delta), (snd oldPos) + (snd delta))
-                                            return fancyEditorData{cursorPos = newPos}
+                                                newPos = ((clampCursorX fancyEditorData (fst oldPos)) + delta, snd oldPos)
+                                                newPosClamped = (clampCursorX fancyEditorData (fst newPos), snd oldPos)
+                                            return fancyEditorData{navigationPos = newPosClamped, cursorPos = newPosClamped}
+            let updateCursorY delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                            let oldPos = navigationPos fancyEditorData
+                                                newPos = (fst oldPos, snd oldPos + delta)
+                                                newPosClamped = (fst oldPos, clampCursorY fancyEditorData $ snd newPos)
+                                            return fancyEditorData{navigationPos = newPosClamped, cursorPos = newPosClamped}
 
             
             _ <- editorWidget `on` keyPressEvent $ do
@@ -99,12 +124,12 @@ newEditorForText targetNotebook filePath text = do
                 keyValue <- eventKeyVal
                 -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
                 -- TODO: scroll the whole view to fit cursor on screen
-                let moveCursorCmd delta = liftIO $ updateCursor delta >> widgetQueueDraw editorWidget >> return True
+                let moveEditorCursor cmd  = liftIO $ cmd >> widgetQueueDraw editorWidget >> return True
                 case (modifiers, unpack $ keyName keyValue) of
-                    ([], "Right") -> moveCursorCmd (1, 0)
-                    ([], "Left") -> moveCursorCmd (-1, 0)
-                    ([], "Up") -> moveCursorCmd (0, -1)
-                    ([], "Down") -> moveCursorCmd (0, 1)
+                    ([], "Right") -> moveEditorCursor $ updateCursorX 1
+                    ([], "Left") -> moveEditorCursor $ updateCursorX (-1)
+                    ([], "Up") -> moveEditorCursor $ updateCursorY (-1)
+                    ([], "Down") -> moveEditorCursor $ updateCursorY 1
                     _ -> return False
 
             _ <- editorWidget `on` draw $ do
@@ -137,7 +162,7 @@ newEditorForText targetNotebook filePath text = do
 
                 let cursorLineNr = snd . cursorPos $ fancyEditorData
                     cursorCharNr = fst . cursorPos $ fancyEditorData
-                    cursorTop = (fromIntegral cursorLineNr) * lineHeight
+                    cursorTop = (fromIntegral cursorLineNr) * lineHeight - (fontExtentsAscent fontSizeInfo)
                     cursorLine = maybe "" id $ listToMaybe $ take 1 $ drop cursorLineNr linesToDraw
                 preCursorLineExtents <- textExtents $ take cursorCharNr cursorLine
                 let cursorLeft = textExtentsXadvance preCursorLineExtents
@@ -145,7 +170,7 @@ newEditorForText targetNotebook filePath text = do
                 setLineWidth 1
                 setSourceRGBA 0 0 0.3 0.8
                 moveTo cursorLeft cursorTop
-                lineTo cursorLeft (cursorTop-lineHeight)
+                lineTo cursorLeft (cursorTop + lineHeight)
                 stroke
                 
                 restore
