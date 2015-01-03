@@ -21,8 +21,7 @@ data SourceData = SourceData {
 
 data FancyEditor = FancyEditor {
     sourceData         :: SourceData,
-    cursorPos          :: (Int, Int),
-    navigationPos      :: (Int, Int),
+    cursorPos          :: (Int, Int, Int), -- X, Y, X_{navigation}
     getFilePath        :: IO (Maybe FilePath)
 }
 
@@ -35,8 +34,7 @@ newSourceData text = SourceData
 toFancyEditor :: DrawingArea -> Text -> FancyEditor
 toFancyEditor widget text = FancyEditor
             { sourceData = newSourceData text
-            , cursorPos = (0, 0)
-            , navigationPos = (0, 0)
+            , cursorPos = (0, 0, 0)
             , getFilePath = getEditorWidgetFilePath widget
             }
 
@@ -91,16 +89,15 @@ newEditorForText targetNotebook filePath text = do
 
             fancyEditorDataHolder <- newMVar $ toFancyEditor editorWidget text
             
-            let nrOfCharsOnCursorLine fancyEditorData = maybe 0 length . listToMaybe . take 1 . drop yPos $ editorTextLines
+            let nrOfCharsOnCursorLine fancyEditorData yPos = maybe 0 length . listToMaybe . take 1 . drop yPos $ editorTextLines
                     where
-                        yPos = snd $ cursorPos fancyEditorData
                         editorTextLines = textLines $ sourceData fancyEditorData
-                clampCursorX fancyEditorData pos
+                clampCursorX fancyEditorData yPos pos
                  | pos < 0 = 0
                  | pos > nrOfChars = nrOfChars
                  | otherwise = pos
                  where 
-                    nrOfChars = nrOfCharsOnCursorLine fancyEditorData
+                    nrOfChars = nrOfCharsOnCursorLine fancyEditorData yPos
                 clampCursorY fancyEditorData pos
                  | pos < 0 = 0
                  | pos > nrOfLines = nrOfLines
@@ -108,15 +105,14 @@ newEditorForText targetNotebook filePath text = do
                  where 
                     nrOfLines = length . textLines . sourceData $ fancyEditorData
             let updateCursorX delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
-                                            let oldPos = cursorPos fancyEditorData
-                                                newPos = ((clampCursorX fancyEditorData (fst oldPos)) + delta, snd oldPos)
-                                                newPosClamped = (clampCursorX fancyEditorData (fst newPos), snd oldPos)
-                                            return fancyEditorData{navigationPos = newPosClamped, cursorPos = newPosClamped}
+                                            let (cx, cy, _) = cursorPos fancyEditorData
+                                                cx' = clampCursorX fancyEditorData cy $ cx + delta
+                                            return fancyEditorData{cursorPos = (cx', cy, cx')}
             let updateCursorY delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
-                                            let oldPos = navigationPos fancyEditorData
-                                                newPos = (fst oldPos, snd oldPos + delta)
-                                                newPosClamped = (fst oldPos, clampCursorY fancyEditorData $ snd newPos)
-                                            return fancyEditorData{navigationPos = newPosClamped, cursorPos = newPosClamped}
+                                            let (_, cy, cxn) = cursorPos fancyEditorData
+                                                cy' = clampCursorY fancyEditorData $ cy + delta
+                                                cx' = clampCursorX fancyEditorData cy' cxn
+                                            return fancyEditorData{cursorPos = (cx', cy', cxn)}
 
             
             _ <- editorWidget `on` keyPressEvent $ do
@@ -160,8 +156,7 @@ newEditorForText targetNotebook filePath text = do
                         showText line
                     ) posWithText
 
-                let cursorLineNr = snd . cursorPos $ fancyEditorData
-                    cursorCharNr = fst . cursorPos $ fancyEditorData
+                let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
                     cursorTop = (fromIntegral cursorLineNr) * lineHeight - (fontExtentsAscent fontSizeInfo)
                     cursorLine = maybe "" id $ listToMaybe $ take 1 $ drop cursorLineNr linesToDraw
                 preCursorLineExtents <- textExtents $ take cursorCharNr cursorLine
