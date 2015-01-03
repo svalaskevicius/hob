@@ -3,7 +3,7 @@ module Hob.Ui.Editor.Fancy (
     ) where
 
 import Control.Monad.Reader
-import Data.Text                  (Text)
+import Data.Text                  (Text, unpack)
 import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
 import Graphics.UI.Gtk
 import System.Glib.GObject        (Quark)
@@ -12,23 +12,25 @@ import Graphics.Rendering.Cairo
 import Hob.Context
 import Hob.Context.UiContext
 
-data TextData = TextData {
-    isModified :: Bool
+data SourceData = SourceData {
+    isModified :: Bool,
+    textLines  :: [String]
 }
 
 data FancyEditor = FancyEditor {
-    textData           :: TextData,
+    sourceData         :: SourceData,
     getFilePath        :: IO (Maybe FilePath)
 }
 
-newTextData :: Text -> TextData
-newTextData _ = TextData
+newSourceData :: Text -> SourceData
+newSourceData text = SourceData
             { isModified = False
+            , textLines = lines . unpack $ text
             }
 
 toFancyEditor :: DrawingArea -> Text -> FancyEditor
 toFancyEditor widget text = FancyEditor
-            { textData = newTextData text
+            { sourceData = newSourceData text
             , getFilePath = getEditorWidgetFilePath widget
             }
 
@@ -83,17 +85,26 @@ newEditorForText targetNotebook filePath text = do
             notebookSetCurrentPage targetNotebook tabNr
             notebookSetShowTabs targetNotebook True
 
-            editorWidget `on` draw $ do
-                setSourceRGB 1 1 1
-                paint
-                setSourceRGBA 1 0 0 0.5
-                setLineWidth 4
-                arc 150 210 20 0 (2*pi)
-                stroke
-                setSourceRGBA 1 0 0 0.1
-                arc 150 210 20 0 (2*pi)
-                fill
+            let fancyEditorData = toFancyEditor editorWidget text
 
+            _ <- editorWidget `on` draw $ do
+                setSourceRGB 0.96 0.95 0.9
+                paint
+                setSourceRGBA 0 0 0 1
+                selectFontFace "Verdana" FontSlantNormal FontWeightNormal
+                setFontSize 18
+                fontSizeInfo <- fontExtents
+                let fontHeight = fontExtentsHeight fontSizeInfo
+                    lineHeight = fontHeight + 5
+                    posWithText = zip [i*lineHeight | i <- [0..]] (textLines $ sourceData fancyEditorData)
+                    
+                save
+                translate 7 (5 + (fontExtentsAscent fontSizeInfo))
+                sequence_ $ map (\(yPos, line) -> do
+                        moveTo 0 yPos
+                        showText line
+                    ) posWithText
+                restore
             return $ toEditor editorWidget text
 
 {-

@@ -32,7 +32,7 @@ launchNewFileEditor ctx targetNotebook filePath = do
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
     where launchEditor text = deferredRunner ctx $ launcherFunction targetNotebook (Just filePath) text
-          isFancy = (reverse . take 4 . reverse $ filePath) == ".txt"
+          isFancy = (reverse . take 6 . reverse $ filePath) == ".fancy"
           launcherFunction = if isFancy then Fancy.newEditorForText else newEditorForText
           isEditorFileMatching editor = do
               f <- getEditorFilePath editor
