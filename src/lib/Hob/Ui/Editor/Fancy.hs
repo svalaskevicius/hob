@@ -8,6 +8,8 @@ import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
 import Graphics.UI.Gtk
 import System.Glib.GObject        (Quark)
 import Graphics.Rendering.Cairo
+import Data.Maybe (listToMaybe)
+import Control.Concurrent.MVar (newMVar, readMVar, modifyMVar_)
 
 import Hob.Context
 import Hob.Context.UiContext
@@ -19,6 +21,7 @@ data SourceData = SourceData {
 
 data FancyEditor = FancyEditor {
     sourceData         :: SourceData,
+    cursorPos          :: (Int, Int),
     getFilePath        :: IO (Maybe FilePath)
 }
 
@@ -31,11 +34,12 @@ newSourceData text = SourceData
 toFancyEditor :: DrawingArea -> Text -> FancyEditor
 toFancyEditor widget text = FancyEditor
             { sourceData = newSourceData text
+            , cursorPos = (0, 0)
             , getFilePath = getEditorWidgetFilePath widget
             }
 
-toEditor :: DrawingArea -> Text -> Editor
-toEditor widget text = Editor
+toEditor :: DrawingArea -> Editor
+toEditor widget = Editor
             { editorId = const . liftIO $ getEditorId widget
 
             , enterEditorMode = \editor mode -> do
@@ -58,8 +62,6 @@ toEditor widget text = Editor
                 active <- liftIO $ getActiveEditor ctx
                 return $ active == Just widget
             }
-    where
-        fancyEditor = toFancyEditor widget text
 
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
@@ -72,6 +74,7 @@ newEditorForText targetNotebook filePath text = do
         title = tabTitleForFile filePath
         createNewEditor ctx = do
             editorWidget <- drawingAreaNew
+            widgetSetCanFocus editorWidget True
             newId <- idGenerator ctx
             setEditorId editorWidget newId
             setEditorWidgetFilePath editorWidget filePath
@@ -84,15 +87,34 @@ newEditorForText targetNotebook filePath text = do
             notebookSetCurrentPage targetNotebook tabNr
             notebookSetShowTabs targetNotebook True
 
-            let fancyEditorData = toFancyEditor editorWidget text
+            fancyEditorDataHolder <- newMVar $ toFancyEditor editorWidget text
+            let updateCursor delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                            let oldPos = cursorPos fancyEditorData
+                                                newPos = ((fst oldPos) + (fst delta), (snd oldPos) + (snd delta))
+                                            return fancyEditorData{cursorPos = newPos}
+
+            
+            _ <- editorWidget `on` keyPressEvent $ do
+                modifiers <- eventModifier
+                keyValue <- eventKeyVal
+                -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
+                -- TODO: scroll the whole view to fit cursor on screen
+                let moveCursorCmd delta = liftIO $ updateCursor delta >> widgetQueueDraw editorWidget >> return True
+                case (modifiers, unpack $ keyName keyValue) of
+                    ([], "Right") -> moveCursorCmd (1, 0)
+                    ([], "Left") -> moveCursorCmd (-1, 0)
+                    ([], "Up") -> moveCursorCmd (0, -1)
+                    ([], "Down") -> moveCursorCmd (0, 1)
+                    _ -> return False
 
             _ <- editorWidget `on` draw $ do
-                setSourceRGB 0.96 0.95 0.9
+                setSourceRGB 0.86 0.85 0.8
                 paint
                 setSourceRGBA 0 0 0 1
                 selectFontFace "Verdana" FontSlantNormal FontWeightNormal
                 setFontSize 18
                 fontSizeInfo <- fontExtents
+                fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
                 let linesToDraw = textLines $ sourceData fancyEditorData
                 lineSizes <- sequence . map textExtents $ linesToDraw
                 let fontHeight = fontExtentsHeight fontSizeInfo
@@ -107,12 +129,32 @@ newEditorForText targetNotebook filePath text = do
 
                 save
                 translate textLeft textTop
+
                 sequence_ $ map (\(yPos, line) -> do
                         moveTo 0 yPos
                         showText line
                     ) posWithText
+
+                let cursorLineNr = snd . cursorPos $ fancyEditorData
+                    cursorCharNr = fst . cursorPos $ fancyEditorData
+                    cursorTop = (fromIntegral cursorLineNr) * lineHeight
+                    cursorLine = maybe "" id $ listToMaybe $ take 1 $ drop cursorLineNr linesToDraw
+                preCursorLineExtents <- textExtents $ take cursorCharNr cursorLine
+                let cursorLeft = textExtentsXadvance preCursorLineExtents
+
+                setLineWidth 1
+                setSourceRGBA 0 0 0.3 0.8
+                moveTo cursorLeft cursorTop
+                lineTo cursorLeft (cursorTop-lineHeight)
+                stroke
+                
                 restore
-            return $ toEditor editorWidget text
+                
+            _ <- editorWidget `on` buttonPressEvent $ do
+                liftIO $ widgetGrabFocus editorWidget
+                return True
+
+            return $ toEditor editorWidget
 
 {-
 getActiveEditorText :: Context -> IO (Maybe Text)
