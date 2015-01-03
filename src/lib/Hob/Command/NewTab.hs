@@ -15,6 +15,7 @@ import Hob.Context.FileContext
 import Hob.Context.UiContext
 import Hob.Control
 import Hob.Ui.Editor
+import qualified Hob.Ui.Editor.Fancy as Fancy
 
 type NewFileEditorLauncher = FilePath -> IO ()
 
@@ -30,7 +31,9 @@ launchNewFileEditor ctx targetNotebook filePath = do
         Just nr -> notebookSetCurrentPage targetNotebook nr
         Nothing -> maybeDo launchEditor =<< fileLoader filePath
 
-    where launchEditor text = deferredRunner ctx $ newEditorForText targetNotebook (Just filePath) text
+    where launchEditor text = deferredRunner ctx $ launcherFunction targetNotebook (Just filePath) text
+          isFancy = (reverse . take 4 . reverse $ filePath) == ".txt"
+          launcherFunction = if isFancy then Fancy.newEditorForText else newEditorForText
           isEditorFileMatching editor = do
               f <- getEditorFilePath editor
               return $ maybe False (filePath ==) f
