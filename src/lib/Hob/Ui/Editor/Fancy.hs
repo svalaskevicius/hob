@@ -294,13 +294,15 @@ drawEditor fancyEditorDataHolder editorWidget = do
             setSourceRGB 0.86 0.85 0.8
             paint
     
-        drawContents (dLines, ((Point textLeft textTop), (Point textRight textBottom)), cursorPosData) = do
+        drawContents (dData, opts) = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             save
             translate textLeft textTop
-            drawText dLines
-            drawCursor cursorPosData
+            drawText (drawableLines dData)
+            drawCursor dData opts
             restore
+            where
+                ((Point textLeft textTop), (Point textRight textBottom)) = boundingRect dData
 
         drawText dLines = do
             setSourceRGBA 0 0.1 0 1
@@ -309,24 +311,19 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     sequence_ $ map showGlyphString pangoShapes
                 ) dLines
 
-        drawCursor (cursorTop, cursorLeft, cursorBottom) = do
+        drawCursor dData opts = do
             setLineWidth 1
             setSourceRGBA 0 0 0.3 0.8
             moveTo cursorLeft cursorTop
             lineTo cursorLeft cursorBottom
             stroke
+            where
+                (Point cursorLeft cursorTop) = cursorPosition dData
+                cursorBottom = cursorTop + (fontAscent opts) + (fontDescent opts)
         
-        getDrawableData = liftIO $ S.evalStateT (do
-                    dData <- S.gets drawingData
-                    let dLines = drawableLines dData
-                        bRect = boundingRect dData
-                        (Point cursorLeft cursorTop) = cursorPosition dData
-                    opts <- S.gets drawingOptions
-                    let a = fontAscent opts
-                        d = fontDescent opts
-                    return (dLines, bRect, (cursorTop, cursorLeft, cursorTop+a+d))
-                ) =<< readMVar fancyEditorDataHolder
-
+        getDrawableData = do
+            fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
+            return (drawingData fancyEditorData, drawingOptions fancyEditorData)
 
 getActiveEditor :: Context -> IO (Maybe DrawingArea)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
