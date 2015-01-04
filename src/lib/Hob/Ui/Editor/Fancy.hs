@@ -121,12 +121,41 @@ newEditorForText targetNotebook filePath text = do
             fontDescriptionSetSize fontDescription 18
             contextSetFontDescription pangoContext fontDescription
 
+            fontSizeInfo <- contextGetMetrics pangoContext fontDescription emptyLanguage
+            let fontHeight = ascent fontSizeInfo + descent fontSizeInfo
+                lineHeight = fontHeight + 5
+            let getLineShapesWithWidths linesToDraw = do
+                    pangoLineShapes <- sequence $ map (\line -> do
+                            pangoItems <- pangoItemize pangoContext line []
+                            sequence $ map pangoShape pangoItems                        
+                        ) linesToDraw
+
+                    lineWidths <- sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
+                    return (pangoLineShapes, lineWidths)
+
+            let cursorPosToXY lineWidths cx cy = (cursorTop, cursorLeft)
+                    where
+                        cursorTop = (fromIntegral cy) * lineHeight - (ascent fontSizeInfo)
+                        maybeCursorLine = listToMaybe $ take 1 . drop cy $ lineWidths
+                        cursorLeft = maybe 0 (sum . take cx . concat) maybeCursorLine
+
+            let scrollEditorToCursor = do
+                    fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
+                    let linesToDraw = textLines $ sourceData fancyEditorData
+                    (_, lineWidths) <- liftIO $ getLineShapesWithWidths linesToDraw
+                    let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
+                        (cursorTop, cursorLeft) = cursorPosToXY lineWidths cursorCharNr cursorLineNr
+                    hAdj <- scrolledWindowGetHAdjustment scrolledWindow
+                    adjustmentClampPage hAdj cursorLeft (cursorLeft+30)
+                    vAdj <- scrolledWindowGetVAdjustment scrolledWindow
+                    adjustmentClampPage vAdj (cursorTop) (cursorTop+2*lineHeight+30)
+                    return()
+
             _ <- editorWidget `on` keyPressEvent $ do
                 modifiers <- eventModifier
                 keyValue <- eventKeyVal
                 -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
-                -- TODO: scroll the whole view to fit cursor on screen
-                let moveEditorCursor cmd  = liftIO $ cmd >> widgetQueueDraw editorWidget >> return True
+                let moveEditorCursor cmd  = liftIO $ cmd >> scrollEditorToCursor >> widgetQueueDraw editorWidget >> return True
                 case (modifiers, unpack $ keyName keyValue) of
                     ([], "Right") -> moveEditorCursor $ updateCursorX 1
                     ([], "Left") -> moveEditorCursor $ updateCursorX (-1)
@@ -139,18 +168,10 @@ newEditorForText targetNotebook filePath text = do
                 paint
                 
                 setSourceRGBA 0 0.1 0 1
-                fontSizeInfo <- liftIO $ contextGetMetrics pangoContext fontDescription emptyLanguage
                 fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
                 let linesToDraw = textLines $ sourceData fancyEditorData
-                pangoLineShapes <- liftIO $ sequence $ map (\line -> do
-                        pangoItems <- pangoItemize pangoContext line []
-                        sequence $ map pangoShape pangoItems                        
-                    ) linesToDraw
-
-                lineWidths <- liftIO $ sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
-                let fontHeight = ascent fontSizeInfo + descent fontSizeInfo
-                    lineHeight = fontHeight + 5
-                    posWithShapes = zip [i*lineHeight | i <- [0..]] pangoLineShapes
+                (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths linesToDraw
+                let posWithShapes = zip [i*lineHeight | i <- [0..]] pangoLineShapes
                     textLeft :: Double
                     textLeft = 7
                     textTop = 5 + (ascent fontSizeInfo)
@@ -168,9 +189,7 @@ newEditorForText targetNotebook filePath text = do
                     ) posWithShapes
 
                 let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
-                    cursorTop = (fromIntegral cursorLineNr) * lineHeight - (ascent fontSizeInfo)
-                    maybeCursorLine = listToMaybe $ take 1 . drop cursorLineNr $ lineWidths
-                    cursorLeft = maybe 0 (sum . take cursorCharNr . concat) maybeCursorLine
+                    (cursorTop, cursorLeft) = cursorPosToXY lineWidths cursorCharNr cursorLineNr
 
                 setLineWidth 1
                 setSourceRGBA 0 0 0.3 0.8
