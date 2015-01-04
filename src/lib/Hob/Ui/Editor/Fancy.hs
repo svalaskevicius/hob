@@ -9,6 +9,7 @@ import Graphics.UI.Gtk
 import System.Glib.GObject        (Quark)
 import Graphics.Rendering.Cairo
 import Data.Maybe (listToMaybe)
+import Data.Char (isPrint)
 import Control.Concurrent.MVar (newMVar, readMVar, modifyMVar_)
 
 import Hob.Context
@@ -150,18 +151,38 @@ newEditorForText targetNotebook filePath text = do
                     vAdj <- scrolledWindowGetVAdjustment scrolledWindow
                     adjustmentClampPage vAdj (cursorTop) (cursorTop+2*lineHeight+30)
                     return()
+                    
+            let insertEditorChar c = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                            let source = sourceData fancyEditorData
+                                                tLines = textLines source
+                                                (cx, cy, _) = cursorPos fancyEditorData
+                                                (preLines, postLines) = splitAt cy tLines
+                                                changedLine = fmap (\l -> let (preChars, postChars) = splitAt cx l
+                                                                          in preChars ++ [c] ++ postChars
+                                                                    ) . take 1 $ postLines
+                                                tLines' = preLines ++ changedLine ++ (drop 1 postLines)
+                                                source' = source{textLines = tLines', isModified = True}
+                                            return fancyEditorData{sourceData = source'}
 
             _ <- editorWidget `on` keyPressEvent $ do
                 modifiers <- eventModifier
                 keyValue <- eventKeyVal
                 -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
+                -- TODO: handle delete, backspace, enter
+                -- TODO: handle text selection, cut, copy, paste
                 let moveEditorCursor cmd  = liftIO $ cmd >> scrollEditorToCursor >> widgetQueueDraw editorWidget >> return True
                 case (modifiers, unpack $ keyName keyValue) of
                     ([], "Right") -> moveEditorCursor $ updateCursorX 1
                     ([], "Left") -> moveEditorCursor $ updateCursorX (-1)
                     ([], "Up") -> moveEditorCursor $ updateCursorY (-1)
                     ([], "Down") -> moveEditorCursor $ updateCursorY 1
-                    _ -> return False
+                    _ -> 
+                                maybe (return False) (\c -> 
+                                    if isPrint c then do
+                                        liftIO $ insertEditorChar c
+                                        moveEditorCursor $ updateCursorX 1
+                                    else return False
+                                ) $ keyToChar keyValue
 
             _ <- editorWidget `on` draw $ do
                 setSourceRGB 0.86 0.85 0.8
