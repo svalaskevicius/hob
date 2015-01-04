@@ -194,7 +194,7 @@ newEditorForText targetNotebook filePath text = do
                 setLineWidth 1
                 setSourceRGBA 0 0 0.3 0.8
                 moveTo cursorLeft cursorTop
-                lineTo cursorLeft (cursorTop + lineHeight)
+                lineTo cursorLeft (cursorTop + fontHeight)
                 stroke
                 
                 restore
