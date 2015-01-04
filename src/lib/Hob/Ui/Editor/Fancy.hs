@@ -49,13 +49,14 @@ newSourceData text = return $ SourceData {
     textLines = lines . unpack $ text
 }
 
-newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> Double -> IO EditorDrawingData
-newDrawingData pangoContext source cursor lHeight = do
+newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> Double -> Double -> IO EditorDrawingData
+newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) lHeight fAscent = do
     lineData <- newDrawableLineData pangoContext source lHeight
+    let cursorP = cursorPosToXY (drawableLineWidths lineData) cursorCharNr cursorLineNr lHeight fAscent
     return $ EditorDrawingData {
         drawableLines = lineData,
-        boundingRect = (Point 0 0, Point 0 0),
-        cursorPosition = Point 0 0
+        boundingRect = getBoundingRect lHeight fAscent lineData,
+        cursorPosition = cursorP
     }
 
 -- TODO: maybe add pango context, widget, scrolling widget, move metrics to subsctructure, add cache for glyphs and widths
@@ -65,7 +66,7 @@ newFancyEditor pangoContext widget text = do
     fontSizeInfo <- contextGetMetrics pangoContext fontDescription emptyLanguage
     let lh = (ascent fontSizeInfo) + (descent fontSizeInfo) + 5
     sd <- newSourceData text
-    dd <- newDrawingData pangoContext sd cp lh
+    dd <- newDrawingData pangoContext sd cp lh (ascent fontSizeInfo)
     return $ FancyEditor {
         sourceData = sd,
         cursorPos = cp,
@@ -136,7 +137,7 @@ newEditorForText targetNotebook filePath text = do
             fancyEditorDataHolder <- newMVar =<< newFancyEditor pangoContext editorWidget text
 
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
-            _ <- editorWidget `on` draw $ ((liftIO $ updateDrawingData fancyEditorDataHolder pangoContext) >> drawEditor fancyEditorDataHolder editorWidget)
+            _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
             _ <- editorWidget `on` buttonPressEvent $ liftIO $ widgetGrabFocus editorWidget >> return True
 
             return $ toEditor editorWidget
@@ -145,12 +146,13 @@ modifyEditor :: MVar FancyEditor -> S.StateT FancyEditor IO () -> IO ()
 modifyEditor fancyEditorDataHolder comp = modifyMVar_ fancyEditorDataHolder $ S.execStateT comp
 
 -- | TODO: invalidate and update partially
-updateDrawingData :: MVar FancyEditor -> PangoContext -> IO ()
-updateDrawingData fancyEditorDataHolder pangoContext = modifyEditor fancyEditorDataHolder $ do
+updateDrawingData :: PangoContext -> S.StateT FancyEditor IO ()
+updateDrawingData pangoContext = do
     source <- S.gets sourceData
     cursor <- S.gets cursorPos
     lHeight <- S.gets lineHeight
-    dData <- liftIO $ newDrawingData pangoContext source cursor lHeight
+    fAscent <- S.gets fontAscent
+    dData <- liftIO $ newDrawingData pangoContext source cursor lHeight fAscent
     S.modify $ \ed -> ed{drawingData = dData}
             
 nrOfCharsOnCursorLine :: Int -> S.StateT FancyEditor IO Int
@@ -181,34 +183,24 @@ updateCursorY delta = do
     cx' <- clampCursorX cy' cxn
     S.modify $ \ed -> ed{cursorPos = (cx', cy', cxn)}
 
-cursorPosToXY :: [[Double]] -> Int -> Int -> S.StateT FancyEditor IO (Double, Double)
-cursorPosToXY lineWidths cx cy = do
-    h <- S.gets lineHeight
-    a <- S.gets fontAscent
-    return (cursorTop h a, cursorLeft)
+cursorPosToXY :: [[Double]] -> Int -> Int -> Double -> Double -> Point
+cursorPosToXY lineWidths cx cy lHeight fAscent = Point cursorLeft cursorTop
     where
-        cursorTop h a = (fromIntegral cy) * h - a
+        cursorTop = (fromIntegral cy) * lHeight - fAscent
         maybeCursorLine = listToMaybe $ take 1 . drop cy $ lineWidths
         cursorLeft = maybe 0 (sum . take cx) maybeCursorLine
 
 scrollEditorToCursor :: ScrolledWindowClass s => PangoContext -> s -> S.StateT FancyEditor IO ()
 scrollEditorToCursor pangoContext scrolledWindow = do
     lHeight <- S.gets lineHeight
-    (cursorTop, cursorLeft) <- getCursorPositionXY pangoContext
+    dData <- S.gets drawingData 
+    let (Point cursorLeft cursorTop) = cursorPosition dData
     liftIO $ do
         hAdj <- scrolledWindowGetHAdjustment scrolledWindow
         adjustmentClampPage hAdj cursorLeft (cursorLeft+30)
         vAdj <- scrolledWindowGetVAdjustment scrolledWindow
         adjustmentClampPage vAdj cursorTop (cursorTop+2*lHeight+30)
 
-getCursorPositionXY :: PangoContext -> S.StateT FancyEditor IO (Double, Double)
-getCursorPositionXY pangoContext = do
-    source <- S.gets sourceData
-    (cursorCharNr, cursorLineNr, _) <- S.gets cursorPos
-    let linesToDraw = textLines source
-    (_, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
-    cursorPosToXY lineWidths cursorCharNr cursorLineNr
-        
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
     source <- S.gets sourceData
@@ -235,6 +227,7 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
         invokeEditorCmd cmd  = liftIO $ do
             modifyEditor fancyEditorDataHolder $ do
                 cmd
+                updateDrawingData pangoContext
                 scrollEditorToCursor pangoContext scrolledWindow
             widgetQueueDraw editorWidget
             return True
@@ -257,16 +250,13 @@ getLineShapesWithWidths pangoContext linesToDraw = do
     lineWordWidths <- sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
     return (pangoLineShapes, map concat lineWordWidths)
 
-getBoundingRect :: [DrawableLine] -> S.StateT FancyEditor IO (Double, Double, Double, Double)
-getBoundingRect dLines = do
-    a <- S.gets fontAscent
-    h <- S.gets lineHeight
-    return (textLeft, textTop a, textRight, textBottom a h)
+getBoundingRect :: Double -> Double -> [DrawableLine] -> (Point, Point)
+getBoundingRect lHeight fAscent dLines = (Point textLeft textTop, Point textRight textBottom)
     where
         textLeft = 7
-        textTop a = 5 + a
+        textTop = 5 + fAscent
         textRight = 7 + textLeft + (if null dLines then 0 else maximum . map sum . drawableLineWidths $ dLines)
-        textBottom a h = textTop a + (if null dLines then 0 else (h + (lineTop . last $ dLines)))
+        textBottom = textTop + (if null dLines then 0 else (lHeight + (lineTop . last $ dLines)))
         lineTop (DrawableLine t _ _) = t
 
 drawableLineWidths :: [DrawableLine] -> [[Double]]
@@ -278,11 +268,6 @@ newDrawableLineData pangoContext source h = do
     (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext linesToDraw
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
 
-getDrawableLineData :: S.StateT FancyEditor IO [DrawableLine]
-getDrawableLineData = do
-    dData <- S.gets drawingData
-    return $ drawableLines dData
-
 drawEditor :: WidgetClass w => MVar FancyEditor -> w -> Render ()
 drawEditor fancyEditorDataHolder editorWidget = do
         drawData <- getDrawableData
@@ -293,7 +278,7 @@ drawEditor fancyEditorDataHolder editorWidget = do
             setSourceRGB 0.86 0.85 0.8
             paint
     
-        drawContents (dLines, (textLeft, textTop, textRight, textBottom), cursorPosData) = do
+        drawContents (dLines, ((Point textLeft textTop), (Point textRight textBottom)), cursorPosData) = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             save
             translate textLeft textTop
@@ -316,10 +301,10 @@ drawEditor fancyEditorDataHolder editorWidget = do
             stroke
         
         getDrawableData = liftIO $ S.evalStateT (do
-                    dLines <- getDrawableLineData
-                    bRect <- getBoundingRect dLines
-                    (cursorCharNr, cursorLineNr, _) <- S.gets cursorPos
-                    (cursorTop, cursorLeft) <- cursorPosToXY (drawableLineWidths dLines) cursorCharNr cursorLineNr
+                    dData <- S.gets drawingData
+                    let dLines = drawableLines dData
+                        bRect = boundingRect dData
+                        (Point cursorLeft cursorTop) = cursorPosition dData
                     a <- S.gets fontAscent
                     d <- S.gets fontDescent
                     return (dLines, bRect, (cursorTop, cursorLeft, cursorTop+a+d))
