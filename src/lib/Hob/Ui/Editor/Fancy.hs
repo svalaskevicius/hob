@@ -114,7 +114,13 @@ newEditorForText targetNotebook filePath text = do
                                                 cx' = clampCursorX fancyEditorData cy' cxn
                                             return fancyEditorData{cursorPos = (cx', cy', cxn)}
 
-            
+
+            pangoContext <- cairoCreateContext Nothing
+            fontDescription <- fontDescriptionNew
+            fontDescriptionSetFamily fontDescription "Ubuntu"
+            fontDescriptionSetSize fontDescription 18
+            contextSetFontDescription pangoContext fontDescription
+
             _ <- editorWidget `on` keyPressEvent $ do
                 modifiers <- eventModifier
                 keyValue <- eventKeyVal
@@ -131,36 +137,40 @@ newEditorForText targetNotebook filePath text = do
             _ <- editorWidget `on` draw $ do
                 setSourceRGB 0.86 0.85 0.8
                 paint
-                setSourceRGBA 0 0 0 1
-                selectFontFace "Verdana" FontSlantNormal FontWeightNormal
-                setFontSize 18
-                fontSizeInfo <- fontExtents
+                
+                setSourceRGBA 0 0.1 0 1
+                fontSizeInfo <- liftIO $ contextGetMetrics pangoContext fontDescription emptyLanguage
                 fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
                 let linesToDraw = textLines $ sourceData fancyEditorData
-                lineSizes <- sequence . map textExtents $ linesToDraw
-                let fontHeight = fontExtentsHeight fontSizeInfo
+                pangoLineShapes <- liftIO $ sequence $ map (\line -> do
+                        pangoItems <- pangoItemize pangoContext line []
+                        sequence $ map pangoShape pangoItems                        
+                    ) linesToDraw
+
+                lineWidths <- liftIO $ sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
+                let fontHeight = ascent fontSizeInfo + descent fontSizeInfo
                     lineHeight = fontHeight + 5
-                    posWithText = zip [i*lineHeight | i <- [0..]] linesToDraw
+                    posWithShapes = zip [i*lineHeight | i <- [0..]] pangoLineShapes
+                    textLeft :: Double
                     textLeft = 7
-                    textTop = 5 + (fontExtentsAscent fontSizeInfo)
-                    textBottom = textTop + (if null posWithText then 0 else lineHeight + (fst . last $ posWithText))
-                    textRight = textLeft + (if null lineSizes then 0 else maximum . map textExtentsXadvance $ lineSizes)
+                    textTop = 5 + (ascent fontSizeInfo)
+                    textBottom = textTop + (if null posWithShapes then 0 else lineHeight + (fst . last $ posWithShapes))
+                    textRight = 7 + textLeft + (if null lineWidths then 0 else maximum . map (sum . map sum) $ lineWidths)
 
                 liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
 
                 save
                 translate textLeft textTop
 
-                sequence_ $ map (\(yPos, line) -> do
+                sequence_ $ map (\(yPos, pangoShapes) -> do
                         moveTo 0 yPos
-                        showText line
-                    ) posWithText
+                        sequence_ $ map showGlyphString pangoShapes
+                    ) posWithShapes
 
                 let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
-                    cursorTop = (fromIntegral cursorLineNr) * lineHeight - (fontExtentsAscent fontSizeInfo)
-                    cursorLine = maybe "" id $ listToMaybe $ take 1 $ drop cursorLineNr linesToDraw
-                preCursorLineExtents <- textExtents $ take cursorCharNr cursorLine
-                let cursorLeft = textExtentsXadvance preCursorLineExtents
+                    cursorTop = (fromIntegral cursorLineNr) * lineHeight - (ascent fontSizeInfo)
+                    maybeCursorLine = listToMaybe $ take 1 . drop cursorLineNr $ lineWidths
+                    cursorLeft = maybe 0 (sum . take cursorCharNr . concat) maybeCursorLine
 
                 setLineWidth 1
                 setSourceRGBA 0 0 0.3 0.8
