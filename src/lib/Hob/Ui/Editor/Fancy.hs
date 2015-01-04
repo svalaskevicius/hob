@@ -23,7 +23,10 @@ data SourceData = SourceData {
 data FancyEditor = FancyEditor {
     sourceData         :: SourceData,
     cursorPos          :: (Int, Int, Int), -- X, Y, X_{navigation}
-    getFilePath        :: IO (Maybe FilePath)
+    getFilePath        :: IO (Maybe FilePath),
+    lineHeight         :: Double,
+    fontAscent         :: Double,
+    fontDescent        :: Double
 }
 
 newSourceData :: Text -> SourceData
@@ -32,11 +35,14 @@ newSourceData text = SourceData
             , textLines = lines . unpack $ text
             }
 
-toFancyEditor :: DrawingArea -> Text -> FancyEditor
-toFancyEditor widget text = FancyEditor
+toFancyEditor :: FontMetrics -> DrawingArea -> Text -> FancyEditor
+toFancyEditor fontSizeInfo widget text = FancyEditor
             { sourceData = newSourceData text
             , cursorPos = (0, 0, 0)
             , getFilePath = getEditorWidgetFilePath widget
+            , lineHeight = (ascent fontSizeInfo) + (descent fontSizeInfo) + 5
+            , fontAscent = ascent fontSizeInfo
+            , fontDescent = descent fontSizeInfo
             }
 
 toEditor :: DrawingArea -> Editor
@@ -88,161 +94,148 @@ newEditorForText targetNotebook filePath text = do
             notebookSetCurrentPage targetNotebook tabNr
             notebookSetShowTabs targetNotebook True
 
-            fancyEditorDataHolder <- newMVar $ toFancyEditor editorWidget text
-            
-            let nrOfCharsOnCursorLine fancyEditorData yPos = maybe 0 length . listToMaybe . take 1 . drop yPos $ editorTextLines
-                    where
-                        editorTextLines = textLines $ sourceData fancyEditorData
-                clampCursorX fancyEditorData yPos pos
-                 | pos < 0 = 0
-                 | pos > nrOfChars = nrOfChars
-                 | otherwise = pos
-                 where 
-                    nrOfChars = nrOfCharsOnCursorLine fancyEditorData yPos
-                clampCursorY fancyEditorData pos
-                 | pos < 0 = 0
-                 | pos > nrOfLines = nrOfLines
-                 | otherwise = pos
-                 where 
-                    nrOfLines = length . textLines . sourceData $ fancyEditorData
-            let updateCursorX delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
-                                            let (cx, cy, _) = cursorPos fancyEditorData
-                                                cx' = clampCursorX fancyEditorData cy $ cx + delta
-                                            return fancyEditorData{cursorPos = (cx', cy, cx')}
-            let updateCursorY delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
-                                            let (_, cy, cxn) = cursorPos fancyEditorData
-                                                cy' = clampCursorY fancyEditorData $ cy + delta
-                                                cx' = clampCursorX fancyEditorData cy' cxn
-                                            return fancyEditorData{cursorPos = (cx', cy', cxn)}
-
-
             pangoContext <- cairoCreateContext Nothing
             fontDescription <- fontDescriptionNew
             fontDescriptionSetFamily fontDescription "Ubuntu"
             fontDescriptionSetSize fontDescription 18
             contextSetFontDescription pangoContext fontDescription
-
             fontSizeInfo <- contextGetMetrics pangoContext fontDescription emptyLanguage
-            let fontHeight = ascent fontSizeInfo + descent fontSizeInfo
-                lineHeight = fontHeight + 5
-            let getLineShapesWithWidths linesToDraw = do
-                    pangoLineShapes <- sequence $ map (\line -> do
-                            pangoItems <- pangoItemize pangoContext line []
-                            sequence $ map pangoShape pangoItems                        
-                        ) linesToDraw
 
-                    lineWidths <- sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
-                    return (pangoLineShapes, lineWidths)
+            fancyEditorDataHolder <- newMVar $ toFancyEditor fontSizeInfo editorWidget text
 
-            let cursorPosToXY lineWidths cx cy = (cursorTop, cursorLeft)
-                    where
-                        cursorTop = (fromIntegral cy) * lineHeight - (ascent fontSizeInfo)
-                        maybeCursorLine = listToMaybe $ take 1 . drop cy $ lineWidths
-                        cursorLeft = maybe 0 (sum . take cx . concat) maybeCursorLine
-
-            let scrollEditorToCursor = do
-                    fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
-                    let linesToDraw = textLines $ sourceData fancyEditorData
-                    (_, lineWidths) <- liftIO $ getLineShapesWithWidths linesToDraw
-                    let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
-                        (cursorTop, cursorLeft) = cursorPosToXY lineWidths cursorCharNr cursorLineNr
-                    hAdj <- scrolledWindowGetHAdjustment scrolledWindow
-                    adjustmentClampPage hAdj cursorLeft (cursorLeft+30)
-                    vAdj <- scrolledWindowGetVAdjustment scrolledWindow
-                    adjustmentClampPage vAdj (cursorTop) (cursorTop+2*lineHeight+30)
-                    return()
-                    
-            let insertEditorChar c = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
-                                            let source = sourceData fancyEditorData
-                                                tLines = textLines source
-                                                (cx, cy, _) = cursorPos fancyEditorData
-                                                (preLines, postLines) = splitAt cy tLines
-                                                changedLine = fmap (\l -> let (preChars, postChars) = splitAt cx l
-                                                                          in preChars ++ [c] ++ postChars
-                                                                    ) . take 1 $ postLines
-                                                tLines' = preLines ++ changedLine ++ (drop 1 postLines)
-                                                source' = source{textLines = tLines', isModified = True}
-                                            return fancyEditorData{sourceData = source'}
-
-            _ <- editorWidget `on` keyPressEvent $ do
-                modifiers <- eventModifier
-                keyValue <- eventKeyVal
-                -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
-                -- TODO: handle delete, backspace, enter
-                -- TODO: handle text selection, cut, copy, paste
-                let moveEditorCursor cmd  = liftIO $ cmd >> scrollEditorToCursor >> widgetQueueDraw editorWidget >> return True
-                case (modifiers, unpack $ keyName keyValue) of
-                    ([], "Right") -> moveEditorCursor $ updateCursorX 1
-                    ([], "Left") -> moveEditorCursor $ updateCursorX (-1)
-                    ([], "Up") -> moveEditorCursor $ updateCursorY (-1)
-                    ([], "Down") -> moveEditorCursor $ updateCursorY 1
-                    _ -> 
-                                maybe (return False) (\c -> 
-                                    if isPrint c then do
-                                        liftIO $ insertEditorChar c
-                                        moveEditorCursor $ updateCursorX 1
-                                    else return False
-                                ) $ keyToChar keyValue
-
-            _ <- editorWidget `on` draw $ do
-                setSourceRGB 0.86 0.85 0.8
-                paint
-                
-                setSourceRGBA 0 0.1 0 1
-                fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
-                let linesToDraw = textLines $ sourceData fancyEditorData
-                (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths linesToDraw
-                let posWithShapes = zip [i*lineHeight | i <- [0..]] pangoLineShapes
-                    textLeft :: Double
-                    textLeft = 7
-                    textTop = 5 + (ascent fontSizeInfo)
-                    textBottom = textTop + (if null posWithShapes then 0 else lineHeight + (fst . last $ posWithShapes))
-                    textRight = 7 + textLeft + (if null lineWidths then 0 else maximum . map (sum . map sum) $ lineWidths)
-
-                liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
-
-                save
-                translate textLeft textTop
-
-                sequence_ $ map (\(yPos, pangoShapes) -> do
-                        moveTo 0 yPos
-                        sequence_ $ map showGlyphString pangoShapes
-                    ) posWithShapes
-
-                let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
-                    (cursorTop, cursorLeft) = cursorPosToXY lineWidths cursorCharNr cursorLineNr
-
-                setLineWidth 1
-                setSourceRGBA 0 0 0.3 0.8
-                moveTo cursorLeft cursorTop
-                lineTo cursorLeft (cursorTop + fontHeight)
-                stroke
-                
-                restore
-                
-            _ <- editorWidget `on` buttonPressEvent $ do
-                liftIO $ widgetGrabFocus editorWidget
-                return True
+            _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
+            _ <- editorWidget `on` draw $ drawEditor pangoContext fancyEditorDataHolder editorWidget
+            _ <- editorWidget `on` buttonPressEvent $ liftIO $ widgetGrabFocus editorWidget >> return True
 
             return $ toEditor editorWidget
 
-{-
-getActiveEditorText :: Context -> IO (Maybe Text)
-getActiveEditorText ctx = do
-    editor <- getActiveEditor ctx
-    maybe (return Nothing) ((return . Just) <=< getEditorText) editor
+            
+nrOfCharsOnCursorLine fancyEditorData yPos = maybe 0 length . listToMaybe . take 1 . drop yPos $ editorTextLines
+    where
+        editorTextLines = textLines $ sourceData fancyEditorData
 
-getEditorText :: TextViewClass a => a -> IO Text
-getEditorText textEdit = do
-    textBuf <- textViewGetBuffer textEdit
-    get textBuf textBufferText
+clampCursorX fancyEditorData yPos pos
+ | pos < 0 = 0
+ | pos > nrOfChars = nrOfChars
+ | otherwise = pos
+ where 
+    nrOfChars = nrOfCharsOnCursorLine fancyEditorData yPos
 
-invokeOnActiveEditor :: (SourceView -> IO()) -> App ()
-invokeOnActiveEditor actions = do
-    ctx <- ask
-    editor <- liftIO $ getActiveEditor ctx
-    liftIO $ maybeDo actions editor
--}
+clampCursorY fancyEditorData pos
+ | pos < 0 = 0
+ | pos > nrOfLines = nrOfLines
+ | otherwise = pos
+ where 
+    nrOfLines = length . textLines . sourceData $ fancyEditorData
+
+updateCursorX fancyEditorDataHolder delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                let (cx, cy, _) = cursorPos fancyEditorData
+                                    cx' = clampCursorX fancyEditorData cy $ cx + delta
+                                return fancyEditorData{cursorPos = (cx', cy, cx')}
+updateCursorY fancyEditorDataHolder delta = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                let (_, cy, cxn) = cursorPos fancyEditorData
+                                    cy' = clampCursorY fancyEditorData $ cy + delta
+                                    cx' = clampCursorX fancyEditorData cy' cxn
+                                return fancyEditorData{cursorPos = (cx', cy', cxn)}
+
+cursorPosToXY fancyEditorData lineWidths cx cy = (cursorTop, cursorLeft)
+        where
+            cursorTop = (fromIntegral cy) * (lineHeight fancyEditorData) - (fontAscent fancyEditorData)
+            maybeCursorLine = listToMaybe $ take 1 . drop cy $ lineWidths
+            cursorLeft = maybe 0 (sum . take cx . concat) maybeCursorLine
+
+scrollEditorToCursor fancyEditorDataHolder pangoContext scrolledWindow = do
+        fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
+        let linesToDraw = textLines $ sourceData fancyEditorData
+        (_, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
+        let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
+            (cursorTop, cursorLeft) = cursorPosToXY fancyEditorData lineWidths cursorCharNr cursorLineNr
+        hAdj <- scrolledWindowGetHAdjustment scrolledWindow
+        adjustmentClampPage hAdj cursorLeft (cursorLeft+30)
+        vAdj <- scrolledWindowGetVAdjustment scrolledWindow
+        adjustmentClampPage vAdj (cursorTop) (cursorTop+2*(lineHeight fancyEditorData)+30)
+        return()
+        
+insertEditorChar fancyEditorDataHolder c = modifyMVar_ fancyEditorDataHolder $ \fancyEditorData -> do
+                                let source = sourceData fancyEditorData
+                                    tLines = textLines source
+                                    (cx, cy, _) = cursorPos fancyEditorData
+                                    (preLines, postLines) = splitAt cy tLines
+                                    changedLine = fmap (\l -> let (preChars, postChars) = splitAt cx l
+                                                              in preChars ++ [c] ++ postChars
+                                                        ) . take 1 $ postLines
+                                    tLines' = preLines ++ changedLine ++ (drop 1 postLines)
+                                    source' = source{textLines = tLines', isModified = True}
+                                return fancyEditorData{sourceData = source'}
+
+keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
+    modifiers <- eventModifier
+    keyValue <- eventKeyVal
+    -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
+    -- TODO: handle delete, backspace, enter
+    -- TODO: handle home, end, page down, page up
+    -- TODO: handle text selection, cut, copy, paste
+    let moveEditorCursor cmd  = liftIO $ cmd >> scrollEditorToCursor fancyEditorDataHolder pangoContext scrolledWindow >> widgetQueueDraw editorWidget >> return True
+    case (modifiers, unpack $ keyName keyValue) of
+        ([], "Right") -> moveEditorCursor $ updateCursorX fancyEditorDataHolder 1
+        ([], "Left") -> moveEditorCursor $ updateCursorX fancyEditorDataHolder (-1)
+        ([], "Up") -> moveEditorCursor $ updateCursorY fancyEditorDataHolder (-1)
+        ([], "Down") -> moveEditorCursor $ updateCursorY fancyEditorDataHolder 1
+        _ -> 
+                    maybe (return False) (\c -> 
+                        if isPrint c then do
+                            liftIO $ insertEditorChar fancyEditorDataHolder c
+                            moveEditorCursor $ updateCursorX fancyEditorDataHolder 1
+                        else return False
+                    ) $ keyToChar keyValue
+
+
+getLineShapesWithWidths pangoContext linesToDraw = do
+    pangoLineShapes <- sequence $ map (\line -> do
+            pangoItems <- pangoItemize pangoContext line []
+            sequence $ map pangoShape pangoItems                        
+        ) linesToDraw
+
+    lineWidths <- sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
+    return (pangoLineShapes, lineWidths)
+
+
+drawEditor pangoContext fancyEditorDataHolder editorWidget = do
+    setSourceRGB 0.86 0.85 0.8
+    paint
+    
+    setSourceRGBA 0 0.1 0 1
+    fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
+    let linesToDraw = textLines $ sourceData fancyEditorData
+    (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
+    let posWithShapes = zip [i*(lineHeight fancyEditorData) | i <- [0..]] pangoLineShapes
+        textLeft :: Double
+        textLeft = 7
+        textTop = 5 + (fontAscent fancyEditorData)
+        textBottom = textTop + (if null posWithShapes then 0 else (lineHeight fancyEditorData) + (fst . last $ posWithShapes))
+        textRight = 7 + textLeft + (if null lineWidths then 0 else maximum . map (sum . map sum) $ lineWidths)
+
+    liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
+
+    save
+    translate textLeft textTop
+
+    sequence_ $ map (\(yPos, pangoShapes) -> do
+            moveTo 0 yPos
+            sequence_ $ map showGlyphString pangoShapes
+        ) posWithShapes
+
+    let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
+        (cursorTop, cursorLeft) = cursorPosToXY fancyEditorData lineWidths cursorCharNr cursorLineNr
+
+    setLineWidth 1
+    setSourceRGBA 0 0 0.3 0.8
+    moveTo cursorLeft cursorTop
+    lineTo cursorLeft (cursorTop + (fontAscent fancyEditorData) + (fontDescent fancyEditorData))
+    stroke
+    
+    restore
+
 
 getActiveEditor :: Context -> IO (Maybe DrawingArea)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
