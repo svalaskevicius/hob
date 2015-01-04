@@ -10,12 +10,12 @@ import Data.Maybe           (mapMaybe)
 import Data.Text            (pack)
 import Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.Ui.Editor
-import qualified Hob.Ui.Editor.Fancy as Fancy
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.Ui.Editor
+import qualified Hob.Ui.Editor.Fancy     as Fancy
 
 type NewFileEditorLauncher = FilePath -> IO ()
 
