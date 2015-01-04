@@ -123,27 +123,37 @@ newEditorForText targetNotebook filePath text = do
         updateEditors (editors ctx) $ \oldEditors -> return $ oldEditors ++ [editor]
     where
         title = tabTitleForFile filePath
-        createNewEditor ctx = do
+
+        newEditorWidget newId = do
             editorWidget <- drawingAreaNew
             widgetSetCanFocus editorWidget True
-            newId <- idGenerator ctx
             setEditorId editorWidget newId
             setEditorWidgetFilePath editorWidget filePath
             setEditorModes editorWidget []
-
+            return editorWidget
+        
+        newEditorScrolls editorWidget = do
             scrolledWindow <- scrolledWindowNew Nothing Nothing
             scrolledWindow `containerAdd` editorWidget
             widgetShowAll scrolledWindow
             tabNr <- notebookAppendPage targetNotebook scrolledWindow title
             notebookSetCurrentPage targetNotebook tabNr
             notebookSetShowTabs targetNotebook True
-
+            return scrolledWindow
+            
+        newPangoContext = do
             pangoContext <- cairoCreateContext Nothing
             fontDescription <- fontDescriptionNew
             fontDescriptionSetFamily fontDescription "Ubuntu"
             fontDescriptionSetSize fontDescription 18
             contextSetFontDescription pangoContext fontDescription
-
+            return pangoContext
+        
+        createNewEditor ctx = do
+            editorWidget <- newEditorWidget =<< idGenerator ctx
+            scrolledWindow <- newEditorScrolls editorWidget
+            pangoContext <- newPangoContext
+            
             fancyEditorDataHolder <- newMVar =<< newFancyEditor pangoContext text
 
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
