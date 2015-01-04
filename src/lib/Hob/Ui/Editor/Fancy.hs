@@ -151,17 +151,21 @@ cursorPosToXY fancyEditorData lineWidths cx cy = (cursorTop, cursorLeft)
         cursorLeft = maybe 0 (sum . take cx . concat) maybeCursorLine
 
 scrollEditorToCursor pangoContext scrolledWindow = do
-    source <- S.gets sourceData
-    (cursorCharNr, cursorLineNr, _) <- S.gets cursorPos
     lHeight <- S.gets lineHeight
-    let linesToDraw = textLines source
-    (_, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
-    (cursorTop, cursorLeft) <- cursorPosToXY' lineWidths cursorCharNr cursorLineNr
+    (cursorTop, cursorLeft) <- getCursorPositionXY pangoContext
     liftIO $ do
         hAdj <- scrolledWindowGetHAdjustment scrolledWindow
         adjustmentClampPage hAdj cursorLeft (cursorLeft+30)
         vAdj <- scrolledWindowGetVAdjustment scrolledWindow
         adjustmentClampPage vAdj cursorTop (cursorTop+2*lHeight+30)
+
+getCursorPositionXY pangoContext = do
+    source <- S.gets sourceData
+    (cursorCharNr, cursorLineNr, _) <- S.gets cursorPos
+    let linesToDraw = textLines source
+    (_, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
+    cursorPosToXY' lineWidths cursorCharNr cursorLineNr
+        
 
 insertEditorChar c = do
     source <- S.gets sourceData
@@ -178,11 +182,12 @@ insertEditorChar c = do
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
     modifiers <- eventModifier
     keyValue <- eventKeyVal
+    let printableChar = (\c -> if isPrint c then Just c else Nothing) =<< keyToChar keyValue
     -- TODO: widgetQueueDraw should only redraw previous and next cursor regions 
     -- TODO: handle delete, backspace, enter
     -- TODO: handle home, end, page down, page up
     -- TODO: handle text selection, cut, copy, paste
-    let moveEditorCursor cmd  = liftIO $ do
+    let invokeEditorCmd cmd  = liftIO $ do
             modifyEditor fancyEditorDataHolder $ do
                 cmd
                 scrollEditorToCursor pangoContext scrolledWindow
@@ -190,21 +195,14 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             return True
 
     case (modifiers, unpack $ keyName keyValue) of
-        ([], "Right") -> moveEditorCursor $ updateCursorX 1
-        ([], "Left") -> moveEditorCursor $ updateCursorX (-1)
-        ([], "Up") -> moveEditorCursor $ updateCursorY (-1)
-        ([], "Down") -> moveEditorCursor $ updateCursorY 1
-        _ -> 
-                    maybe (return False) (\c -> 
-                        if isPrint c then liftIO $ do
-                            modifyEditor fancyEditorDataHolder $ do
-                                insertEditorChar c
-                                updateCursorX 1
-                                scrollEditorToCursor pangoContext scrolledWindow
-                            widgetQueueDraw editorWidget
-                            return True
-                        else return False
-                    ) $ keyToChar keyValue
+        ([], "Right") -> invokeEditorCmd $ updateCursorX 1
+        ([], "Left") -> invokeEditorCmd $ updateCursorX (-1)
+        ([], "Up") -> invokeEditorCmd $ updateCursorY (-1)
+        ([], "Down") -> invokeEditorCmd $ updateCursorY 1
+        _ -> maybe (return False) (\c -> invokeEditorCmd $ do
+                 insertEditorChar c
+                 updateCursorX 1
+             ) printableChar
 
 
 getLineShapesWithWidths pangoContext linesToDraw = do
@@ -219,19 +217,18 @@ getLineShapesWithWidths pangoContext linesToDraw = do
 
 drawEditor pangoContext fancyEditorDataHolder editorWidget = do
         drawBackground
-        drawText
+        drawContents
     where
         drawBackground = do
             setSourceRGB 0.86 0.85 0.8
             paint
     
-        drawText = do
+        drawContents = do
             setSourceRGBA 0 0.1 0 1
             fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
             let linesToDraw = textLines $ sourceData fancyEditorData
             (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
             let posWithShapes = zip [i*(lineHeight fancyEditorData) | i <- [0..]] pangoLineShapes
-                textLeft :: Double
                 textLeft = 7
                 textTop = 5 + (fontAscent fancyEditorData)
                 textBottom = textTop + (if null posWithShapes then 0 else (lineHeight fancyEditorData) + (fst . last $ posWithShapes))
