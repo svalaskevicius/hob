@@ -214,46 +214,66 @@ getLineShapesWithWidths pangoContext linesToDraw = do
     lineWidths <- sequence . map (sequence . map (`glyphItemGetLogicalWidths` Nothing)) $ pangoLineShapes
     return (pangoLineShapes, lineWidths)
 
+getBoundingRect drawableLines = do
+    a <- S.gets fontAscent
+    h <- S.gets lineHeight
+    return (textLeft, textTop a, textRight, textBottom a h)
+    where
+        textLeft = 7
+        textTop a = 5 + a
+        textRight = 7 + textLeft + (if null drawableLines then 0 else maximum . map (sum . map sum) . drawableLineWidths $ drawableLines)
+        textBottom a h = textTop a + (if null drawableLines then 0 else (h + (lineTop . last $ drawableLines)))
+        lineTop (t, _, _) = t
+
+drawableLineWidths = map (\(_, w, _) -> w)
+
+getDrawableLineData pangoContext = do
+    source <- S.gets sourceData
+    h <- S.gets lineHeight
+    let linesToDraw = textLines source
+    (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
+    return $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
 
 drawEditor pangoContext fancyEditorDataHolder editorWidget = do
+        drawData <- getDrawableData
         drawBackground
-        drawContents
+        drawContents drawData
     where
         drawBackground = do
             setSourceRGB 0.86 0.85 0.8
             paint
     
-        drawContents = do
-            setSourceRGBA 0 0.1 0 1
-            fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
-            let linesToDraw = textLines $ sourceData fancyEditorData
-            (pangoLineShapes, lineWidths) <- liftIO $ getLineShapesWithWidths pangoContext linesToDraw
-            let posWithShapes = zip [i*(lineHeight fancyEditorData) | i <- [0..]] pangoLineShapes
-                textLeft = 7
-                textTop = 5 + (fontAscent fancyEditorData)
-                textBottom = textTop + (if null posWithShapes then 0 else (lineHeight fancyEditorData) + (fst . last $ posWithShapes))
-                textRight = 7 + textLeft + (if null lineWidths then 0 else maximum . map (sum . map sum) $ lineWidths)
-
+        drawContents (drawableLines, (textLeft, textTop, textRight, textBottom), cursorPosData) = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
-
             save
             translate textLeft textTop
+            drawText drawableLines
+            drawCursor cursorPosData
+            restore
 
-            sequence_ $ map (\(yPos, pangoShapes) -> do
+        drawText drawableLines = do
+            setSourceRGBA 0 0.1 0 1
+            sequence_ $ map (\(yPos, _, pangoShapes) -> do
                     moveTo 0 yPos
                     sequence_ $ map showGlyphString pangoShapes
-                ) posWithShapes
+                ) drawableLines
 
-            let (cursorCharNr, cursorLineNr, _) = cursorPos $ fancyEditorData
-                (cursorTop, cursorLeft) = cursorPosToXY fancyEditorData lineWidths cursorCharNr cursorLineNr
-
+        drawCursor (cursorTop, cursorLeft, cursorBottom) = do
             setLineWidth 1
             setSourceRGBA 0 0 0.3 0.8
             moveTo cursorLeft cursorTop
-            lineTo cursorLeft (cursorTop + (fontAscent fancyEditorData) + (fontDescent fancyEditorData))
+            lineTo cursorLeft cursorBottom
             stroke
-            
-            restore
+        
+        getDrawableData = liftIO $ S.evalStateT (do
+                    drawableLines <- getDrawableLineData pangoContext
+                    boundingRect <- getBoundingRect drawableLines
+                    (cursorCharNr, cursorLineNr, _) <- S.gets cursorPos
+                    (cursorTop, cursorLeft) <- cursorPosToXY' (drawableLineWidths drawableLines) cursorCharNr cursorLineNr
+                    a <- S.gets fontAscent
+                    d <- S.gets fontDescent
+                    return (drawableLines, boundingRect, (cursorTop, cursorLeft, cursorTop+a+d))
+                ) =<< readMVar fancyEditorDataHolder
 
 
 getActiveEditor :: Context -> IO (Maybe DrawingArea)
