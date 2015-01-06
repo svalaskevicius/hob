@@ -53,7 +53,8 @@ library
                    filepath -any, glib >=0.13.0.0, gtk3 >=0.13.0.1, pango >= 0.13.0.0, cairo >= 0.13.0.1,
                    gtksourceview3 >=0.13.0.0, mtl >=2.1.0 && <2.2.0,
                    transformers >=0.3.0.0 && <0.4, text >= 1.1.1.0,
-                   system-filepath -any, gtk-largeTreeStore >= 0.0.1.0, vector >= 0.10.12.2 && < 0.10.13
+                   system-filepath -any, gtk-largeTreeStore >= 0.0.1.0, vector >= 0.10.12.2 && < 0.10.13,
+                   haskell-src-exts >= 1.16.0.1 && < 1.17.0.0
 
 test-suite spec
   type:
