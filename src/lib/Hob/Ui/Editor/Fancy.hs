@@ -42,7 +42,7 @@ data EditorDrawingOptions = EditorDrawingOptions {
 
 data FancyEditor = FancyEditor {
     sourceData     :: SourceData,
-    cursorPos      :: (Int, Int, Int), -- X, Y, X_{navigation}
+    cursorPos      :: (Int, Int, Int), -- ^ X, Y, X_{navigation}
     drawingOptions :: EditorDrawingOptions,
     drawingData    :: EditorDrawingData
 }
