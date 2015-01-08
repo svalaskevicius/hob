@@ -17,6 +17,7 @@ import           System.Glib.GObject       (Quark)
 import qualified Language.Haskell.Exts.Annotated as P
 import Data.Tree
 import Data.Traversable (traverse)
+import qualified Data.Foldable as F
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -63,7 +64,8 @@ data FancyEditor = FancyEditor {
 
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
-newSourceData text = return sd
+newSourceData text = do
+    return sd
     where
         parseMode = P.defaultParseMode
         textAsString = unpack $ text
@@ -75,8 +77,8 @@ newSourceData text = return sd
                 (\s -> Block 
                         (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
                         (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
-                ) . P.srcInfoSpan . P.ann
-            )
+                )
+            ) . concatMap (F.foldr (\a s->(s++[P.srcInfoSpan a])) [])
         sd = SourceData {
             isModified = False,
             textLines = lines textAsString,
