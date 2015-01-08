@@ -13,25 +13,39 @@ import           Filesystem.Path.CurrentOS (decodeString, encodeString,
                                             filename)
 import           Graphics.Rendering.Cairo
 import           Graphics.UI.Gtk           hiding (Point)
+import           System.Glib.GObject       (Quark)
+import qualified Language.Haskell.Exts.Annotated as P
+import Data.Tree
+import Data.Traversable (traverse)
+
 import           Hob.Context
 import           Hob.Context.UiContext
-import           System.Glib.GObject       (Quark)
+
+data Block a = Block (Point a) (Point a) deriving Show
+type BlockD = Block Double
+type BlockI = Block Int
+type Blocks a = Forest (Block a)
 
 data SourceData = SourceData {
-    isModified :: Bool,
-    textLines  :: [String]
+    isModified  :: Bool,
+    textLines   :: [String],
+    parseResult :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
+    sourceBlocks :: Blocks Int
 }
 
 -- | Point x y
-data Point = Point Double Double
+data Point a = Point a a deriving Show
+type PointD = Point Double
+type PointI = Point Int
 
 -- | DrawableLine (y position) (x position of each char) (glyphs to draw)
 data DrawableLine = DrawableLine Double [Double] [GlyphItem]
 
 data EditorDrawingData = EditorDrawingData {
     drawableLines  :: [DrawableLine],
-    boundingRect   :: (Point, Point),
-    cursorPosition :: Point
+    boundingRect   :: (PointD, PointD),
+    cursorPosition :: PointD,
+    backgroundBlocks :: Blocks Double
 }
 
 data EditorDrawingOptions = EditorDrawingOptions {
@@ -49,20 +63,49 @@ data FancyEditor = FancyEditor {
 
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
-newSourceData text = return SourceData {
-    isModified = False,
-    textLines = lines . unpack $ text
-}
+newSourceData text = return sd
+    where
+        parseMode = P.defaultParseMode
+        textAsString = unpack $ text
+        parsedModule = P.parseFileContentsWithComments parseMode textAsString
+        declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
+        declarations (P.ParseFailed _ _) = []
+        declarations _ = error "unsupported parse result"
+        collectSourceBlocks = map (
+                (\s -> Block 
+                        (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
+                        (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
+                ) . P.srcInfoSpan . P.ann
+            )
+        sd = SourceData {
+            isModified = False,
+            textLines = lines textAsString,
+            parseResult = parsedModule,
+            sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule
+        }
 
 newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
 newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
     lineData <- newDrawableLineData pangoContext source opts
-    let cursorP = cursorPosToXY (drawableLineWidths lineData) cursorCharNr cursorLineNr opts
-    return EditorDrawingData {
-        drawableLines = lineData,
-        boundingRect = getBoundingRect opts lineData,
-        cursorPosition = cursorP
-    }
+    let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
+    return $ ed lineData cursorP
+    where
+        sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
+        convertBlocks lineData = fmap . fmap $ convertBlock
+            where
+                convertBlock (Block tl br) = Block (sourceCoordsToDrawing lineData tl) (movePointToMaxRightOfTheRange tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br)
+                movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
+                movePointToMaxRightOfTheRange (Point _ l1) (Point _ l2) (Point px py) = Point (max px maxRight) py
+                    where
+                        maxRight = maximum . (0:) . map sum $ lineRange
+                            where
+                                lineRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
+        ed lineData cursorP = EditorDrawingData {
+            drawableLines = lineData,
+            boundingRect = getBoundingRect opts lineData,
+            cursorPosition = cursorP,
+            backgroundBlocks = convertBlocks lineData (sourceBlocks source)
+        }
 
 newDrawingOptions :: PangoContext -> IO EditorDrawingOptions
 newDrawingOptions pangoContext = do
@@ -204,8 +247,8 @@ updateCursorY delta = do
     cx' <- clampCursorX cy' cxn
     S.modify $ \ed -> ed{cursorPos = (cx', cy', cxn)}
 
-cursorPosToXY :: [[Double]] -> Int -> Int -> EditorDrawingOptions -> Point
-cursorPosToXY lineWidths cx cy opts = Point cursorLeft cursorTop
+sourcePointToDrawingPoint :: [[Double]] -> PointI -> EditorDrawingOptions -> PointD
+sourcePointToDrawingPoint lineWidths (Point cx cy) opts = Point cursorLeft cursorTop
     where
         cursorTop = fromIntegral cy * lHeight - fAscent
         maybeCursorLine = listToMaybe $ take 1 . drop cy $ lineWidths
@@ -274,7 +317,7 @@ getLineShapesWithWidths pangoContext linesToDraw = do
     lineWordWidths <- mapM (mapM (`glyphItemGetLogicalWidths` Nothing)) pangoLineShapes
     return (pangoLineShapes, map concat lineWordWidths)
 
-getBoundingRect :: EditorDrawingOptions -> [DrawableLine] -> (Point, Point)
+getBoundingRect :: EditorDrawingOptions -> [DrawableLine] -> (PointD, PointD)
 getBoundingRect opts dLines = (Point textLeft textTop, Point textRight textBottom)
     where
         fAscent = fontAscent opts
@@ -310,6 +353,8 @@ drawEditor fancyEditorDataHolder editorWidget = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             save
             translate textLeft textTop
+            setSourceRGBA 0.46 0.45 0.3 0.2
+            _ <- traverse (traverse (\(Block (Point x1 y1) (Point x2 y2)) -> rectangle x1 y1 (abs (x2-x1)) (abs(y2-y1)) >> fill)) $ backgroundBlocks dData
             drawText (drawableLines dData)
             drawCursor dData opts
             restore
