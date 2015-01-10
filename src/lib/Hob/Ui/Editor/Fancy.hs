@@ -6,7 +6,7 @@ import           Control.Concurrent.MVar   (MVar, modifyMVar_, newMVar,
                                             readMVar)
 import           Control.Monad.Reader
 import qualified Control.Monad.State.Lazy  as S
-import           Data.Char                 (isPrint)
+import           Data.Char                 (isPrint, isSpace)
 import           Data.Maybe                (listToMaybe)
 import           Data.Text                 (Text, unpack)
 import           Filesystem.Path.CurrentOS (decodeString, encodeString,
@@ -95,22 +95,45 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
         sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
         convertBlocks lineData = fmap . fmap $ convertBlock
             where
-                convertBlock (Block tl br) = [dTopLeft, dTopRight, dBottomRight, dBottomLeft]
+                convertBlock (Block tl br) = if multiline then [dTopLeft, dTopRight, dBottomRight, dBottomLeft, dTopLeftSecondLine, dBottomLeftFirstLine]
+                                             else [dTopLeft, dTopRight, dBottomRight, dBottomLeftFirstLine]
                     where
+                        multiline = let (Point _ sy1) = tl
+                                        (Point _ sy2) = br
+                                    in sy2 > sy1
                         dTopLeft = sourceCoordsToDrawing lineData tl
                         dBottomRight = movePointToMaxRightOfTheRange tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br
                         dTopRight = let (Point _ tly) = dTopLeft
                                         (Point brx _) = dBottomRight
                                     in Point brx tly
+                        dBottomLeftFirstLine = let (Point tlx tly) = dTopLeft
+                                               in Point tlx (tly + lineHeight opts)
                         dBottomLeft = let (Point tlx _) = dTopLeft
                                           (Point _ bry) = dBottomRight
-                                      in Point tlx bry
+                                          (Point _ sy1) = tl
+                                          (Point _ sy2) = br
+                                      in Point (min tlx $ leftMostCharBetween (sy1+1) sy2) bry
+                        dTopLeftSecondLine = let (Point _ tly) = dTopLeft
+                                                 (Point blx _) = dBottomLeft
+                                             in Point blx (tly + lineHeight opts)
+                leftMostCharBetween :: Int -> Int -> Double
+                leftMostCharBetween l1 l2 = maximum . (0:) $ lineWhiteSpacePrefixWidths
+                    where
+                        lineTextRange = take (l2-l1) . drop (l1) $ (textLines source)
+                        lineWhiteSpacePrefixes :: [String]
+                        lineWhiteSpacePrefixes = map (takeWhile isSpace) lineTextRange
+                        lineWhiteSpacePrefixLengths :: [Int]
+                        lineWhiteSpacePrefixLengths = map length lineWhiteSpacePrefixes
+                        lineWhiteSpacePrefixWidths :: [Double]
+                        lineWhiteSpacePrefixWidths = zipWith (\l w -> sum $ take l w) lineWhiteSpacePrefixLengths lineWidthRange 
+                        lineWidthRange :: [[Double]]
+                        lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
                 movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
                 movePointToMaxRightOfTheRange (Point _ l1) (Point _ l2) (Point px py) = Point (max px maxRight) py
                     where
-                        maxRight = maximum . (0:) . map sum $ lineRange
+                        maxRight = maximum . (0:) . map sum $ lineWidthRange
                             where
-                                lineRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
+                                lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
         ed lineData cursorP = EditorDrawingData {
             drawableLines = lineData,
             boundingRect = getBoundingRect opts lineData,
@@ -364,11 +387,14 @@ drawEditor fancyEditorDataHolder editorWidget = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             save
             translate textLeft textTop
-            setSourceRGBA 0.69 0.65 0.5 0.3
             let drawBgPath [] = return()
                 drawBgPath ((Point px py):ps) = do
                     moveTo px py
                     mapM_ (\(Point lx ly) -> lineTo lx ly) ps
+                    closePath
+                    setSourceRGB 0.9 0 0
+                    strokePreserve
+                    setSourceRGBA 0.69 0.65 0.5 0.3
                     fill
             _ <- traverse (traverse drawBgPath) $ backgroundPaths dData
             drawText (drawableLines dData)
