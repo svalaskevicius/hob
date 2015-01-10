@@ -46,7 +46,7 @@ data EditorDrawingData = EditorDrawingData {
     drawableLines  :: [DrawableLine],
     boundingRect   :: (PointD, PointD),
     cursorPosition :: PointD,
-    backgroundBlocks :: Blocks Double
+    backgroundPaths :: Forest [PointD]
 }
 
 data EditorDrawingOptions = EditorDrawingOptions {
@@ -95,7 +95,16 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
         sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
         convertBlocks lineData = fmap . fmap $ convertBlock
             where
-                convertBlock (Block tl br) = Block (sourceCoordsToDrawing lineData tl) (movePointToMaxRightOfTheRange tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br)
+                convertBlock (Block tl br) = [dTopLeft, dTopRight, dBottomRight, dBottomLeft]
+                    where
+                        dTopLeft = sourceCoordsToDrawing lineData tl
+                        dBottomRight = movePointToMaxRightOfTheRange tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br
+                        dTopRight = let (Point _ tly) = dTopLeft
+                                        (Point brx _) = dBottomRight
+                                    in Point brx tly
+                        dBottomLeft = let (Point tlx _) = dTopLeft
+                                          (Point _ bry) = dBottomRight
+                                      in Point tlx bry
                 movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
                 movePointToMaxRightOfTheRange (Point _ l1) (Point _ l2) (Point px py) = Point (max px maxRight) py
                     where
@@ -106,7 +115,7 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
             drawableLines = lineData,
             boundingRect = getBoundingRect opts lineData,
             cursorPosition = cursorP,
-            backgroundBlocks = convertBlocks lineData (sourceBlocks source)
+            backgroundPaths = convertBlocks lineData (sourceBlocks source)
         }
 
 newDrawingOptions :: PangoContext -> IO EditorDrawingOptions
@@ -355,8 +364,13 @@ drawEditor fancyEditorDataHolder editorWidget = do
             liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             save
             translate textLeft textTop
-            setSourceRGBA 0.46 0.45 0.3 0.2
-            _ <- traverse (traverse (\(Block (Point x1 y1) (Point x2 y2)) -> rectangle x1 y1 (abs (x2-x1)) (abs(y2-y1)) >> fill)) $ backgroundBlocks dData
+            setSourceRGBA 0.69 0.65 0.5 0.3
+            let drawBgPath [] = return()
+                drawBgPath ((Point px py):ps) = do
+                    moveTo px py
+                    mapM_ (\(Point lx ly) -> lineTo lx ly) ps
+                    fill
+            _ <- traverse (traverse drawBgPath) $ backgroundPaths dData
             drawText (drawableLines dData)
             drawCursor dData opts
             restore
