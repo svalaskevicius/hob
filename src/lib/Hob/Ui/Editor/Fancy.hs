@@ -18,6 +18,7 @@ import qualified Language.Haskell.Exts.Annotated as P
 import Data.Tree
 import Data.Traversable (traverse)
 import qualified Data.Foldable as F
+import Data.Generics
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -62,9 +63,29 @@ data FancyEditor = FancyEditor {
     drawingData    :: EditorDrawingData
 }
 
+
+findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
+findVars (P.Var _ (P.UnQual _ name)) = [name]
+findVars _ = []
+
+findNames :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
+findNames name = [name]
+
+findNamesInPatterns :: [P.Pat P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
+findNamesInPatterns = concatMap (findElements findNames)
+
+findFuncs :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, P.SrcSpanInfo, [P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+findFuncs (P.Match l name pat rhs _) = [(name, l, findNamesInPatterns pat, findElements findVars rhs)]
+findFuncs (P.InfixMatch l pat1 name pat2 rhs _) = [(name, l, (findElements findNames pat1) ++ (findNamesInPatterns pat2), findElements findVars rhs)]
+
+findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
+findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
+
+
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
 newSourceData text = do
+    print $ findElements findFuncs  $ declarations parsedModule
     return sd
     where
         parseMode = P.defaultParseMode
