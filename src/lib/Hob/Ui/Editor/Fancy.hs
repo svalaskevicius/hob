@@ -7,7 +7,7 @@ import           Control.Concurrent.MVar   (MVar, modifyMVar_, newMVar,
 import           Control.Monad.Reader
 import qualified Control.Monad.State.Lazy  as S
 import           Data.Char                 (isPrint, isSpace)
-import           Data.Maybe                (listToMaybe)
+import           Data.Maybe                (listToMaybe, mapMaybe)
 import           Data.Text                 (Text, unpack)
 import           Filesystem.Path.CurrentOS (decodeString, encodeString,
                                             filename)
@@ -28,11 +28,14 @@ type BlockD = Block Double
 type BlockI = Block Int
 type Blocks a = Forest (Block a)
 
+data VariableDependency = VariableDependency (P.Name P.SrcSpanInfo) [P.Name P.SrcSpanInfo] deriving Show
+
 data SourceData = SourceData {
-    isModified  :: Bool,
-    textLines   :: [String],
-    parseResult :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
-    sourceBlocks :: Blocks Int
+    isModified   :: Bool,
+    textLines    :: [String],
+    parseResult  :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
+    sourceBlocks :: Blocks Int,
+    varDeps      :: [VariableDependency]
 }
 
 -- | Point x y
@@ -63,7 +66,6 @@ data FancyEditor = FancyEditor {
     drawingData    :: EditorDrawingData
 }
 
-
 findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findVars (P.Var _ (P.UnQual _ name)) = [name]
 findVars _ = []
@@ -74,19 +76,24 @@ findNames name = [name]
 findNamesInPatterns :: [P.Pat P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
 findNamesInPatterns = concatMap (findElements findNames)
 
-findFuncs :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, P.SrcSpanInfo, [P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
-findFuncs (P.Match l name pat rhs _) = [(name, l, findNamesInPatterns pat, findElements findVars rhs)]
-findFuncs (P.InfixMatch l pat1 name pat2 rhs _) = [(name, l, (findElements findNames pat1) ++ (findNamesInPatterns pat2), findElements findVars rhs)]
+findFuncs :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+findFuncs (P.Match _ name pat rhs _) = [(name, findNamesInPatterns pat, findElements findVars rhs)]
+findFuncs (P.InfixMatch _ pat1 name pat2 rhs _) = [(name, (findElements findNames pat1) ++ (findNamesInPatterns pat2), findElements findVars rhs)]
 
 findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
 findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
 
+findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
+findVariableDependencies decls = funcUsages ++ varUsages
+    where
+        varElements = findElements findFuncs decls
+        funcs = map (\(f, _, _)->f) varElements
+        funcUsages = map (\f->VariableDependency f (concatMap (\(_, _, usages)-> filter (f P.=~=) usages) varElements)) funcs
+        varUsages = concatMap (\(_, vars, usages) -> map (\v->VariableDependency v (filter (v P.=~=) usages)) vars) varElements
 
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
-newSourceData text = do
-    print $ findElements findFuncs  $ declarations parsedModule
-    return sd
+newSourceData text = return sd
     where
         parseMode = P.defaultParseMode
         textAsString = unpack $ text
@@ -100,11 +107,13 @@ newSourceData text = do
                         (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
                 )
             ) . concatMap (F.foldr (\a s->(s++[P.srcInfoSpan a])) [])
+        variableDeps = findVariableDependencies . declarations $ parsedModule
         sd = SourceData {
             isModified = False,
             textLines = lines textAsString,
             parseResult = parsedModule,
-            sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule
+            sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule,
+            varDeps = variableDeps
         }
 
 newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
