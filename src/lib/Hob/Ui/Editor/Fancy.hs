@@ -43,13 +43,14 @@ data Point a = Point a a deriving Show
 type PointD = Point Double
 type PointI = Point Int
 
--- | DrawableLine (y position) (x position of each char) (glyphs to draw)
-data DrawableLine = DrawableLine Double [Double] [GlyphItem]
+--data DrawableG
+-- | DrawableLine (y position) (x position of each char) [(width of the glyph, colour group, glyph to draw)]
+data DrawableLine = DrawableLine Double [Double] [(Double, Int, GlyphItem)]
 
 data EditorDrawingData = EditorDrawingData {
-    drawableLines  :: [DrawableLine],
-    boundingRect   :: (PointD, PointD),
-    cursorPosition :: PointD,
+    drawableLines   :: [DrawableLine],
+    boundingRect    :: (PointD, PointD),
+    cursorPosition  :: PointD,
     backgroundPaths :: Forest [PointD]
 }
 
@@ -370,16 +371,24 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
         ([], "Down") -> invokeEditorCmd $ updateCursorY 1
         _ -> maybe (return False) (\c -> invokeEditorCmd $ insertEditorChar c >> updateCursorX 1) printableChar
 
-
-getLineShapesWithWidths :: PangoContext -> [String] -> IO ([[GlyphItem]], [[Double]])
+-- | [(String, [(Int, Int)]) = [(line, [(relposof break, colour group)])]
+getLineShapesWithWidths :: PangoContext -> [(String, [(Int, Int)])] -> IO ([[(Double, Int, GlyphItem)]], [[Double]])
 getLineShapesWithWidths pangoContext linesToDraw = do
-    pangoLineShapes <- mapM (\line -> do
-            pangoItems <- pangoItemize pangoContext line []
-            mapM pangoShape pangoItems
+    pangoLineShapes <- mapM (\(line, pieces) -> do
+            pangoItems <- mapM (\partLine -> pangoItemize pangoContext partLine []) (listToPieces (map fst pieces) line)
+            mapM pangoShape (concat pangoItems)
         ) linesToDraw
 
+    extents <- mapM (mapM glyphItemExtents) pangoLineShapes
     lineWordWidths <- mapM (mapM (`glyphItemGetLogicalWidths` Nothing)) pangoLineShapes
-    return (pangoLineShapes, map concat lineWordWidths)
+    let sizedLineShapes = zipWith3 (\le lc ls -> zipWith3 (\e c s -> (glyphWidthFromExtent e, c, s)) le (lc++(repeat 0)) ls) extents ((map ((map snd).snd) linesToDraw)) pangoLineShapes
+    return (sizedLineShapes, map concat lineWordWidths)
+    where
+        glyphWidthFromExtent (_, (PangoRectangle _ _ w _)) = w
+        listToPieces :: [Int] -> [a] -> [[a]]
+        listToPieces [] l = [l]
+        listToPieces (p:ps) l = let (l1, lRest) = splitAt p l
+                                in l1:listToPieces ps lRest
 
 getBoundingRect :: EditorDrawingOptions -> [DrawableLine] -> (PointD, PointD)
 getBoundingRect opts dLines = (Point textLeft textTop, Point textRight textBottom)
@@ -398,7 +407,7 @@ drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
-    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext linesToDraw
+    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (map (\l->(l, [(2, 0), (3, 1)]))linesToDraw)
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
@@ -437,7 +446,7 @@ drawEditor fancyEditorDataHolder editorWidget = do
             setSourceRGBA 0 0.1 0 1
             mapM_ (\(DrawableLine yPos _ pangoShapes) -> do
                     moveTo 0 yPos
-                    mapM_ showGlyphString pangoShapes
+                    mapM_ (\(w, c, s) -> (if c == 0 then setSourceRGB 0 0 0 else setSourceRGB 0 1 0) >> showGlyphString s >> relMoveTo w 0) pangoShapes
                 ) dLines
 
         drawCursor dData opts = do
