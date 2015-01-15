@@ -12,6 +12,7 @@ import           Data.Text                 (Text, unpack)
 import           Filesystem.Path.CurrentOS (decodeString, encodeString,
                                             filename)
 import           Graphics.Rendering.Cairo
+import qualified Data.Function as F
 import           Graphics.UI.Gtk           hiding (Point)
 import           System.Glib.GObject       (Quark)
 import qualified Language.Haskell.Exts.Annotated as P
@@ -19,6 +20,9 @@ import Data.Tree
 import Data.Traversable (traverse)
 import qualified Data.Foldable as F
 import Data.Generics
+import Data.List (sortBy, groupBy)
+import qualified Data.Vector as V
+import System.Random (getStdGen, randoms)
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -58,7 +62,8 @@ data EditorDrawingData = EditorDrawingData {
     drawableLines   :: [DrawableLine],
     boundingRect    :: (PointD, PointD),
     cursorPosition  :: PointD,
-    backgroundPaths :: Forest [PointD]
+    backgroundPaths :: Forest [PointD],
+    colourGroupToRgb :: V.Vector (Double, Double, Double)
 }
 
 data EditorDrawingOptions = EditorDrawingOptions {
@@ -128,8 +133,10 @@ newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawing
 newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
     lineData <- newDrawableLineData pangoContext source opts
     let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
-    return $ ed lineData cursorP
+    g <- getStdGen
+    return $ ed lineData cursorP (generateRgbColours $ ((randoms g)::[Double]))
     where
+        generateRgbColours stream = (\([r, g, b], next) -> (r, g, b) : generateRgbColours next) . splitAt 3 $ stream
         sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
         convertBlocks lineData = fmap . fmap $ convertBlock
             where
@@ -172,11 +179,12 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                         maxRight = maximum . (0:) . map sum $ lineWidthRange
                             where
                                 lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
-        ed lineData cursorP = EditorDrawingData {
+        ed lineData cursorP colourStream = EditorDrawingData {
             drawableLines = lineData,
             boundingRect = getBoundingRect opts lineData,
             cursorPosition = cursorP,
-            backgroundPaths = convertBlocks lineData (sourceBlocks source)
+            backgroundPaths = convertBlocks lineData (sourceBlocks source),
+            colourGroupToRgb = V.fromList . take (length $ varDeps source) $ colourStream
         }
 
 newDrawingOptions :: PangoContext -> IO EditorDrawingOptions
@@ -399,7 +407,7 @@ getLineShapesWithWidths pangoContext linesToDraw = do
         breakPointedLines = map (\(line, ranges) -> (line, colouredRangesToBreakPoints ranges)) linesToDraw
         relativePiecePositions pieces = map fst pieces
         coloursOfThePieces pieces = map snd pieces
-        colouredRangesToBreakPoints [] = []
+        colouredRangesToBreakPoints [] = [(0, DefaultColourGroup)]
         colouredRangesToBreakPoints ((ColouredRange p1 l1 c1):rs1) = removeZeroLengths $ [(0, DefaultColourGroup), (p1, c1), (l1, DefaultColourGroup)] ++ go rs1 (p1 + l1)
             where
                 go [] _ = []
@@ -422,10 +430,36 @@ getBoundingRect opts dLines = (Point textLeft textTop, Point textRight textBotto
 drawableLineWidths :: [DrawableLine] -> [[Double]]
 drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 
+varDependenciesToColourGroupLines :: [VariableDependency] -> [[ColouredRange]]
+varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
+    where convertDefinition ((VariableDependency def defs), colourGroup) = srcElementToLineAndColourRange def : map srcElementToLineAndColourRange defs
+            where
+                  srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
+                    where
+                        srcSpan = P.srcInfoSpan . P.ann $ srcElement
+                        startLine = P.srcSpanStartLine srcSpan - 1
+                        startPos = P.srcSpanStartColumn srcSpan - 1
+                        definitionLength = P.srcSpanEndColumn srcSpan - startPos
+          linedItemsToListPositions = convertLineNrToPosInList 0 . moveLineNrUp . (groupBy ((==) `F.on` fst))
+            where
+                moveLineNrUp = map (\items -> (fst . head $ items, map snd items))
+                convertLineNrToPosInList _ [] = [[]]
+                convertLineNrToPosInList line allItems@((l,item):items)
+                 | line < l = replicate (l-line) [] ++ convertLineNrToPosInList l allItems
+                 | line == l = item : convertLineNrToPosInList (l+1) items
+                 | otherwise = error "unexpected order of colourRanges"
+          compareLinesWithColouredRanges (l1, ColouredRange c1 _ _) (l2, ColouredRange c2 _ _)
+            | lineComparison == EQ = columnComparison
+            | otherwise = lineComparison
+            where
+                lineComparison = compare l1 l2
+                columnComparison = compare c1 c2
+
+
 newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
-    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (map (\l->(l, [ColouredRange 3 5 (ColourGroup 1), ColouredRange 9 3 (ColourGroup 1)]))linesToDraw)
+    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw (varDependenciesToColourGroupLines $ varDeps source))
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
@@ -454,13 +488,13 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     setSourceRGBA 0.69 0.65 0.5 0.3
                     fill
             _ <- traverse (traverse drawBgPath) $ backgroundPaths dData
-            drawText (drawableLines dData)
+            drawText (drawableLines dData) (colourGroupToRgb dData)
             drawCursor dData opts
             restore
             where
                 (Point textLeft textTop, Point textRight textBottom) = boundingRect dData
 
-        drawText dLines = do
+        drawText dLines colourRgb = do
             setSourceRGBA 0 0.1 0 1
             mapM_ (\(DrawableLine yPos _ pangoShapes) -> do
                     moveTo 0 yPos
@@ -472,7 +506,9 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     showGlyphString s
                     relMoveTo w 0
                 setTextColour DefaultColourGroup = setSourceRGB 0 0 0
-                setTextColour (ColourGroup _) = setSourceRGB 0.5 0.8 0.4
+                setTextColour (ColourGroup c) = do
+                    let (r, g, b) = colourRgb V.! c
+                    setSourceRGB r g b
 
         drawCursor dData opts = do
             setLineWidth 1
