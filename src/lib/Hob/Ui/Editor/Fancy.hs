@@ -34,13 +34,14 @@ type Blocks a = Forest (Block a)
 
 data VariableDependency = VariableDependency (P.Name P.SrcSpanInfo) [P.Name P.SrcSpanInfo] deriving Show
 
-data ColourGroup = DefaultColourGroup | ColourGroup Int
+data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show)
 
 data ColouredRange = ColouredRange 
                         Int -- ^ pos
                         Int -- ^ length
                         ColourGroup -- ^ colour group
-
+                    deriving (Show)
+                    
 data SourceData = SourceData {
     isModified   :: Bool,
     textLines    :: [String],
@@ -411,7 +412,7 @@ getLineShapesWithWidths pangoContext linesToDraw = do
         colouredRangesToBreakPoints ((ColouredRange p1 l1 c1):rs1) = removeZeroLengths $ [(0, DefaultColourGroup), (p1, c1), (l1, DefaultColourGroup)] ++ go rs1 (p1 + l1)
             where
                 go [] _ = []
-                go ((ColouredRange p l c):rs) delta = [(p - delta, c), (l, DefaultColourGroup)] ++ go rs (delta + l + p)
+                go ((ColouredRange p l c):rs) delta = [(p - delta, c), (l, DefaultColourGroup)] ++ go rs (l + p)
                 removeZeroLengths ((l, _):(0, c):rs) = removeZeroLengths ((l, c):rs)
                 removeZeroLengths (r:rs) = r : removeZeroLengths rs
                 removeZeroLengths [] = []
@@ -439,7 +440,7 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy comp
                         srcSpan = P.srcInfoSpan . P.ann $ srcElement
                         startLine = P.srcSpanStartLine srcSpan - 1
                         startPos = P.srcSpanStartColumn srcSpan - 1
-                        definitionLength = P.srcSpanEndColumn srcSpan - startPos
+                        definitionLength = P.srcSpanEndColumn srcSpan - startPos - 1
           linedItemsToListPositions = convertLineNrToPosInList 0 . moveLineNrUp . (groupBy ((==) `F.on` fst))
             where
                 moveLineNrUp = map (\items -> (fst . head $ items, map snd items))
