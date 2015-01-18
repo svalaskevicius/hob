@@ -7,7 +7,7 @@ import           Control.Concurrent.MVar   (MVar, modifyMVar_, newMVar,
 import           Control.Monad.Reader
 import qualified Control.Monad.State.Lazy  as S
 import           Data.Char                 (isPrint, isSpace)
-import           Data.Maybe                (listToMaybe, mapMaybe)
+import           Data.Maybe                (listToMaybe, mapMaybe, maybeToList, catMaybes)
 import           Data.Text                 (Text, unpack)
 import           Filesystem.Path.CurrentOS (decodeString, encodeString,
                                             filename)
@@ -26,13 +26,23 @@ import System.Random (getStdGen, randoms)
 
 import           Hob.Context
 import           Hob.Context.UiContext
+import Text.Show.Pretty
 
 data Block a = Block (Point a) (Point a) deriving Show
 type BlockD = Block Double
 type BlockI = Block Int
 type Blocks a = Forest (Block a)
 
-data VariableDependency = VariableDependency (P.Name P.SrcSpanInfo) [P.Name P.SrcSpanInfo] deriving Show
+
+data VariableUsage = VariableUsage
+                                [P.Name P.SrcSpanInfo] -- ^ defined var, list for destructuring matches
+                                [P.Name P.SrcSpanInfo] -- ^ "depending on" variable usages
+                                deriving Show
+
+data VariableDependency = VariableDependency 
+                                (P.Name P.SrcSpanInfo) -- ^ definition of the "depending on" variable
+                                [VariableUsage]        -- ^ usages of the definition
+                                deriving Show
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show)
 
@@ -90,24 +100,63 @@ findNames name = [name]
 findNamesInPatterns :: [P.Pat P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
 findNamesInPatterns = concatMap (findElements findNames)
 
+findGenerators :: P.Stmt P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Exp P.SrcSpanInfo)]
+findGenerators (P.Generator _ pat exp) = [(pat, exp)]
+findGenerators _ = []
+
+findQualifiers :: P.Stmt P.SrcSpanInfo -> [P.Exp P.SrcSpanInfo]
+findQualifiers (P.Qualifier _ exp) = [exp]
+findQualifiers _ = []
+
 findFuncs :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
 findFuncs (P.Match _ name pat rhs _) = [(name, findNamesInPatterns pat, findElements findVars rhs)]
 findFuncs (P.InfixMatch _ pat1 name pat2 rhs _) = [(name, (findElements findNames pat1) ++ (findNamesInPatterns pat2), findElements findVars rhs)]
 
+bindsToDecls :: Maybe (P.Binds l) -> [P.Decl l]
+bindsToDecls (Just (P.BDecls _ decls)) = decls
+bindsToDecls _ = []
+
+findFuncs' :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findFuncs' (P.Match _ name pats rhs binds) = [(name, pats, rhs, bindsToDecls binds)]
+findFuncs' (P.InfixMatch _ pat name pats rhs binds) = [(name, pat:pats, rhs, bindsToDecls binds)]
+
+findPatternBinds :: P.Decl P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findPatternBinds (P.PatBind _ pat rhs binds) = [(pat, rhs, bindsToDecls binds)]
+findPatternBinds _ = []
+
+-- todo add non recursive finder
 findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
 findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
 
 findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
-findVariableDependencies decls = funcUsages ++ varUsages
+findVariableDependencies decls = varDeps
     where
-        varElements = findElements findFuncs decls
-        funcs = map (\(f, _, _)->f) varElements
-        funcUsages = map (\f->VariableDependency f (concatMap (\(_, _, usages)-> filter (f P.=~=) usages) varElements)) funcs
-        varUsages = concatMap (\(_, vars, usages) -> map (\v->VariableDependency v (filter (v P.=~=) usages)) vars) varElements
+        funcs = findElements findFuncs' decls
+            -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
+        varDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
+            where
+                -- | finds patterns used in rhs 
+                patternDependencies (fncName, patterns, rhs, subDecls) = patternUsage
+                    where
+                        patternNames :: [P.Name P.SrcSpanInfo]
+                        patternNames = findNamesInPatterns patterns
+                        generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+                        generators = map (\(pat, exp) -> (findElements findNames pat, findElements findVars exp)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
+                        qualifiers :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+                        qualifiers = map (\exp -> ([], findElements findVars exp)) $ (findElements findQualifiers rhs ++ findElements findQualifiers subDecls)
+                        findUsedVars :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
+                        findUsedVars name = filter (name P.=~=)
+                        subPatterns :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+                        subPatterns = map (\(pat, rhs, decls) -> (findElements findNames pat, (findElements findNames rhs) ++ concatMap (findElements findNames) decls)) $ findElements findPatternBinds subDecls
+                        patternUsage :: [VariableDependency]
+                        patternUsage = concat $ map (\name->catMaybes $ map (\(pvars, evars)->let usage = findUsedVars name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (qualifiers++generators++subPatterns)) patternNames
+                        
 
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
-newSourceData text = return sd
+newSourceData text = do
+    putStrLn $ ppShow variableDeps
+    return sd
     where
         parseMode = P.defaultParseMode
         textAsString = unpack $ text
@@ -433,7 +482,7 @@ drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 
 varDependenciesToColourGroupLines :: [VariableDependency] -> [[ColouredRange]]
 varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
-    where convertDefinition ((VariableDependency def defs), colourGroup) = srcElementToLineAndColourRange def : map srcElementToLineAndColourRange defs
+    where convertDefinition ((VariableDependency def [VariableUsage defs usages]), colourGroup) = srcElementToLineAndColourRange def : map srcElementToLineAndColourRange (defs++usages)
             where
                   srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
                     where
