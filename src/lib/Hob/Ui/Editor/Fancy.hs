@@ -271,7 +271,7 @@ newEditorForText targetNotebook filePath text = do
             pangoContext <- cairoCreateContext Nothing
             fontDescription <- fontDescriptionNew
             fontDescriptionSetFamily fontDescription "Ubuntu"
-            fontDescriptionSetSize fontDescription 18
+            fontDescriptionSetSize fontDescription 14
             contextSetFontDescription pangoContext fontDescription
             return pangoContext
 
@@ -486,7 +486,7 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     closePath
                     setSourceRGB 0.9 0 0
                     strokePreserve
-                    setSourceRGBA 0.69 0.65 0.5 0.3
+                    setSourceRGBA 0.69 0.65 0.5 0.2
                     fill
             _ <- traverse (traverse drawBgPath) $ backgroundPaths dData
             drawText (drawableLines dData) (colourGroupToRgb dData)
