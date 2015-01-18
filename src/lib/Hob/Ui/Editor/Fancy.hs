@@ -35,12 +35,12 @@ type Blocks a = Forest (Block a)
 
 
 data VariableUsage = VariableUsage
-                                [P.Name P.SrcSpanInfo] -- ^ defined var, list for destructuring matches
+                                [P.Name P.SrcSpanInfo] -- ^ defined var, list for destructuring matches | target <- usages
                                 [P.Name P.SrcSpanInfo] -- ^ "depending on" variable usages
                                 deriving Show
 
 data VariableDependency = VariableDependency 
-                                (P.Name P.SrcSpanInfo) -- ^ definition of the "depending on" variable
+                                (P.Name P.SrcSpanInfo) -- ^ definition of the "depending on" variable | source -> usages
                                 [VariableUsage]        -- ^ usages of the definition
                                 deriving Show
 
@@ -129,8 +129,13 @@ findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
 findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
 
 findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
-findVariableDependencies decls = varDeps
+findVariableDependencies decls = foldr insertVarDep [] varDeps
     where
+        insertVarDep varDep [] = [varDep]
+        insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
+         | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
+         | otherwise = dep:insertVarDep varDep deps
+        
         funcs = findElements findFuncs' decls
             -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
         varDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
@@ -482,15 +487,16 @@ drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 
 varDependenciesToColourGroupLines :: [VariableDependency] -> [[ColouredRange]]
 varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
-    where convertDefinition ((VariableDependency def [VariableUsage defs usages]), colourGroup) = srcElementToLineAndColourRange def : map srcElementToLineAndColourRange (defs++usages)
+    where 
+        convertDefinition ((VariableDependency def usageDefs), colourGroup) = srcElementToLineAndColourRange def : concatMap (\(VariableUsage defs usages) -> map srcElementToLineAndColourRange (defs ++ usages)) usageDefs
             where
-                  srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
+                srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
                     where
                         srcSpan = P.srcInfoSpan . P.ann $ srcElement
                         startLine = P.srcSpanStartLine srcSpan - 1
                         startPos = P.srcSpanStartColumn srcSpan - 1
                         definitionLength = P.srcSpanEndColumn srcSpan - startPos - 1
-          linedItemsToListPositions = convertLineNrToPosInList 0 . moveLineNrUp . (groupBy ((==) `F.on` fst))
+        linedItemsToListPositions = convertLineNrToPosInList 0 . moveLineNrUp . (groupBy ((==) `F.on` fst))
             where
                 moveLineNrUp = map (\items -> (fst . head $ items, map snd items))
                 convertLineNrToPosInList _ [] = [[]]
@@ -498,7 +504,7 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy comp
                  | line < l = replicate (l-line) [] ++ convertLineNrToPosInList l allItems
                  | line == l = item : convertLineNrToPosInList (l+1) items
                  | otherwise = error "unexpected order of colourRanges"
-          compareLinesWithColouredRanges (l1, ColouredRange c1 _ _) (l2, ColouredRange c2 _ _)
+        compareLinesWithColouredRanges (l1, ColouredRange c1 _ _) (l2, ColouredRange c2 _ _)
             | lineComparison == EQ = columnComparison
             | otherwise = lineComparison
             where
