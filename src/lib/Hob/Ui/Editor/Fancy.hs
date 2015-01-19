@@ -23,6 +23,9 @@ import Data.Generics
 import Data.List (sortBy, groupBy)
 import qualified Data.Vector as V
 import System.Random (getStdGen, randoms)
+import Data.Tree
+import qualified Data.Set as Set
+import Debug.Trace
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -44,13 +47,13 @@ data VariableDependency = VariableDependency
                                 [VariableUsage]        -- ^ usages of the definition
                                 deriving Show
 
-data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show)
+data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
 data ColouredRange = ColouredRange 
                         Int -- ^ pos
                         Int -- ^ length
                         ColourGroup -- ^ colour group
-                    deriving (Show)
+                    deriving (Show, Eq)
                     
 data SourceData = SourceData {
     isModified   :: Bool,
@@ -94,11 +97,15 @@ findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findVars (P.Var _ (P.UnQual _ name)) = [name]
 findVars _ = []
 
+findPatternVars :: P.Pat P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
+findPatternVars (P.PVar _ name) = [name]
+findPatternVars _ = []
+
 findNames :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findNames name = [name]
 
 findNamesInPatterns :: [P.Pat P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
-findNamesInPatterns = concatMap (findElements findNames)
+findNamesInPatterns = concatMap (findElements findPatternVars)
 
 findGenerators :: P.Stmt P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Exp P.SrcSpanInfo)]
 findGenerators (P.Generator _ pat exp) = [(pat, exp)]
@@ -120,6 +127,11 @@ findFuncs' :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanI
 findFuncs' (P.Match _ name pats rhs binds) = [(name, pats, rhs, bindsToDecls binds)]
 findFuncs' (P.InfixMatch _ pat name pats rhs binds) = [(name, pat:pats, rhs, bindsToDecls binds)]
 
+findFuncs'' :: P.Decl P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findFuncs'' (P.FunBind _ matches) = concatMap findFuncs' matches
+findFuncs'' _ = []
+
+
 findPatternBinds :: P.Decl P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
 findPatternBinds (P.PatBind _ pat rhs binds) = [(pat, rhs, bindsToDecls binds)]
 findPatternBinds _ = []
@@ -136,25 +148,39 @@ findVariableDependencies decls = foldr insertVarDep [] varDeps
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
          | otherwise = dep:insertVarDep varDep deps
         
-        funcs = findElements findFuncs' decls
+        funcs = findElements findFuncs'' decls
             -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
         varDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
             where
                 -- | finds patterns used in rhs 
                 patternDependencies (fncName, patterns, rhs, subDecls) = patternUsage
                     where
+                        filterNames :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
+                        filterNames name = filter (name P.=~=)
+                        
                         patternNames :: [P.Name P.SrcSpanInfo]
                         patternNames = findNamesInPatterns patterns
+
+                        subPatternNames :: [P.Name P.SrcSpanInfo]
+                        subPatternNames = concatMap (\(pat, _, _) -> findElements findPatternVars pat) $ concatMap ([] `mkQ` findPatternBinds) subDecls
+
+                        subFuncNames :: [P.Name P.SrcSpanInfo]
+                        subFuncNames = concatMap (\(name, pat, _, _) -> name : findElements findPatternVars pat) $ concatMap ([] `mkQ` findFuncs'') subDecls
+
                         generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         generators = map (\(pat, exp) -> (findElements findNames pat, findElements findVars exp)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
+
                         qualifiers :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         qualifiers = map (\exp -> ([], findElements findVars exp)) $ (findElements findQualifiers rhs ++ findElements findQualifiers subDecls)
-                        findUsedVars :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
-                        findUsedVars name = filter (name P.=~=)
+
                         subPatterns :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         subPatterns = map (\(pat, rhs, decls) -> (findElements findNames pat, (findElements findNames rhs) ++ concatMap (findElements findNames) decls)) $ findElements findPatternBinds subDecls
+                        
+                        variables :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
+                        variables = [([fncName], findElements findVars rhs)]
+
                         patternUsage :: [VariableDependency]
-                        patternUsage = concat $ map (\name->catMaybes $ map (\(pvars, evars)->let usage = findUsedVars name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (qualifiers++generators++subPatterns)) patternNames
+                        patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) (patternNames++subFuncNames++subPatternNames)
                         
 
 -- TODO: vector for lines?
@@ -486,9 +512,9 @@ drawableLineWidths :: [DrawableLine] -> [[Double]]
 drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 
 varDependenciesToColourGroupLines :: [VariableDependency] -> [[ColouredRange]]
-varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
+varDependenciesToColourGroupLines vars = linedItemsToListPositions $ makeUnique $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
     where 
-        convertDefinition ((VariableDependency def usageDefs), colourGroup) = srcElementToLineAndColourRange def : concatMap (\(VariableUsage defs usages) -> map srcElementToLineAndColourRange (defs ++ usages)) usageDefs
+        convertDefinition ((VariableDependency def usageDefs), colourGroup) = srcElementToLineAndColourRange def : concatMap (\(VariableUsage _ usages) -> map srcElementToLineAndColourRange (usages)) usageDefs
             where
                 srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
                     where
@@ -510,12 +536,20 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ sortBy comp
             where
                 lineComparison = compare l1 l2
                 columnComparison = compare c1 c2
+        makeUnique (i1:i2:items) 
+           | i1 == i2 = makeUnique (i2:items)
+           | otherwise = i1 : makeUnique (i2:items)
+        makeUnique [i1] = [i1]
+        makeUnique [] = []
+        
 
 
 newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
-    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw (varDependenciesToColourGroupLines $ varDeps source))
+        colourGroups = varDependenciesToColourGroupLines $ varDeps source
+    putStrLn $ ppShow (colourGroups!!146)
+    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw colourGroups)
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
