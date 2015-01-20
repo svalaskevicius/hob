@@ -26,6 +26,8 @@ import System.Random (getStdGen, randoms)
 import Data.Tree
 import qualified Data.Set as Set
 import Debug.Trace
+import Data.Prizm.Color.CIE.LCH
+import Data.Prizm.Color
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -217,7 +219,10 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
     g <- getStdGen
     return $ ed lineData cursorP (generateRgbColours $ ((randoms g)::[Double]))
     where
-        generateRgbColours stream = (\([r, g, b], next) -> (r, g, b) : generateRgbColours next) . splitAt 3 $ stream
+        generateRgbColours stream = (\([l, c, h], next) -> (generateColor l c h) : generateRgbColours next) . splitAt 3 $ stream
+            where
+                generateColor l c h = let (RGB r g b) = toRGB (CIELCH ((l/4.0+0.1)*100.0) ((0.5+c/2.0)*100.0) (h*360.0))
+                                      in ((fromIntegral r)/255.0, (fromIntegral g)/255.0, (fromIntegral b)/255.0)
         sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
         convertBlocks lineData = fmap . fmap $ convertBlock
             where
