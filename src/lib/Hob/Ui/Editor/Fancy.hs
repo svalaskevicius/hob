@@ -209,7 +209,7 @@ newSourceDataFromText text = newSourceData newTextLines
 -- TODO: vector for lines?
 newSourceData :: [String] -> IO SourceData
 newSourceData newTextLines = do
-    debugPrint varDepGraphNodes
+--    debugPrint newVarDeps
     return sd
     where
         parseMode = P.defaultParseMode
@@ -248,8 +248,8 @@ newSourceData newTextLines = do
 
 newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
 newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
-    debugPrint (varDepGraph source)
-    debugPrint $ reverse . topSort $ varDepGraph source
+--    debugPrint (varDepGraph source)
+  --  debugPrint $ reverse . topSort $ varDepGraph source
     lineData <- newDrawableLineData pangoContext source opts
     let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
     return $ ed lineData cursorP
