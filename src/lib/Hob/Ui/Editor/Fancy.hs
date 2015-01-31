@@ -67,7 +67,10 @@ data SourceData = SourceData {
     textLines    :: [String],
     parseResult  :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
     sourceBlocks :: Blocks Int,
-    varDeps      :: [VariableDependency]
+    varDeps      :: [VariableDependency],
+    varDepGraph  :: Graph,
+    varDepGraphLookupByVertex :: Vertex -> (P.Name P.SrcSpanInfo, Int, [Int]),
+    varDepGraphLookupByKey :: Int -> Maybe Vertex
 }
 
 -- | Point x y
@@ -217,13 +220,27 @@ newSourceData text = do
                         (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
                 )
             ) . concatMap (F.foldr (\a s->(s++[P.srcInfoSpan a])) [])
-        variableDeps = findVariableDependencies . declarations $ parsedModule
+        newVarDeps = findVariableDependencies . declarations $ parsedModule
+        viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) $ newVarDeps
+        foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps newVarDeps >>= Just . map (\(VariableUsage targets _) -> targets)
+            where
+                foundVarDeps ((VariableDependency var usages):vars) = if var == v then Just usages else foundVarDeps vars
+                foundVarDeps [] = Nothing
+        varToId v = foundVarId viariablesWithIds
+            where
+                foundVarId ((idx, var):vars) = if var == v then Just idx else foundVarId vars
+                foundVarId [] = Nothing
+        varDepGraphNodes = map (\(idx, var) -> (var, idx, catMaybes . (map varToId) . foundDepsForVariable $ var)) viariablesWithIds
+        (newVarDepGraph, newVarDepGraphVertexToNode, newVarDepGraphKeyToVertex) = graphFromEdges varDepGraphNodes
         sd = SourceData {
             isModified = False,
             textLines = lines textAsString,
             parseResult = parsedModule,
             sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule,
-            varDeps = variableDeps
+            varDeps = newVarDeps,
+            varDepGraph = transposeG newVarDepGraph,
+            varDepGraphLookupByVertex = newVarDepGraphVertexToNode,
+            varDepGraphLookupByKey = newVarDepGraphKeyToVertex
         }
 
 newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
@@ -232,13 +249,15 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
     debugPrint $ reverse . topSort $ varDepGraph source
     lineData <- newDrawableLineData pangoContext source opts
     let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
-    g <- getStdGen
-    return $ ed lineData cursorP (generateRgbColours $ ((randoms g)::[Double]))
+    return $ ed lineData cursorP
     where
-        generateRgbColours stream = (\([l, c, h], next) -> (generateColor l c h) : generateRgbColours next) . splitAt 3 $ stream
+        generateCielCHColours amount = [generateColor 0.2 1 (stepToHue i) | i <- [0..amount-1]]
             where
-                generateColor l c h = let (RGB r g b) = toRGB (CIELCH ((l/4.0+0.1)*100.0) ((0.5+c/2.0)*100.0) (h*360.0))
-                                      in ((fromIntegral r)/255.0, (fromIntegral g)/255.0, (fromIntegral b)/255.0)
+                goldenRatio = 1.61803398875
+                stepToHue step = (fromIntegral step) * (fromIntegral amount) / goldenRatio
+                generateColor l c h = CIELCH ((l/4.0+0.2)*100.0) ((0.6+c/2.0)*100.0) (h*360.0)
+        cielChToRgbTuple c = let (RGB r g b) = toRGB c
+                             in ((fromIntegral r)/255.0, (fromIntegral g)/255.0, (fromIntegral b)/255.0)
         sourceCoordsToDrawing lineData p = sourcePointToDrawingPoint (drawableLineWidths lineData) p opts
         convertBlocks lineData = fmap . fmap $ convertBlock
             where
@@ -281,12 +300,26 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                         maxRight = maximum . (0:) . map sum $ lineWidthRange
                             where
                                 lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
-        ed lineData cursorP colourStream = EditorDrawingData {
+        variableDepsGraphEdges = tracePrint dependencyColours
+            where
+                uniqueVarColours = V.fromList . generateCielCHColours $ length . varDeps $ source
+                dependencyColours = V.fromList . map (cielChToRgbTuple . vertexDepColour) $ variableVertexesInTopoOrder
+                    where
+                        vertexDepColour v = let (_, idx, deps) = varDepGraphLookupByVertex source v
+                                            in combineColours (idx:deps)
+                            where
+                                combineColours ids = foldl1 addColourInFold (idsToColours ids)
+                                    where
+                                        idsToColours = map (uniqueVarColours V.!)
+                                        percent = toInteger $ 100 `quot` (length ids)
+                                        addColourInFold c1 c2 = interpolate percent (c1, c2)
+                        variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
+        ed lineData cursorP = EditorDrawingData {
             drawableLines = lineData,
             boundingRect = getBoundingRect opts lineData,
             cursorPosition = cursorP,
             backgroundPaths = convertBlocks lineData (sourceBlocks source),
-            colourGroupToRgb = V.fromList . take (length $ varDeps source) $ colourStream
+            colourGroupToRgb = variableDepsGraphEdges
         }
 
 newDrawingOptions :: PangoContext -> IO EditorDrawingOptions
