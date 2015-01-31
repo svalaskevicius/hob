@@ -201,16 +201,19 @@ findVariableDependencies decls = foldr insertVarDep [] varDeps
                         patternUsage :: [VariableDependency]
                         patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) (patternNames++subFuncNames++subPatternNames)
                         
+newSourceDataFromText :: Text -> IO SourceData
+newSourceDataFromText text = newSourceData newTextLines
+    where
+        newTextLines = lines . unpack $ text
 
 -- TODO: vector for lines?
-newSourceData :: Text -> IO SourceData
-newSourceData text = do
+newSourceData :: [String] -> IO SourceData
+newSourceData newTextLines = do
     debugPrint varDepGraphNodes
     return sd
     where
         parseMode = P.defaultParseMode
-        textAsString = unpack $ text
-        parsedModule = P.parseFileContentsWithComments parseMode textAsString
+        parsedModule = P.parseFileContentsWithComments parseMode . unlines $ newTextLines
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
@@ -234,7 +237,7 @@ newSourceData text = do
         (newVarDepGraph, newVarDepGraphVertexToNode, newVarDepGraphKeyToVertex) = graphFromEdges varDepGraphNodes
         sd = SourceData {
             isModified = False,
-            textLines = lines textAsString,
+            textLines = newTextLines,
             parseResult = parsedModule,
             sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule,
             varDeps = newVarDeps,
@@ -338,7 +341,7 @@ newDrawingOptions pangoContext = do
 newFancyEditor :: PangoContext -> Text -> IO FancyEditor
 newFancyEditor pangoContext text = do
     dOptions <- newDrawingOptions pangoContext
-    sd <- newSourceData text
+    sd <- newSourceDataFromText text
     dd <- newDrawingData pangoContext sd initialCursor dOptions
     return FancyEditor {
         sourceData = sd,
@@ -493,8 +496,9 @@ insertEditorChar c = do
                                   in preChars ++ [c] ++ postChars
                             ) . take 1 $ postLines
         tLines' = preLines ++ changedLine ++ drop 1 postLines
-        source' = source{textLines = tLines', isModified = True}
-    S.modify $ \ed -> ed{sourceData = source'}
+    source' <- liftIO $ newSourceData tLines'
+    let source'' = source'{isModified = True}
+    S.modify $ \ed -> ed{sourceData = source''}
 
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
