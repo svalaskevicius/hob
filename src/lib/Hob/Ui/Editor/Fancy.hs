@@ -303,20 +303,18 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                         maxRight = maximum . (0:) . map sum $ lineWidthRange
                             where
                                 lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
-        variableDepsGraphEdges = tracePrint dependencyColours
+        variableDepsGraphEdges = V.fromList . map (cielChToRgbTuple . vertexDepColour) $ variableVertexesInTopoOrder
             where
                 uniqueVarColours = V.fromList . generateCielCHColours $ length . varDeps $ source
-                dependencyColours = V.fromList . map (cielChToRgbTuple . vertexDepColour) $ variableVertexesInTopoOrder
+                vertexDepColour v = let (_, idx, deps) = varDepGraphLookupByVertex source v
+                                    in combineColours (idx:deps)
                     where
-                        vertexDepColour v = let (_, idx, deps) = varDepGraphLookupByVertex source v
-                                            in combineColours (idx:deps)
+                        combineColours ids = foldl1 addColourInFold (idsToColours ids)
                             where
-                                combineColours ids = foldl1 addColourInFold (idsToColours ids)
-                                    where
-                                        idsToColours = map (uniqueVarColours V.!)
-                                        percent = toInteger $ 100 `quot` (length ids)
-                                        addColourInFold c1 c2 = interpolate percent (c1, c2)
-                        variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
+                                idsToColours = map (uniqueVarColours V.!)
+                                percent = toInteger $ 100 `quot` (length ids)
+                                addColourInFold c1 c2 = interpolate percent (c1, c2)
+                variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
         ed lineData cursorP = EditorDrawingData {
             drawableLines = lineData,
             boundingRect = getBoundingRect opts lineData,
