@@ -22,7 +22,6 @@ import qualified Data.Foldable as F
 import Data.Generics
 import Data.List (sortBy, groupBy)
 import qualified Data.Vector as V
-import System.Random (getStdGen, randoms)
 import Data.Tree
 import qualified Data.Set as Set
 import Debug.Trace
