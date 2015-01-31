@@ -28,10 +28,15 @@ import qualified Data.Set as Set
 import Debug.Trace
 import Data.Prizm.Color.CIE.LCH
 import Data.Prizm.Color
+import Data.Graph
 
 import           Hob.Context
 import           Hob.Context.UiContext
-import Text.Show.Pretty
+import qualified IPPrint                                                                                                                                       
+import qualified Language.Haskell.HsColour as HsColour                                                 
+import qualified Language.Haskell.HsColour.Colourise as HsColour                                       
+import qualified Language.Haskell.HsColour.Output as HsColour                                          
+                                                                                                       
 
 data Block a = Block (Point a) (Point a) deriving Show
 type BlockD = Block Double
@@ -94,6 +99,15 @@ data FancyEditor = FancyEditor {
     drawingOptions :: EditorDrawingOptions,
     drawingData    :: EditorDrawingData
 }
+
+
+debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }                                                                                                        
+
+debugPrint :: Show a => a -> IO()
+debugPrint = putStrLn . HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow
+
+tracePrint :: Show a => a -> a
+tracePrint v = trace (HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow $ v) v
 
 findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findVars (P.Var _ (P.UnQual _ name)) = [name]
@@ -188,7 +202,7 @@ findVariableDependencies decls = foldr insertVarDep [] varDeps
 -- TODO: vector for lines?
 newSourceData :: Text -> IO SourceData
 newSourceData text = do
-    putStrLn $ ppShow variableDeps
+    debugPrint varDepGraphNodes
     return sd
     where
         parseMode = P.defaultParseMode
@@ -214,6 +228,8 @@ newSourceData text = do
 
 newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
 newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
+    debugPrint (varDepGraph source)
+    debugPrint $ reverse . topSort $ varDepGraph source
     lineData <- newDrawableLineData pangoContext source opts
     let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
     g <- getStdGen
@@ -553,7 +569,7 @@ newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO 
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
         colourGroups = varDependenciesToColourGroupLines $ varDeps source
-    putStrLn $ ppShow (colourGroups!!146)
+    debugPrint (colourGroups!!137)
     (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw colourGroups)
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
