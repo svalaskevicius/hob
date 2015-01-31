@@ -97,7 +97,7 @@ newEditorForText targetNotebook filePath text = do
             sourceViewSetTabWidth editor 4
             sourceViewSetInsertSpacesInsteadOfTabs editor True
             sourceViewSetHighlightCurrentLine editor True
-            sourceViewSetDrawSpaces editor SourceDrawSpacesTrailing
+            sourceViewSetDrawSpaces editor [SourceDrawSpacesTrailing]
 
             scrolledWindow <- scrolledWindowNew Nothing Nothing
             scrolledWindow `containerAdd` editor
