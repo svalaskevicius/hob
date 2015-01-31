@@ -604,8 +604,7 @@ newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO 
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
         colourGroups = varDependenciesToColourGroupLines $ varDeps source
-    debugPrint (colourGroups!!137)
-    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw colourGroups)
+    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw (colourGroups++repeat []))
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
