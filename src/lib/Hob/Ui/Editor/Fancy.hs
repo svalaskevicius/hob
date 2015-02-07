@@ -136,13 +136,14 @@ bindsToDecls :: Maybe (P.Binds l) -> [P.Decl l]
 bindsToDecls (Just (P.BDecls _ decls)) = decls
 bindsToDecls _ = []
 
-findFuncs' :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
-findFuncs' (P.Match _ name pats rhs binds) = [(name, pats, rhs, bindsToDecls binds)]
-findFuncs' (P.InfixMatch _ pat name pats rhs binds) = [(name, pat:pats, rhs, bindsToDecls binds)]
+findFuncs :: P.Decl P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findFuncs (P.FunBind _ matches) = concatMap funcMatches matches
+    where
+        funcMatches :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+        funcMatches (P.Match _ name pats rhs binds) = [(name, pats, rhs, bindsToDecls binds)]
+        funcMatches (P.InfixMatch _ pat name pats rhs binds) = [(name, pat:pats, rhs, bindsToDecls binds)]
 
-findFuncs'' :: P.Decl P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
-findFuncs'' (P.FunBind _ matches) = concatMap findFuncs' matches
-findFuncs'' _ = []
+findFuncs _ = []
 
 
 findPatternBinds :: P.Decl P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
@@ -161,7 +162,7 @@ findVariableDependencies decls = foldr insertVarDep [] findVarDeps
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
          | otherwise = dep:insertVarDep varDep deps
 
-        funcs = findElements findFuncs'' decls
+        funcs = findElements findFuncs decls
             -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
         findVarDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
             where
@@ -178,7 +179,7 @@ findVariableDependencies decls = foldr insertVarDep [] findVarDeps
                         subPatternNames = concatMap (\(pat, _, _) -> findElements findPatternVars pat) $ concatMap ([] `mkQ` findPatternBinds) subDecls
 
                         subFuncNames :: [P.Name P.SrcSpanInfo]
-                        subFuncNames = concatMap (\(name, pat, _, _) -> name : findElements findPatternVars pat) $ concatMap ([] `mkQ` findFuncs'') subDecls
+                        subFuncNames = concatMap (\(name, pat, _, _) -> name : findElements findPatternVars pat) $ concatMap ([] `mkQ` findFuncs) subDecls
 
                         generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         generators = map (\(pat, expr) -> (findElements findNames pat, findElements findVars expr)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
