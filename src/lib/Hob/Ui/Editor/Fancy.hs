@@ -17,7 +17,9 @@ import           Graphics.UI.Gtk           hiding (Point)
 import           System.Glib.GObject       (Quark)
 import qualified Language.Haskell.Exts.Annotated as P
 import Data.Tree
-import Data.Traversable (traverse)
+import Data.Monoid
+import qualified Data.Traversable as T (mapM)
+import Data.Traversable (Traversable, traverse)
 import qualified Data.Foldable as F
 import Data.Generics
 import Data.List (sortBy, groupBy)
@@ -208,20 +210,25 @@ newSourceDataFromText text = newSourceData newTextLines
 -- TODO: vector for lines?
 newSourceData :: [String] -> IO SourceData
 newSourceData newTextLines = do
---    debugPrint newVarDeps
+--    debugPrint $ sourceBlocks sd
     return sd
     where
+        collectSourceInfoSpans = concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
+        nestInfoSpans :: [P.SrcSpan] -> Forest P.SrcSpan
+        nestInfoSpans [] = []
+        nestInfoSpans (x:xs) = Node x (nestInfoSpans inTheRangeXs) : (nestInfoSpans furtherXs)
+            where
+                (inTheRangeXs, furtherXs) = break (isAfter x) . dropWhile (x == ) $ xs
+                isAfter x y = (P.srcSpanEndLine y > P.srcSpanEndLine x) || ((P.srcSpanEndLine y == P.srcSpanEndLine x) && (P.srcSpanEndLine y > P.srcSpanEndLine x))
+        infoSpanToBlock s = Block 
+                                (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
+                                (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
+        collectSourceBlocks = (fmap (fmap infoSpanToBlock)) . nestInfoSpans . collectSourceInfoSpans
         parseMode = P.defaultParseMode
         parsedModule = P.parseFileContentsWithComments parseMode . unlines $ newTextLines
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
-        collectSourceBlocks = map (
-                (\s -> Block 
-                        (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
-                        (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
-                )
-            ) . concatMap (F.foldr (\a s->(s++[P.srcInfoSpan a])) [])
         newVarDeps = findVariableDependencies . declarations $ parsedModule
         viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) $ newVarDeps
         foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps newVarDeps >>= Just . map (\(VariableUsage targets _) -> targets)
@@ -238,7 +245,7 @@ newSourceData newTextLines = do
             isModified = False,
             textLines = newTextLines,
             parseResult = parsedModule,
-            sourceBlocks = map (\b -> Node b []) . collectSourceBlocks $ declarations parsedModule,
+            sourceBlocks = collectSourceBlocks $ declarations parsedModule,
             varDeps = newVarDeps,
             varDepGraph = transposeG newVarDepGraph,
             varDepGraphLookupByVertex = newVarDepGraphVertexToNode,
@@ -607,23 +614,33 @@ newDrawableLineData pangoContext source opts = do
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
+        
+data ComparisonResult1DRange = Before | Inside | After deriving (Eq, Show)
+
+instance Monoid ComparisonResult1DRange where
+    mappend Before Before = Before
+    mappend After After = After
+    mappend _ _ = Inside
 
 drawEditor :: WidgetClass w => MVar FancyEditor -> w -> Render ()
 drawEditor fancyEditorDataHolder editorWidget = do
         drawData <- getDrawableData
+        updateWidgetSize drawData
         drawBackground
         drawContents drawData
     where
         drawBackground = do
             setSourceRGB 0.86 0.85 0.8
             paint
-
-        drawContents (dData, opts) = do
-            liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
-            save
-            translate textLeft textTop
-            let drawBgPath [] = return()
-                drawBgPath ((Point px py):ps) = do
+            
+        updateWidgetSize (dData, _) = liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
+            where
+                (Point textLeft textTop, Point textRight textBottom) = boundingRect dData
+            
+        drawPaths = traverse (traverse drawPath)
+            where
+                drawPath [] = return()
+                drawPath ((Point px py):ps) = do
                     moveTo px py
                     mapM_ (\(Point lx ly) -> lineTo lx ly) ps
                     closePath
@@ -631,12 +648,41 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     strokePreserve
                     setSourceRGBA 0.69 0.65 0.5 0.2
                     fill
-            _ <- traverse (traverse drawBgPath) $ backgroundPaths dData
-            drawText (drawableLines dData) (colourGroupToRgb dData)
+
+        drawContents (dData, opts) = do
+            save
+            translate textLeft textTop
+            rectangle <- getClipRectangle
+            drawPaths $ bgPathsToDraw rectangle
+            drawText (linesToDraw rectangle) (colourGroupToRgb dData)
             drawCursor dData opts
             restore
             where
+                linesToDraw Nothing = drawableLines dData
+                linesToDraw (Just (Rectangle _ ry _ rh)) = filterLines $ drawableLines dData
+                    where
+                        filterLines = takeWhile lineBeforeRectEnd . dropWhile lineBeforeRect
+                            where
+                                lineBeforeRect (DrawableLine y _ _) = (y + (fontDescent opts)) < fromIntegral ry
+                                lineBeforeRectEnd (DrawableLine y _ _) = (y - (fontAscent opts)) < fromIntegral (ry + rh)
                 (Point textLeft textTop, Point textRight textBottom) = boundingRect dData
+                bgPathsToDraw Nothing = backgroundPaths dData
+                bgPathsToDraw (Just rect) = filterPaths rect $ backgroundPaths dData
+                filterPaths :: Rectangle -> (Forest [PointD]) -> Forest [PointD]
+                filterPaths rect@(Rectangle rx ry rw rh) = map (\n->Node (rootLabel n) (filterPaths rect $ subForest n) ) . filter (doesPathIntersectRectangle . rootLabel)
+                    where
+                        doesPathIntersectRectangle = checkRangeResults . map pointRelToRect
+                            where
+                                pointRelToRect (Point x y) = (comparePos1D x rx (rx+rw), comparePos1D y ry (ry+rh))
+                                comparePos1D :: Double -> Int -> Int -> ComparisonResult1DRange
+                                comparePos1D a b1 b2 
+                                    | a < (fromIntegral b1) = Before
+                                    | (a >= (fromIntegral b1)) && (a <= (fromIntegral b2)) = Inside
+                                    | otherwise = After
+                                checkRangeResults [] = False
+                                checkRangeResults ((Inside, Inside):_) = True
+                                checkRangeResults [(_, _)] = False
+                                checkRangeResults ((rx1, ry1):(rx2, ry2):rs) = checkRangeResults ((rx1 `mappend` rx2, ry1 `mappend` ry2):rs)
 
         drawText dLines colourRgb = do
             setSourceRGBA 0 0.1 0 1
