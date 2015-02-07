@@ -3,15 +3,15 @@ module Hob.Command.SaveCurrentTab (
         saveCurrentEditorTab,
         saveCurrentEditorTabHandler) where
 
-import Control.Monad.Reader
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceView)
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceView)
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.Ui.Editor
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.Ui.Editor
 
 type NewFileNameChooser = IO (Maybe FilePath)
 

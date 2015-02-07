@@ -20,12 +20,12 @@ import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
                                                        styleContextRemoveClass)
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.DirectoryTree
-import Hob.Ui.Sidebar
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.DirectoryTree
+import           Hob.Ui.Sidebar
 
 {-| Index based on suffix arrays
 

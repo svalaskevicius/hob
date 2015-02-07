@@ -5,10 +5,10 @@ module Hob.Command.NewTab (
             NewFileEditorLauncher) where
 
 
-import Control.Monad.Reader
-import Data.Maybe           (mapMaybe)
-import Data.Text            (pack)
-import Graphics.UI.Gtk
+import           Control.Monad.Reader
+import           Data.Maybe              (mapMaybe)
+import           Data.Text               (pack)
+import           Graphics.UI.Gtk
 
 import           Hob.Context
 import           Hob.Context.FileContext

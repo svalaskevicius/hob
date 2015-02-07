@@ -1,10 +1,10 @@
 module Hob.Command.FocusNextTab (focusNextTabCommandHandler) where
 
-import Control.Monad.Trans (liftIO)
-import Graphics.UI.Gtk
+import           Control.Monad.Trans   (liftIO)
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.UiContext
+import           Hob.Context
+import           Hob.Context.UiContext
 
 focusNextTabCommandHandler :: CommandHandler
 focusNextTabCommandHandler = CommandHandler Nothing focusNextTab

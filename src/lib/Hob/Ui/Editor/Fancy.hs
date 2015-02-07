@@ -2,46 +2,41 @@ module Hob.Ui.Editor.Fancy (
     newEditorForText
     ) where
 
-import           Control.Concurrent.MVar   (MVar, modifyMVar_, newMVar,
-                                            readMVar)
+import           Control.Concurrent.MVar             (MVar, modifyMVar_,
+                                                      newMVar, readMVar)
 import           Control.Monad.Reader
-import qualified Control.Monad.State.Lazy  as S
-import           Data.Char                 (isPrint, isSpace)
-import           Data.Maybe                (listToMaybe, mapMaybe, maybeToList, catMaybes)
-import           Data.Text                 (Text, unpack)
-import           Filesystem.Path.CurrentOS (decodeString, encodeString,
-                                            filename)
+import qualified Control.Monad.State.Lazy            as S
+import           Data.Char                           (isPrint, isSpace)
+import qualified Data.Foldable                       as F
+import qualified Data.Function                       as F
+import           Data.Generics
+import           Data.Graph
+import           Data.List                           (groupBy, sortBy)
+import           Data.Maybe                          (catMaybes, listToMaybe,
+                                                      maybeToList)
+import           Data.Prizm.Color
+import           Data.Prizm.Color.CIE.LCH
+import           Data.Text                           (Text, unpack)
+import           Data.Traversable                    (traverse)
+import           Data.Tree
+import qualified Data.Vector                         as V
+import           Debug.Trace
+import           Filesystem.Path.CurrentOS           (decodeString,
+                                                      encodeString, filename)
 import           Graphics.Rendering.Cairo
-import qualified Data.Function as F
-import           Graphics.UI.Gtk           hiding (Point)
-import           System.Glib.GObject       (Quark)
-import qualified Language.Haskell.Exts.Annotated as P
-import Data.Tree
-import Data.Monoid
-import qualified Data.Traversable as T (mapM)
-import Data.Traversable (Traversable, traverse)
-import qualified Data.Foldable as F
-import Data.Generics
-import Data.List (sortBy, groupBy)
-import qualified Data.Vector as V
-import Data.Tree
-import qualified Data.Set as Set
-import Debug.Trace
-import Data.Prizm.Color.CIE.LCH
-import Data.Prizm.Color
-import Data.Graph
+import           Graphics.UI.Gtk                     hiding (Point)
+import qualified Language.Haskell.Exts.Annotated     as P
+import           System.Glib.GObject                 (Quark)
 
 import           Hob.Context
 import           Hob.Context.UiContext
-import qualified IPPrint                                                                                                                                       
-import qualified Language.Haskell.HsColour as HsColour                                                 
-import qualified Language.Haskell.HsColour.Colourise as HsColour                                       
-import qualified Language.Haskell.HsColour.Output as HsColour                                          
-                                                                                                       
+import qualified IPPrint
+import qualified Language.Haskell.HsColour           as HsColour
+import qualified Language.Haskell.HsColour.Colourise as HsColour
+import qualified Language.Haskell.HsColour.Output    as HsColour
+
 
 data Block a = Block (Point a) (Point a) deriving Show
-type BlockD = Block Double
-type BlockI = Block Int
 type Blocks a = Forest (Block a)
 
 
@@ -50,28 +45,28 @@ data VariableUsage = VariableUsage
                                 [P.Name P.SrcSpanInfo] -- ^ "depending on" variable usages
                                 deriving Show
 
-data VariableDependency = VariableDependency 
+data VariableDependency = VariableDependency
                                 (P.Name P.SrcSpanInfo) -- ^ definition of the "depending on" variable | source -> usages
                                 [VariableUsage]        -- ^ usages of the definition
                                 deriving Show
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
-data ColouredRange = ColouredRange 
+data ColouredRange = ColouredRange
                         Int -- ^ pos
                         Int -- ^ length
                         ColourGroup -- ^ colour group
                     deriving (Show, Eq)
-                    
+
 data SourceData = SourceData {
-    isModified   :: Bool,
-    textLines    :: [String],
-    parseResult  :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
-    sourceBlocks :: Blocks Int,
-    varDeps      :: [VariableDependency],
-    varDepGraph  :: Graph,
+    isModified                :: Bool,
+    textLines                 :: [String],
+    parseResult               :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
+    sourceBlocks              :: Blocks Int,
+    varDeps                   :: [VariableDependency],
+    varDepGraph               :: Graph,
     varDepGraphLookupByVertex :: Vertex -> (P.Name P.SrcSpanInfo, Int, [Int]),
-    varDepGraphLookupByKey :: Int -> Maybe Vertex
+    varDepGraphLookupByKey    :: Int -> Maybe Vertex
 }
 
 -- | Point x y
@@ -84,10 +79,10 @@ type PointI = Point Int
 data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)]
 
 data EditorDrawingData = EditorDrawingData {
-    drawableLines   :: [DrawableLine],
-    boundingRect    :: (PointD, PointD),
-    cursorPosition  :: PointD,
-    backgroundPaths :: Forest [PointD],
+    drawableLines    :: [DrawableLine],
+    boundingRect     :: (PointD, PointD),
+    cursorPosition   :: PointD,
+    backgroundPaths  :: Forest [PointD],
     colourGroupToRgb :: V.Vector (Double, Double, Double)
 }
 
@@ -105,13 +100,15 @@ data FancyEditor = FancyEditor {
 }
 
 
-debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }                                                                                                        
+debugColourPrefs :: HsColour.ColourPrefs
+debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }
 
 debugPrint :: Show a => a -> IO()
 debugPrint = putStrLn . HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow
 
 tracePrint :: Show a => a -> a
 tracePrint v = trace (HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow $ v) v
+
 
 findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findVars (P.Var _ (P.UnQual _ name)) = [name]
@@ -128,16 +125,12 @@ findNamesInPatterns :: [P.Pat P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
 findNamesInPatterns = concatMap (findElements findPatternVars)
 
 findGenerators :: P.Stmt P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Exp P.SrcSpanInfo)]
-findGenerators (P.Generator _ pat exp) = [(pat, exp)]
+findGenerators (P.Generator _ pat expr) = [(pat, expr)]
 findGenerators _ = []
 
 findQualifiers :: P.Stmt P.SrcSpanInfo -> [P.Exp P.SrcSpanInfo]
-findQualifiers (P.Qualifier _ exp) = [exp]
+findQualifiers (P.Qualifier _ expr) = [expr]
 findQualifiers _ = []
-
-findFuncs :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
-findFuncs (P.Match _ name pat rhs _) = [(name, findNamesInPatterns pat, findElements findVars rhs)]
-findFuncs (P.InfixMatch _ pat1 name pat2 rhs _) = [(name, (findElements findNames pat1) ++ (findNamesInPatterns pat2), findElements findVars rhs)]
 
 bindsToDecls :: Maybe (P.Binds l) -> [P.Decl l]
 bindsToDecls (Just (P.BDecls _ decls)) = decls
@@ -161,23 +154,23 @@ findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
 findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
 
 findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
-findVariableDependencies decls = foldr insertVarDep [] varDeps
+findVariableDependencies decls = foldr insertVarDep [] findVarDeps
     where
         insertVarDep varDep [] = [varDep]
         insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
          | otherwise = dep:insertVarDep varDep deps
-        
+
         funcs = findElements findFuncs'' decls
             -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
-        varDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
+        findVarDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
             where
-                -- | finds patterns used in rhs 
+                -- | finds patterns used in rhs
                 patternDependencies (fncName, patterns, rhs, subDecls) = patternUsage
                     where
                         filterNames :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
                         filterNames name = filter (name P.=~=)
-                        
+
                         patternNames :: [P.Name P.SrcSpanInfo]
                         patternNames = findNamesInPatterns patterns
 
@@ -188,20 +181,20 @@ findVariableDependencies decls = foldr insertVarDep [] varDeps
                         subFuncNames = concatMap (\(name, pat, _, _) -> name : findElements findPatternVars pat) $ concatMap ([] `mkQ` findFuncs'') subDecls
 
                         generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
-                        generators = map (\(pat, exp) -> (findElements findNames pat, findElements findVars exp)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
+                        generators = map (\(pat, expr) -> (findElements findNames pat, findElements findVars expr)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
 
                         qualifiers :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
-                        qualifiers = map (\exp -> ([], findElements findVars exp)) $ (findElements findQualifiers rhs ++ findElements findQualifiers subDecls)
+                        qualifiers = map (\expr -> ([], findElements findVars expr)) $ (findElements findQualifiers rhs ++ findElements findQualifiers subDecls)
 
                         subPatterns :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
-                        subPatterns = map (\(pat, rhs, decls) -> (findElements findNames pat, (findElements findNames rhs) ++ concatMap (findElements findNames) decls)) $ findElements findPatternBinds subDecls
-                        
+                        subPatterns = map (\(pat, patternRhs, patternDecls) -> (findElements findNames pat, (findElements findNames patternRhs) ++ concatMap (findElements findNames) patternDecls)) $ findElements findPatternBinds subDecls
+
                         variables :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         variables = [([fncName], findElements findVars rhs)]
 
                         patternUsage :: [VariableDependency]
                         patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) (patternNames++subFuncNames++subPatternNames)
-                        
+
 newSourceDataFromText :: Text -> IO SourceData
 newSourceDataFromText text = newSourceData newTextLines
     where
@@ -216,11 +209,11 @@ newSourceData newTextLines = do
         collectSourceInfoSpans = concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
         nestInfoSpans :: [P.SrcSpan] -> Forest P.SrcSpan
         nestInfoSpans [] = []
-        nestInfoSpans (x:xs) = Node x (nestInfoSpans inTheRangeXs) : (nestInfoSpans furtherXs)
+        nestInfoSpans (el:els) = Node el (nestInfoSpans inTheRangeEls) : (nestInfoSpans furtherEls)
             where
-                (inTheRangeXs, furtherXs) = break (isAfter x) . dropWhile (x == ) $ xs
-                isAfter x y = (P.srcSpanEndLine y > P.srcSpanEndLine x) || ((P.srcSpanEndLine y == P.srcSpanEndLine x) && (P.srcSpanEndLine y > P.srcSpanEndLine x))
-        infoSpanToBlock s = Block 
+                (inTheRangeEls, furtherEls) = break (isAfter el) . dropWhile (el == ) $ els
+                isAfter a b = (P.srcSpanEndLine b > P.srcSpanEndLine a) || ((P.srcSpanEndLine b == P.srcSpanEndLine a) && (P.srcSpanEndLine b > P.srcSpanEndLine a))
+        infoSpanToBlock s = Block
                                 (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
                                 (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
         collectSourceBlocks = (fmap (fmap infoSpanToBlock)) . nestInfoSpans . collectSourceInfoSpans
@@ -300,7 +293,7 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                         lineWhiteSpacePrefixLengths :: [Int]
                         lineWhiteSpacePrefixLengths = map length lineWhiteSpacePrefixes
                         lineWhiteSpacePrefixWidths :: [Double]
-                        lineWhiteSpacePrefixWidths = zipWith (\l w -> sum $ take l w) lineWhiteSpacePrefixLengths lineWidthRange 
+                        lineWhiteSpacePrefixWidths = zipWith (\l w -> sum $ take l w) lineWhiteSpacePrefixLengths lineWidthRange
                         lineWidthRange :: [[Double]]
                         lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
                 movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
@@ -411,8 +404,8 @@ newEditorForText targetNotebook filePath text = do
         newPangoContext = do
             pangoContext <- cairoCreateContext Nothing
             fontDescription <- fontDescriptionNew
-            fontDescriptionSetFamily fontDescription "Ubuntu"
-            fontDescriptionSetSize fontDescription 14
+            fontDescriptionSetFamily fontDescription "Ubuntu Mono"
+            fontDescriptionSetSize fontDescription 12
             contextSetFontDescription pangoContext fontDescription
             return pangoContext
 
@@ -575,7 +568,7 @@ drawableLineWidths = map (\(DrawableLine _ w _) -> w)
 
 varDependenciesToColourGroupLines :: [VariableDependency] -> [[ColouredRange]]
 varDependenciesToColourGroupLines vars = linedItemsToListPositions $ makeUnique $ sortBy compareLinesWithColouredRanges $ concatMap convertDefinition $ zip vars [0..]
-    where 
+    where
         convertDefinition ((VariableDependency def usageDefs), colourGroup) = srcElementToLineAndColourRange def : concatMap (\(VariableUsage _ usages) -> map srcElementToLineAndColourRange (usages)) usageDefs
             where
                 srcElementToLineAndColourRange srcElement = (startLine, ColouredRange startPos definitionLength (ColourGroup colourGroup))
@@ -598,12 +591,12 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ makeUnique 
             where
                 lineComparison = compare l1 l2
                 columnComparison = compare c1 c2
-        makeUnique (i1:i2:items) 
+        makeUnique (i1:i2:items)
            | i1 == i2 = makeUnique (i2:items)
            | otherwise = i1 : makeUnique (i2:items)
         makeUnique [i1] = [i1]
         makeUnique [] = []
-        
+
 
 
 newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
@@ -614,13 +607,8 @@ newDrawableLineData pangoContext source opts = do
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
         h = lineHeight opts
-        
-data ComparisonResult1DRange = Before | Inside | After deriving (Eq, Show)
 
-instance Monoid ComparisonResult1DRange where
-    mappend Before Before = Before
-    mappend After After = After
-    mappend _ _ = Inside
+data ComparisonResult1DRange = Before | Inside | After deriving (Eq, Show)
 
 drawEditor :: WidgetClass w => MVar FancyEditor -> w -> Render ()
 drawEditor fancyEditorDataHolder editorWidget = do
@@ -632,29 +620,29 @@ drawEditor fancyEditorDataHolder editorWidget = do
         drawBackground = do
             setSourceRGB 0.86 0.85 0.8
             paint
-            
+
         updateWidgetSize (dData, _) = liftIO $ widgetSetSizeRequest editorWidget (ceiling textRight) (ceiling textBottom)
             where
-                (Point textLeft textTop, Point textRight textBottom) = boundingRect dData
-            
-        drawPaths = traverse (traverse drawPath)
+                (_, Point textRight textBottom) = boundingRect dData
+
+        drawPaths paths = traverse (traverse drawPath) paths >> return()
             where
                 drawPath [] = return()
                 drawPath ((Point px py):ps) = do
                     moveTo px py
                     mapM_ (\(Point lx ly) -> lineTo lx ly) ps
                     closePath
-                    setSourceRGB 0.9 0 0
+                    setSourceRGBA 0.3 0.3 0.4 0.05
                     strokePreserve
-                    setSourceRGBA 0.69 0.65 0.5 0.2
+                    setSourceRGBA 0.69 0.65 0.5 0.15
                     fill
 
         drawContents (dData, opts) = do
             save
             translate textLeft textTop
-            rectangle <- getClipRectangle
-            drawPaths $ bgPathsToDraw rectangle
-            drawText (linesToDraw rectangle) (colourGroupToRgb dData)
+            rect <- getClipRectangle
+            drawPaths $ bgPathsToDraw rect
+            drawText (linesToDraw rect) (colourGroupToRgb dData)
             drawCursor dData opts
             restore
             where
@@ -663,9 +651,9 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     where
                         filterLines = takeWhile lineBeforeRectEnd . dropWhile lineBeforeRect
                             where
-                                lineBeforeRect (DrawableLine y _ _) = (y + (fontDescent opts)) < fromIntegral ry
-                                lineBeforeRectEnd (DrawableLine y _ _) = (y - (fontAscent opts)) < fromIntegral (ry + rh)
-                (Point textLeft textTop, Point textRight textBottom) = boundingRect dData
+                                lineBeforeRect (DrawableLine ly _ _) = (ly + (fontDescent opts)) < fromIntegral ry
+                                lineBeforeRectEnd (DrawableLine ly _ _) = (ly - (fontAscent opts)) < fromIntegral (ry + rh)
+                (Point textLeft textTop, _) = boundingRect dData
                 bgPathsToDraw Nothing = backgroundPaths dData
                 bgPathsToDraw (Just rect) = filterPaths rect $ backgroundPaths dData
                 filterPaths :: Rectangle -> (Forest [PointD]) -> Forest [PointD]
@@ -673,16 +661,20 @@ drawEditor fancyEditorDataHolder editorWidget = do
                     where
                         doesPathIntersectRectangle = checkRangeResults . map pointRelToRect
                             where
-                                pointRelToRect (Point x y) = (comparePos1D x rx (rx+rw), comparePos1D y ry (ry+rh))
+                                pointRelToRect (Point px py) = (comparePos1D px rx (rx+rw), comparePos1D py ry (ry+rh))
                                 comparePos1D :: Double -> Int -> Int -> ComparisonResult1DRange
-                                comparePos1D a b1 b2 
+                                comparePos1D a b1 b2
                                     | a < (fromIntegral b1) = Before
                                     | (a >= (fromIntegral b1)) && (a <= (fromIntegral b2)) = Inside
                                     | otherwise = After
                                 checkRangeResults [] = False
                                 checkRangeResults ((Inside, Inside):_) = True
                                 checkRangeResults [(_, _)] = False
-                                checkRangeResults ((rx1, ry1):(rx2, ry2):rs) = checkRangeResults ((rx1 `mappend` rx2, ry1 `mappend` ry2):rs)
+                                checkRangeResults ((rx1, ry1):(rx2, ry2):rs) = checkRangeResults ((rx1 `combinePoints` rx2, ry1 `combinePoints` ry2):rs)
+                                    where
+                                        combinePoints Before Before = Before
+                                        combinePoints After After = After
+                                        combinePoints _ _ = Inside
 
         drawText dLines colourRgb = do
             setSourceRGBA 0 0.1 0 1
@@ -692,6 +684,7 @@ drawEditor fancyEditorDataHolder editorWidget = do
                 ) dLines
             where
                 drawTextPiece (w, c, s) = do
+            -- TODO: filter only pieces in clip rect
                     setTextColour c
                     showGlyphString s
                     relMoveTo w 0

@@ -3,14 +3,14 @@ module Hob.Command.FocusSidebar (
     syncFocusSidebarCommandHandler
     ) where
 
-import Control.Monad.Reader
-import Graphics.UI.Gtk
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.Ui.Editor         (getActiveEditor, getEditorFilePath)
-import Hob.Ui.Sidebar        (syncPathToSidebar)
+import           Hob.Context
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.Ui.Editor         (getActiveEditor, getEditorFilePath)
+import           Hob.Ui.Sidebar        (syncPathToSidebar)
 
 focusSidebarCommandHandler :: CommandHandler
 focusSidebarCommandHandler = CommandHandler Nothing focusSidebar

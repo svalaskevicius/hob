@@ -11,34 +11,34 @@ module Hob.Ui.Editor (
                updateEditorTitle
                ) where
 
-import Control.Monad.Reader
-import Data.Text                  (Text)
-import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
-                                   castToSourceView,
-                                   sourceBufferBeginNotUndoableAction,
-                                   sourceBufferEndNotUndoableAction,
-                                   sourceBufferNew,
-                                   sourceBufferSetHighlightSyntax,
-                                   sourceBufferSetLanguage,
-                                   sourceBufferSetStyleScheme,
-                                   sourceViewNewWithBuffer,
-                                   sourceViewSetAutoIndent,
-                                   sourceViewSetDrawSpaces,
-                                   sourceViewSetHighlightCurrentLine,
-                                   sourceViewSetIndentOnTab,
-                                   sourceViewSetIndentWidth,
-                                   sourceViewSetInsertSpacesInsteadOfTabs,
-                                   sourceViewSetShowLineNumbers,
-                                   sourceViewSetTabWidth)
-import System.Glib.GObject        (Quark)
+import           Control.Monad.Reader
+import           Data.Text                  (Text)
+import           Filesystem.Path.CurrentOS  (decodeString, encodeString,
+                                             filename)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..),
+                                             SourceView, castToSourceView,
+                                             sourceBufferBeginNotUndoableAction,
+                                             sourceBufferEndNotUndoableAction,
+                                             sourceBufferNew,
+                                             sourceBufferSetHighlightSyntax,
+                                             sourceBufferSetLanguage,
+                                             sourceBufferSetStyleScheme,
+                                             sourceViewNewWithBuffer,
+                                             sourceViewSetAutoIndent,
+                                             sourceViewSetDrawSpaces,
+                                             sourceViewSetHighlightCurrentLine,
+                                             sourceViewSetIndentOnTab,
+                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
+                                             sourceViewSetShowLineNumbers,
+                                             sourceViewSetTabWidth)
+import           System.Glib.GObject        (Quark)
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.Control
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.Control
 
 gtkEditor :: SourceView -> Editor
 gtkEditor sourceView = Editor

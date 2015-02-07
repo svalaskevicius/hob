@@ -18,16 +18,16 @@ module Hob.Context.Types (
     fromContext,
     ) where
 
-import Control.Monad.Reader
-import Data.Maybe               (isJust)
-import Data.Monoid
-import Graphics.UI.Gtk          (Modifier)
-import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Control.Monad.Reader
+import           Data.Maybe               (isJust)
+import           Data.Monoid
+import           Graphics.UI.Gtk          (Modifier)
+import           GtkExtras.LargeTreeStore as LTS (TreeStore)
 
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.DirectoryTree
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.DirectoryTree
 
 
 type App = ReaderT Context IO

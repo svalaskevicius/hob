@@ -4,7 +4,7 @@ module Hob.Context.CommandMatcher (
     createMatcherForKeyBinding,
 ) where
 
-import Hob.Context.Types
+import           Hob.Context.Types
 
 
 createMatcherForPrefix :: String -> (String -> CommandHandler) -> CommandMatcher

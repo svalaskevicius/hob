@@ -15,25 +15,25 @@ import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
 
-import Hob.Command.CloseCurrentTab
-import Hob.Command.FindText
-import Hob.Command.FocusCommandEntry
-import Hob.Command.FocusNextTab
-import Hob.Command.FocusNumberedTab
-import Hob.Command.FocusPreviousTab
-import Hob.Command.FocusSidebar
-import Hob.Command.NewTab
-import Hob.Command.ReloadSidebarTree
-import Hob.Command.ReplaceText
-import Hob.Command.SaveCurrentTab
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.Ui.CommandEntry
-import Hob.Ui.Editor
-import Hob.Ui.Sidebar
-import Hob.Ui.SidebarSearch
+import           Hob.Command.CloseCurrentTab
+import           Hob.Command.FindText
+import           Hob.Command.FocusCommandEntry
+import           Hob.Command.FocusNextTab
+import           Hob.Command.FocusNumberedTab
+import           Hob.Command.FocusPreviousTab
+import           Hob.Command.FocusSidebar
+import           Hob.Command.NewTab
+import           Hob.Command.ReloadSidebarTree
+import           Hob.Command.ReplaceText
+import           Hob.Command.SaveCurrentTab
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.Ui.CommandEntry
+import           Hob.Ui.Editor
+import           Hob.Ui.Sidebar
+import           Hob.Ui.SidebarSearch
 
 loadGui :: FileContext -> StyleContext -> IO Context
 loadGui fileCtx styleCtx = do

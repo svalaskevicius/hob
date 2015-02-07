@@ -7,13 +7,14 @@ module Hob.Context.FileContext (
     sourceLanguage
 ) where
 
-import Data.Text                  (Text)
-import Data.Tree                  (Forest)
-import Graphics.UI.Gtk.SourceView (SourceLanguage, SourceLanguageManager,
-                                   sourceLanguageManagerGuessLanguage,
-                                   sourceLanguageManagerNew)
+import           Data.Text                  (Text)
+import           Data.Tree                  (Forest)
+import           Graphics.UI.Gtk.SourceView (SourceLanguage,
+                                             SourceLanguageManager,
+                                             sourceLanguageManagerGuessLanguage,
+                                             sourceLanguageManagerNew)
 
-import Hob.DirectoryTree
+import           Hob.DirectoryTree
 
 type FileLoader = FilePath -> IO (Maybe Text)
 type FileWriter = FilePath -> Text -> IO ()

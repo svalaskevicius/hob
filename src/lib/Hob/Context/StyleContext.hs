@@ -7,15 +7,12 @@ module Hob.Context.StyleContext (
     sourceStyleFont
 ) where
 
-import Control.Monad                 (liftM)
-import Graphics.Rendering.Pango.Font (FontDescription,
-                                      fontDescriptionFromString)
-import Graphics.UI.Gtk.SourceView    (SourceStyleScheme,
-                                      SourceStyleSchemeManager,
-                                      sourceStyleSchemeManagerGetDefault,
-                                      sourceStyleSchemeManagerGetScheme,
-                                      sourceStyleSchemeManagerSetSearchPath)
-import System.FilePath               ((</>))
+import           Control.Monad                 (liftM)
+import           Graphics.Rendering.Pango.Font (FontDescription,
+                                                fontDescriptionFromString)
+import           Graphics.UI.Gtk.SourceView    (SourceStyleScheme,
+                                                SourceStyleSchemeManager, sourceStyleSchemeManagerGetDefault, sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath)
+import           System.FilePath               ((</>))
 
 data StyleContext = StyleContext {
     contextDataPath     :: FilePath,

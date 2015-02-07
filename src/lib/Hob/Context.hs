@@ -27,19 +27,19 @@ module Hob.Context (
     getActiveCommands,
 ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Reader
-import Graphics.UI.Gtk          (postGUIAsync)
-import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Control.Concurrent.MVar
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk            (postGUIAsync)
+import           GtkExtras.LargeTreeStore   as LTS (TreeStore)
 
-import Hob.Context.CommandMatcher
-import Hob.Context.Editor
-import Hob.Context.Events
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.Types
-import Hob.Context.UiContext
-import Hob.DirectoryTree
+import           Hob.Context.CommandMatcher
+import           Hob.Context.Editor
+import           Hob.Context.Events
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.Types
+import           Hob.Context.UiContext
+import           Hob.DirectoryTree
 
 
 

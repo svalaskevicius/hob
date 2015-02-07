@@ -4,10 +4,10 @@ module Hob.Context.Events (
     emitEvent,
 ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Reader
+import           Control.Concurrent.MVar
+import           Control.Monad.Reader
 
-import Hob.Context.Types
+import           Hob.Context.Types
 
 initEventBus :: IO EventBus
 initEventBus = do

@@ -7,12 +7,12 @@ module Hob.Context.Editor (
     getActiveCommands,
     ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Reader
-import Data.Monoid
+import           Control.Concurrent.MVar
+import           Control.Monad.Reader
+import           Data.Monoid
 
-import Hob.Context.Events
-import Hob.Context.Types
+import           Hob.Context.Events
+import           Hob.Context.Types
 
 
 runOnEditor :: (Editor -> Editor -> a) -> Editor -> a

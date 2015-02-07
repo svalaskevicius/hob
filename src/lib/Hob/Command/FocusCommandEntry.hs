@@ -4,13 +4,13 @@ module Hob.Command.FocusCommandEntry (
     focusCommandEntryCommandHandler,
     ) where
 
-import Control.Monad.Reader
-import Graphics.UI.Gtk
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.Ui.Editor
+import           Hob.Context
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.Ui.Editor
 
 focusCommandEntryCommandHandler :: CommandHandler
 focusCommandEntryCommandHandler = CommandHandler Nothing focusCommandEntry
