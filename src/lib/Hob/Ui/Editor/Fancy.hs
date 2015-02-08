@@ -64,6 +64,11 @@ data ColouredRange = ColouredRange
                         ColourGroup -- ^ colour group
                     deriving (Show, Eq)
 
+data SourceChangeEvent = InsertChar (Point Int) Char -- ^ Point (col, line) before the inserted char, Char that was inserted
+--                       | DeleteChar (Point Int) -- ^ Point (col, line) before the delete char
+--                       | DeleteLineSeparator Int -- ^ line number after which the line separator was removed
+--                       | InsertLineSeparator (Point Int) -- ^ Point (col, line) after which the line separator was inserted
+
 data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [String],
@@ -239,11 +244,13 @@ newSourceDataFromText text = newSourceData Nothing newTextLines
         newTextLines = lines . unpack $ text
 
 -- TODO: vector for lines?
-newSourceData :: Maybe SourceData -> [String] -> IO SourceData
-newSourceData oldSourceData newTextLines = do
+newSourceData :: Maybe (SourceData, [SourceChangeEvent]) -> [String] -> IO SourceData
+newSourceData sourceHistory newTextLines = do
 --    debugPrint $ varDeps sd
     return sd
     where
+        oldSourceData = fmap fst sourceHistory
+        sourceChangeEvents = fmap snd sourceHistory
         collectSourceInfoSpans = concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
         nestInfoSpans :: [P.SrcSpan] -> Forest P.SrcSpan
         nestInfoSpans [] = []
@@ -255,8 +262,17 @@ newSourceData oldSourceData newTextLines = do
                                 (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
                                 (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
         collectSourceBlocks = (fmap (fmap infoSpanToBlock)) . nestInfoSpans . collectSourceInfoSpans
-        parseMode = P.defaultParseMode
-        parsedModule = P.parseFileContentsWithComments parseMode . unlines $ newTextLines
+        parsedModule = case oldSourceData of
+                        Nothing -> parseFullModule
+                        Just oldSource -> addCachedMatches (parseModuleMinusMatches notChangedMatches) (adjustMatchesLines notChangedMatches)
+            where
+                parseFullModule = P.parseFileContentsWithComments P.defaultParseMode . unlines $ newTextLines
+                notChangedMatches = [] -- cached matches that have not changed
+                adjustMatchesLines = id
+                parseModuleMinusMatches = const parseFullModule
+                addCachedMatches (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) matches = P.ParseOk (P.Module loc headers pragmas imports (decls++matches), comments)
+                addCachedMatches res _ = res
+                
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
@@ -534,7 +550,7 @@ insertEditorChar c = do
                                   in preChars ++ [c] ++ postChars
                             ) . take 1 $ postLines
         tLines' = preLines ++ changedLine ++ drop 1 postLines
-    source' <- liftIO $ newSourceData (Just source) tLines'
+    source' <- liftIO $ newSourceData (Just (source, [InsertChar (Point cx cy) c])) tLines'
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source''}
 
