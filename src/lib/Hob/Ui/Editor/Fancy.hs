@@ -53,6 +53,8 @@ data VariableDependency = VariableDependency
                                 deriving Show
 
 type ScopedVariableDependencies = Map (P.Match P.SrcSpanInfo) [VariableDependency]
+type FunctionDef = (P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])
+type FunctionCache = Map (P.Decl P.SrcSpanInfo) [FunctionDef]
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
@@ -66,6 +68,7 @@ data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [String],
     parseResult               :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
+    functionDefCache          :: FunctionCache,
     sourceBlocks              :: Blocks Int,
     varDeps                   :: ScopedVariableDependencies,
     varDepGraph               :: Graph,
@@ -143,10 +146,10 @@ bindsToDecls :: Maybe (P.Binds l) -> [P.Decl l]
 bindsToDecls (Just (P.BDecls _ decls)) = decls
 bindsToDecls _ = []
 
-findFuncs :: P.Decl P.SrcSpanInfo -> [(P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findFuncs :: P.Decl P.SrcSpanInfo -> [FunctionDef]
 findFuncs (P.FunBind _ matches) = concatMap funcMatches matches
     where
-        funcMatches :: P.Match P.SrcSpanInfo -> [(P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+        funcMatches :: P.Match P.SrcSpanInfo -> [FunctionDef]
         funcMatches match@(P.Match _ name pats rhs binds) = [(match, name, pats, rhs, bindsToDecls binds)]
         funcMatches match@(P.InfixMatch _ pat name pats rhs binds) = [(match, name, pat:pats, rhs, bindsToDecls binds)]
 
@@ -167,9 +170,14 @@ findElementsNonRec query a = let res = [] `mkQ` query $ a
 
 -- TODO: this is a performance hog. both cpu and memory
 -- TODO: add func as scope, use it for comparing later in cache
-findVariableDependencies :: (Data l) => Maybe ScopedVariableDependencies -> [P.Decl l] -> ScopedVariableDependencies
-findVariableDependencies oldVarDeps decls = foldr (\f m -> M.insert (varDepMapKey f) (varDepsForFunctionMatch f) m) M.empty funcs
+findVariableDependencies :: FunctionCache -> Maybe ScopedVariableDependencies -> [P.Decl P.SrcSpanInfo] -> (FunctionCache, ScopedVariableDependencies)
+findVariableDependencies funcCache oldVarDeps decls = 
+    let (funcs, funcCache') = S.runState findFuncs' funcCache 
+        deps = varDepsForFunctions funcs
+    in (funcCache', deps)
     where
+        varDepsForFunctions = foldr (\f m -> M.insert (varDepMapKey f) (varDepsForFunctionMatch f) m) M.empty
+
         varDepsForFunctionMatch f = maybe (findVarDeps f) id $ M.lookup (varDepMapKey f) =<< oldVarDeps
         
         varDepMapKey (match, _, _, _, _) = match
@@ -179,7 +187,19 @@ findVariableDependencies oldVarDeps decls = foldr (\f m -> M.insert (varDepMapKe
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
          | otherwise = dep:insertVarDep varDep deps
 
-        funcs = findElements findFuncs decls
+        findFuncs' :: S.State FunctionCache [FunctionDef]
+        findFuncs' = (return . concat) =<< mapM _findFuncs decls
+            where
+                _findFuncs :: P.Decl P.SrcSpanInfo -> S.State FunctionCache [FunctionDef]
+                _findFuncs d = do
+                    c <- S.get
+                    case M.lookup d c of
+                        Nothing -> do
+                                    let funcs = findElements findFuncs d
+                                    S.put $ M.insert d funcs c
+                                    return funcs
+                        Just funcs -> return funcs
+            
 
         findVarDeps = foldr insertVarDep [] . patternDependencies -- TODO subDelcs, do notation
             where
@@ -240,7 +260,7 @@ newSourceData oldSourceData newTextLines = do
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
-        newVarDeps = findVariableDependencies (fmap varDeps oldSourceData) . declarations $ parsedModule
+        (funcDefCache, newVarDeps) = findVariableDependencies (maybe M.empty functionDefCache oldSourceData) (fmap varDeps oldSourceData) . declarations $ parsedModule
         viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) . concat . M.elems $ newVarDeps
         foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps (concat . M.elems $ newVarDeps) >>= Just . map (\(VariableUsage targets _) -> targets)
             where
@@ -256,6 +276,7 @@ newSourceData oldSourceData newTextLines = do
             isModified = False,
             textLines = newTextLines,
             parseResult = parsedModule,
+            functionDefCache = funcDefCache,
             sourceBlocks = collectSourceBlocks $ declarations parsedModule,
             varDeps = newVarDeps,
             varDepGraph = transposeG newVarDepGraph,
