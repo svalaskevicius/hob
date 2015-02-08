@@ -52,7 +52,7 @@ data VariableDependency = VariableDependency
                                 [VariableUsage]        -- ^ usages of the definition
                                 deriving Show
 
-type ScopedVariableDependencies = Map (P.Name P.SrcSpanInfo) [VariableDependency]
+type ScopedVariableDependencies = Map (P.Match P.SrcSpanInfo) [VariableDependency]
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
@@ -140,12 +140,12 @@ bindsToDecls :: Maybe (P.Binds l) -> [P.Decl l]
 bindsToDecls (Just (P.BDecls _ decls)) = decls
 bindsToDecls _ = []
 
-findFuncs :: P.Decl P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+findFuncs :: P.Decl P.SrcSpanInfo -> [(P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
 findFuncs (P.FunBind _ matches) = concatMap funcMatches matches
     where
-        funcMatches :: P.Match P.SrcSpanInfo -> [(P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
-        funcMatches (P.Match _ name pats rhs binds) = [(name, pats, rhs, bindsToDecls binds)]
-        funcMatches (P.InfixMatch _ pat name pats rhs binds) = [(name, pat:pats, rhs, bindsToDecls binds)]
+        funcMatches :: P.Match P.SrcSpanInfo -> [(P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])]
+        funcMatches match@(P.Match _ name pats rhs binds) = [(match, name, pats, rhs, bindsToDecls binds)]
+        funcMatches match@(P.InfixMatch _ pat name pats rhs binds) = [(match, name, pat:pats, rhs, bindsToDecls binds)]
 
 findFuncs _ = []
 
@@ -164,22 +164,24 @@ findElementsNonRec query a = let res = [] `mkQ` query $ a
 
 -- TODO: this is a performance hog. both cpu and memory
 -- TODO: add func as scope, use it for comparing later in cache
-findVariableDependencies :: (Data l) => [P.Decl l] -> ScopedVariableDependencies
-findVariableDependencies decls = foldr (\f m -> M.insert (funcName f) (findVarDeps f) m) M.empty funcs
+findVariableDependencies :: (Data l) => Maybe ScopedVariableDependencies -> [P.Decl l] -> ScopedVariableDependencies
+findVariableDependencies oldVarDeps decls = foldr (\f m -> M.insert (varDepMapKey f) (varDepsForFunctionMatch f) m) M.empty funcs
     where
+        varDepsForFunctionMatch f = maybe (findVarDeps f) id $ M.lookup (varDepMapKey f) =<< oldVarDeps
+        
+        varDepMapKey (match, _, _, _, _) = match
+        
         insertVarDep varDep [] = [varDep]
         insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
          | otherwise = dep:insertVarDep varDep deps
 
         funcs = findElements findFuncs decls
-        
-        funcName (name, _, _, _) = name
 
         findVarDeps = foldr insertVarDep [] . patternDependencies -- TODO subDelcs, do notation
             where
                 -- | finds patterns used in rhs
-                patternDependencies (fncName, patterns, rhs, subDecls) = patternUsage
+                patternDependencies (_, fncName, patterns, rhs, subDecls) = patternUsage
                     where
                         filterNames :: P.Name P.SrcSpanInfo -> [P.Name P.SrcSpanInfo] -> [P.Name P.SrcSpanInfo]
                         filterNames name = filter (name P.=~=)
@@ -191,7 +193,7 @@ findVariableDependencies decls = foldr (\f m -> M.insert (funcName f) (findVarDe
                         subPatternNames = concatMap (\(pat, _, _) -> findElements findPatternVars pat) $ concatMap ([] `mkQ` findPatternBinds) subDecls
 
                         subFuncNames :: [P.Name P.SrcSpanInfo]
-                        subFuncNames = concatMap (\(name, _, _, _) -> [name]) $ concatMap ([] `mkQ` findFuncs) subDecls
+                        subFuncNames = concatMap (\(_, name, _, _, _) -> [name]) $ concatMap ([] `mkQ` findFuncs) subDecls
 
                         generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         generators = map (\(pat, expr) -> (findElements findNames pat, findElements findVars expr)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
@@ -209,13 +211,13 @@ findVariableDependencies decls = foldr (\f m -> M.insert (funcName f) (findVarDe
                         patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) $ nubBy (P.=~=) (patternNames++subFuncNames++subPatternNames)
 
 newSourceDataFromText :: Text -> IO SourceData
-newSourceDataFromText text = newSourceData newTextLines
+newSourceDataFromText text = newSourceData Nothing newTextLines
     where
         newTextLines = lines . unpack $ text
 
 -- TODO: vector for lines?
-newSourceData :: [String] -> IO SourceData
-newSourceData newTextLines = do
+newSourceData :: Maybe SourceData -> [String] -> IO SourceData
+newSourceData oldSourceData newTextLines = do
 --    debugPrint $ varDeps sd
     return sd
     where
@@ -235,7 +237,7 @@ newSourceData newTextLines = do
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
-        newVarDeps = findVariableDependencies . declarations $ parsedModule
+        newVarDeps = findVariableDependencies (fmap varDeps oldSourceData) . declarations $ parsedModule
         viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) . concat . M.elems $ newVarDeps
         foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps (concat . M.elems $ newVarDeps) >>= Just . map (\(VariableUsage targets _) -> targets)
             where
@@ -506,7 +508,7 @@ insertEditorChar c = do
                                   in preChars ++ [c] ++ postChars
                             ) . take 1 $ postLines
         tLines' = preLines ++ changedLine ++ drop 1 postLines
-    source' <- liftIO $ newSourceData tLines'
+    source' <- liftIO $ newSourceData (Just source) tLines'
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source''}
 
