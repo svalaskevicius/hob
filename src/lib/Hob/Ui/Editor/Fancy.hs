@@ -11,7 +11,7 @@ import qualified Data.Foldable                       as F
 import qualified Data.Function                       as F
 import           Data.Generics
 import           Data.Graph
-import           Data.List                           (groupBy, sortBy)
+import           Data.List                           (groupBy, sortBy, nubBy)
 import           Data.Maybe                          (catMaybes, listToMaybe,
                                                       maybeToList)
 import           Data.Prizm.Color
@@ -150,12 +150,18 @@ findPatternBinds :: P.Decl P.SrcSpanInfo -> [(P.Pat P.SrcSpanInfo, P.Rhs P.SrcSp
 findPatternBinds (P.PatBind _ pat rhs binds) = [(pat, rhs, bindsToDecls binds)]
 findPatternBinds _ = []
 
--- todo add non recursive finder
 findElements :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
 findElements query a = ([] `mkQ` query $ a) ++ (concat $ gmapQ (findElements query) a)
 
+findElementsNonRec :: (Data a, Typeable b) => (b -> [c]) -> a -> [c]
+findElementsNonRec query a = let res = [] `mkQ` query $ a
+                             in if null res then (concat $ gmapQ (findElementsNonRec query) a)
+                             else res
+
+-- TODO: this is a performance hog. both cpu and memory
+-- TODO: add func as scope, use it for comparing later in cache
 findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
-findVariableDependencies decls = foldr insertVarDep [] findVarDeps
+findVariableDependencies decls = concatMap findVarDeps funcs
     where
         insertVarDep varDep [] = [varDep]
         insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
@@ -163,8 +169,8 @@ findVariableDependencies decls = foldr insertVarDep [] findVarDeps
          | otherwise = dep:insertVarDep varDep deps
 
         funcs = findElements findFuncs decls
-            -- \name -> VariableDependency name ((findElements findNames rhs)++(findElements findNames subDecls)) ) . findNamesInPatterns $ patterns
-        findVarDeps = concatMap patternDependencies funcs -- TODO subDelcs, do notation
+
+        findVarDeps = foldr insertVarDep [] . patternDependencies -- TODO subDelcs, do notation
             where
                 -- | finds patterns used in rhs
                 patternDependencies (fncName, patterns, rhs, subDecls) = patternUsage
@@ -179,7 +185,7 @@ findVariableDependencies decls = foldr insertVarDep [] findVarDeps
                         subPatternNames = concatMap (\(pat, _, _) -> findElements findPatternVars pat) $ concatMap ([] `mkQ` findPatternBinds) subDecls
 
                         subFuncNames :: [P.Name P.SrcSpanInfo]
-                        subFuncNames = concatMap (\(name, pat, _, _) -> name : findElements findPatternVars pat) $ concatMap ([] `mkQ` findFuncs) subDecls
+                        subFuncNames = concatMap (\(name, _, _, _) -> [name]) $ concatMap ([] `mkQ` findFuncs) subDecls
 
                         generators :: [([P.Name P.SrcSpanInfo], [P.Name P.SrcSpanInfo])]
                         generators = map (\(pat, expr) -> (findElements findNames pat, findElements findVars expr)) $ (findElements findGenerators rhs ++ findElements findGenerators subDecls)
@@ -194,7 +200,7 @@ findVariableDependencies decls = foldr insertVarDep [] findVarDeps
                         variables = [([fncName], findElements findVars rhs)]
 
                         patternUsage :: [VariableDependency]
-                        patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) (patternNames++subFuncNames++subPatternNames)
+                        patternUsage = concatMap (\name->catMaybes $ map (\(pvars, evars)->let usage = filterNames name evars in if null usage then Nothing else Just $ VariableDependency name [VariableUsage pvars usage]) (variables++qualifiers++generators++subPatterns)) $ nubBy (P.=~=) (patternNames++subFuncNames++subPatternNames)
 
 newSourceDataFromText :: Text -> IO SourceData
 newSourceDataFromText text = newSourceData newTextLines
