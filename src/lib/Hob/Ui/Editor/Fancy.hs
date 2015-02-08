@@ -14,6 +14,8 @@ import           Data.Graph
 import           Data.List                           (groupBy, sortBy, nubBy)
 import           Data.Maybe                          (catMaybes, listToMaybe,
                                                       maybeToList)
+import qualified Data.Map as M
+import Data.Map (Map)
 import           Data.Prizm.Color
 import           Data.Prizm.Color.CIE.LCH
 import           Data.Text                           (Text, unpack)
@@ -50,6 +52,8 @@ data VariableDependency = VariableDependency
                                 [VariableUsage]        -- ^ usages of the definition
                                 deriving Show
 
+type ScopedVariableDependencies = Map (P.Name P.SrcSpanInfo) [VariableDependency]
+
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
 data ColouredRange = ColouredRange
@@ -63,7 +67,7 @@ data SourceData = SourceData {
     textLines                 :: [String],
     parseResult               :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
     sourceBlocks              :: Blocks Int,
-    varDeps                   :: [VariableDependency],
+    varDeps                   :: ScopedVariableDependencies,
     varDepGraph               :: Graph,
     varDepGraphLookupByVertex :: Vertex -> (P.Name P.SrcSpanInfo, Int, [Int]),
     varDepGraphLookupByKey    :: Int -> Maybe Vertex
@@ -76,7 +80,7 @@ type PointI = Point Int
 
 --data DrawableG
 -- | DrawableLine (y position) (x position of each char) [(width of the glyph, colour group, glyph to draw)]
-data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)]
+data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)] 
 
 data EditorDrawingData = EditorDrawingData {
     drawableLines    :: [DrawableLine],
@@ -160,8 +164,8 @@ findElementsNonRec query a = let res = [] `mkQ` query $ a
 
 -- TODO: this is a performance hog. both cpu and memory
 -- TODO: add func as scope, use it for comparing later in cache
-findVariableDependencies :: (Data l) => [P.Decl l] -> [VariableDependency]
-findVariableDependencies decls = concatMap findVarDeps funcs
+findVariableDependencies :: (Data l) => [P.Decl l] -> ScopedVariableDependencies
+findVariableDependencies decls = foldr (\f m -> M.insert (funcName f) (findVarDeps f) m) M.empty funcs
     where
         insertVarDep varDep [] = [varDep]
         insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
@@ -169,6 +173,8 @@ findVariableDependencies decls = concatMap findVarDeps funcs
          | otherwise = dep:insertVarDep varDep deps
 
         funcs = findElements findFuncs decls
+        
+        funcName (name, _, _, _) = name
 
         findVarDeps = foldr insertVarDep [] . patternDependencies -- TODO subDelcs, do notation
             where
@@ -210,7 +216,7 @@ newSourceDataFromText text = newSourceData newTextLines
 -- TODO: vector for lines?
 newSourceData :: [String] -> IO SourceData
 newSourceData newTextLines = do
---    debugPrint $ sourceBlocks sd
+--    debugPrint $ varDeps sd
     return sd
     where
         collectSourceInfoSpans = concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
@@ -230,8 +236,8 @@ newSourceData newTextLines = do
         declarations (P.ParseFailed _ _) = []
         declarations _ = error "unsupported parse result"
         newVarDeps = findVariableDependencies . declarations $ parsedModule
-        viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) $ newVarDeps
-        foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps newVarDeps >>= Just . map (\(VariableUsage targets _) -> targets)
+        viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) . concat . M.elems $ newVarDeps
+        foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps (concat . M.elems $ newVarDeps) >>= Just . map (\(VariableUsage targets _) -> targets)
             where
                 foundVarDeps ((VariableDependency var usages):vars) = if var == v then Just usages else foundVarDeps vars
                 foundVarDeps [] = Nothing
@@ -311,7 +317,7 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                                 lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
         variableDepsGraphEdges = V.fromList . map (cielChToRgbTuple . vertexDepColour) $ variableVertexesInTopoOrder
             where
-                uniqueVarColours = V.fromList . generateCielCHColours $ length . varDeps $ source
+                uniqueVarColours = V.fromList . generateCielCHColours $ length . concat . M.elems . varDeps $ source
                 vertexDepColour v = let (_, idx, deps) = varDepGraphLookupByVertex source v
                                     in combineColours (idx:deps)
                     where
@@ -609,7 +615,8 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ makeUnique 
 newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
 newDrawableLineData pangoContext source opts = do
     let linesToDraw = textLines source
-        colourGroups = varDependenciesToColourGroupLines $ varDeps source
+        colourGroups = varDependenciesToColourGroupLines . concat . M.elems . varDeps $ source
+--    debugPrint $ colourGroups !! 143
     (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw (colourGroups++repeat []))
     return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
     where
@@ -674,9 +681,9 @@ drawEditor fancyEditorDataHolder editorWidget = do
                                     | a < (fromIntegral b1) = Before
                                     | (a >= (fromIntegral b1)) && (a <= (fromIntegral b2)) = Inside
                                     | otherwise = After
-                                checkRangeResults [] = False
                                 checkRangeResults ((Inside, Inside):_) = True
-                                checkRangeResults [(_, _)] = False
+                                checkRangeResults [] = False
+                                checkRangeResults [_] = False
                                 checkRangeResults ((rx1, ry1):(rx2, ry2):rs) = checkRangeResults ((rx1 `combinePoints` rx2, ry1 `combinePoints` ry2):rs)
                                     where
                                         combinePoints Before Before = Before
