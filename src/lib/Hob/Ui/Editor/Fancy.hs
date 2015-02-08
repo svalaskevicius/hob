@@ -82,8 +82,11 @@ type PointI = Point Int
 -- | DrawableLine (y position) (x position of each char) [(width of the glyph, colour group, glyph to draw)]
 data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)] 
 
+type TextShapeCache = Map String [(GlyphItem, (PangoRectangle, PangoRectangle), [Double])]
+
 data EditorDrawingData = EditorDrawingData {
     drawableLines    :: [DrawableLine],
+    textToShapeCache :: TextShapeCache,
     boundingRect     :: (PointD, PointD),
     cursorPosition   :: PointD,
     backgroundPaths  :: Forest [PointD],
@@ -260,13 +263,13 @@ newSourceData oldSourceData newTextLines = do
             varDepGraphLookupByKey = newVarDepGraphKeyToVertex
         }
 
-newDrawingData :: PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
-newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
+newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
+newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
 --    debugPrint (varDepGraph source)
   --  debugPrint $ reverse . topSort $ varDepGraph source
-    lineData <- newDrawableLineData pangoContext source opts
+    (textShapesCache, lineData) <- newDrawableLineData (maybe M.empty textToShapeCache oldData) pangoContext source opts
     let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
-    return $ ed lineData cursorP
+    return $ ed textShapesCache lineData cursorP
     where
         generateCielCHColours amount = [generateColor 0.2 1 (stepToHue i) | i <- [0..amount-1]]
             where
@@ -329,8 +332,9 @@ newDrawingData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
                                 percent = toInteger $ 100 `quot` (length ids)
                                 addColourInFold c1 c2 = interpolate percent (c1, c2)
                 variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
-        ed lineData cursorP = EditorDrawingData {
+        ed textShapesCache lineData cursorP = EditorDrawingData {
             drawableLines = lineData,
+            textToShapeCache = textShapesCache,
             boundingRect = getBoundingRect opts lineData,
             cursorPosition = cursorP,
             backgroundPaths = convertBlocks lineData (sourceBlocks source),
@@ -354,7 +358,7 @@ newFancyEditor :: PangoContext -> Text -> IO FancyEditor
 newFancyEditor pangoContext text = do
     dOptions <- newDrawingOptions pangoContext
     sd <- newSourceDataFromText text
-    dd <- newDrawingData pangoContext sd initialCursor dOptions
+    dd <- newDrawingData Nothing pangoContext sd initialCursor dOptions
     return FancyEditor {
         sourceData = sd,
         cursorPos = initialCursor,
@@ -446,8 +450,9 @@ updateDrawingData pangoContext = do
     source <- S.gets sourceData
     cursor <- S.gets cursorPos
     opts <- S.gets drawingOptions
-    dData <- liftIO $ newDrawingData pangoContext source cursor opts
-    S.modify $ \ed -> ed{drawingData = dData}
+    dData <- S.gets drawingData
+    dData' <- liftIO $ newDrawingData (Just dData) pangoContext source cursor opts
+    S.modify $ \ed -> ed{drawingData = dData'}
 
 nrOfCharsOnCursorLine :: Int -> S.StateT FancyEditor IO Int
 nrOfCharsOnCursorLine yPos = liftM (maybe 0 length . listToMaybe . take 1 . drop yPos . textLines) $ S.gets sourceData
@@ -538,19 +543,37 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
         _ -> maybe (return False) (\c -> invokeEditorCmd $ insertEditorChar c >> updateCursorX 1) printableChar
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
-getLineShapesWithWidths :: PangoContext -> [(String, [ColouredRange])] -> IO ([[(Double, ColourGroup, GlyphItem)]], [[Double]])
-getLineShapesWithWidths pangoContext linesToDraw = do
-    pangoLineShapes <- mapM (\(line, pieces) -> do
-            pangoItems <- mapM (\partLine -> pangoItemize pangoContext partLine []) (listToPieces (relativePiecePositions pieces) line)
-            mapM pangoShape (concat pangoItems)
-        ) breakPointedLines
+getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
+getLineShapesWithWidths textShapeCache pangoContext linesToDraw = do
+    (pangoLineShapeData, textShapeCache') <- S.runStateT (mapM (\partLine -> do
+            (return . concat) =<< mapM partLineToShapes partLine
+        ) lineParts) textShapeCache
 
-    extents <- mapM (mapM glyphItemExtents) pangoLineShapes
-    lineWordWidths <- mapM (mapM (`glyphItemGetLogicalWidths` Nothing)) pangoLineShapes
-    let sizedLineShapes = zipWith3 (\le lc ls -> zipWith3 (\e c s -> (glyphWidthFromExtent e, c, s)) le lc ls) extents ((map (coloursOfThePieces.snd) breakPointedLines)) pangoLineShapes
-    return (sizedLineShapes, map concat lineWordWidths)
+    let pangoLineShapes = map (map (\(s, _, _) -> s)) pangoLineShapeData
+        extents = map (map (\(_, e, _) -> e)) pangoLineShapeData
+        lineWordWidths = map (map (\(_, _, w) -> w)) pangoLineShapeData
+    return (textShapeCache', sizedLineShapes pangoLineShapes extents, map concat lineWordWidths)
     where
+        lineParts = map (\(line, pieces) -> listToPieces (relativePiecePositions pieces) line) breakPointedLines
+
+        partLineToShapes partLine = do
+            cache <- S.get
+            case M.lookup partLine cache of
+                Nothing -> do
+                    shapes <- liftIO $ mapM (\part -> do
+                                shape <- pangoShape part
+                                extents <- glyphItemExtents shape
+                                widths <- glyphItemGetLogicalWidths shape Nothing
+                                return (shape, extents, widths)
+                            ) =<< pangoItemize pangoContext partLine []
+                    S.put (M.insert partLine shapes cache)
+                    return shapes
+                Just shapeData -> return shapeData
+
+        sizedLineShapes pangoLineShapes extents = zipWith3 (\le lc ls -> zipWith3 (\e c s -> (glyphWidthFromExtent e, c, s)) le lc ls) extents ((map (coloursOfThePieces.snd) breakPointedLines)) pangoLineShapes
+
         glyphWidthFromExtent (_, (PangoRectangle _ _ w _)) = w
+
         listToPieces :: [Int] -> [a] -> [[a]]
         listToPieces [] l = [l]
         listToPieces (p:ps) l = let (l1, lRest) = splitAt p l
@@ -614,13 +637,13 @@ varDependenciesToColourGroupLines vars = linedItemsToListPositions $ makeUnique 
 
 
 
-newDrawableLineData :: PangoContext -> SourceData -> EditorDrawingOptions -> IO [DrawableLine]
-newDrawableLineData pangoContext source opts = do
+newDrawableLineData :: TextShapeCache -> PangoContext -> SourceData -> EditorDrawingOptions -> IO (TextShapeCache, [DrawableLine])
+newDrawableLineData textShapeCache pangoContext source opts = do
     let linesToDraw = textLines source
         colourGroups = varDependenciesToColourGroupLines . concat . M.elems . varDeps $ source
 --    debugPrint $ colourGroups !! 143
-    (pangoLineShapes, lineWidths) <- getLineShapesWithWidths pangoContext (zip linesToDraw (colourGroups++repeat []))
-    return $ map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes
+    (textShapeCache', pangoLineShapes, lineWidths) <- getLineShapesWithWidths textShapeCache pangoContext (zip linesToDraw (colourGroups++repeat []))
+    return $ (textShapeCache', map (\(a, b, c) -> DrawableLine a b c) $ zip3 [i*h | i <- [0..]] lineWidths pangoLineShapes)
     where
         h = lineHeight opts
 
