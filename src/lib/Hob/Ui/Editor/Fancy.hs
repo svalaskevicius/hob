@@ -124,6 +124,9 @@ debugPrint = putStrLn . HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compat
 tracePrint :: Show a => a -> a
 tracePrint v = trace (HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow $ v) v
 
+tracePrintOther :: Show a => a -> b -> b
+tracePrintOther p v = trace (HsColour.hscolour (HsColour.TTYg HsColour.XTerm256Compatible) debugColourPrefs False False "" False . IPPrint.pshow $ p) v
+
 
 findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]
 findVars (P.Var _ (P.UnQual _ name)) = [name]
