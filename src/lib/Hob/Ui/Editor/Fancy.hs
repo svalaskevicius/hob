@@ -267,14 +267,29 @@ newSourceData sourceHistory newTextLines = do
         collectSourceBlocks = (fmap (fmap infoSpanToBlock)) . nestInfoSpans . collectSourceInfoSpans
         parsedModule = case oldSourceData of
                         Nothing -> parseFullModule
-                        Just oldSource -> addCachedMatches (parseModuleMinusMatches notChangedMatches) (adjustMatchesLines notChangedMatches)
+                        Just oldSource -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls . parseResult $ oldSource)
+                                          in addCachedDecls (parseModuleMinusDecls notChangedDecls) (adjustMatchesLines notChangedDecls)
             where
-                parseFullModule = P.parseFileContentsWithComments P.defaultParseMode . unlines $ newTextLines
-                notChangedMatches = [] -- cached matches that have not changed
+                parseModuleLines = P.parseFileContentsWithComments P.defaultParseMode . unlines
+                parseFullModule = parseModuleLines newTextLines
+                allCachedDecls (P.ParseOk (P.Module _ _ _ _ decls, _)) = decls
+                allCachedDecls _ = []
+                isNotChangedDecl decl = maybe False (null . filter eventChangesDecl) sourceChangeEvents
+                    where
+                        declInfoSpan = P.srcInfoSpan . P.ann $ decl
+                        startLine = P.srcSpanStartLine declInfoSpan
+                        endLine = P.srcSpanEndLine declInfoSpan
+                        startCol = P.srcSpanStartColumn declInfoSpan
+                        endCol = P.srcSpanEndColumn declInfoSpan
+                        declContainsPoint (Point c l) = ((l == startLine) && (c >= startCol) && (l < endLine))
+                                                     || ((l == endLine) && (c <= endCol) && (l > startLine))
+                                                     || ((l == startLine) && (c >= startCol) && (l == endLine) && (c <= endCol))
+                                                     || ((l > startLine) && (l < endLine))
+                        eventChangesDecl (InsertChar p _) = declContainsPoint p
                 adjustMatchesLines = id
-                parseModuleMinusMatches = const parseFullModule
-                addCachedMatches (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) matches = P.ParseOk (P.Module loc headers pragmas imports (decls++matches), comments)
-                addCachedMatches res _ = res
+                parseModuleMinusDecls decls = tracePrintOther decls parseFullModule
+                addCachedDecls (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) oldDecls = P.ParseOk (P.Module loc headers pragmas imports (decls++oldDecls), comments)
+                addCachedDecls res _ = res
                 
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
         declarations (P.ParseFailed _ _) = []
