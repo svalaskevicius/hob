@@ -11,7 +11,7 @@ import qualified Data.Foldable                       as F
 import qualified Data.Function                       as F
 import           Data.Generics
 import           Data.Graph
-import           Data.List                           (groupBy, sortBy, nubBy)
+import           Data.List                           (groupBy, sortBy, nubBy, sort)
 import           Data.Maybe                          (catMaybes, listToMaybe,
                                                       maybeToList)
 import qualified Data.Map as M
@@ -68,7 +68,8 @@ data SourceChangeEvent = InsertChar (Point Int) Char -- ^ Point (col, line) befo
 --                       | DeleteChar (Point Int) -- ^ Point (col, line) before the delete char
 --                       | DeleteLineSeparator Int -- ^ line number after which the line separator was removed
 --                       | InsertLineSeparator (Point Int) -- ^ Point (col, line) after which the line separator was inserted
-
+        deriving (Show)
+        
 data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [String],
@@ -254,7 +255,7 @@ newSourceData sourceHistory newTextLines = do
     where
         oldSourceData = fmap fst sourceHistory
         sourceChangeEvents = fmap snd sourceHistory
-        collectSourceInfoSpans = concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
+        collectSourceInfoSpans = sort . concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
         nestInfoSpans :: [P.SrcSpan] -> Forest P.SrcSpan
         nestInfoSpans [] = []
         nestInfoSpans (el:els) = Node el (nestInfoSpans inTheRangeEls) : (nestInfoSpans furtherEls)
@@ -268,7 +269,7 @@ newSourceData sourceHistory newTextLines = do
         parsedModule = case oldSourceData of
                         Nothing -> parseFullModule
                         Just oldSource -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls . parseResult $ oldSource)
-                                          in addCachedDecls (parseModuleMinusDecls notChangedDecls) (adjustMatchesLines notChangedDecls)
+                                          in addCachedDecls (parseModuleMinusDecls notChangedDecls) notChangedDecls
             where
                 parseModuleLines = P.parseFileContentsWithComments P.defaultParseMode . unlines
                 parseFullModule = parseModuleLines newTextLines
@@ -281,14 +282,38 @@ newSourceData sourceHistory newTextLines = do
                         endLine = P.srcSpanEndLine declInfoSpan
                         startCol = P.srcSpanStartColumn declInfoSpan
                         endCol = P.srcSpanEndColumn declInfoSpan
-                        declContainsPoint (Point c l) = ((l == startLine) && (c >= startCol) && (l < endLine))
-                                                     || ((l == endLine) && (c <= endCol) && (l > startLine))
-                                                     || ((l == startLine) && (c >= startCol) && (l == endLine) && (c <= endCol))
-                                                     || ((l > startLine) && (l < endLine))
+                        declContainsPoint pt = ((line == startLine) && (col >= startCol) && (line < endLine))
+                                                     || ((line == endLine) && (col <= endCol) && (line > startLine))
+                                                     || ((line == startLine) && (col >= startCol) && (line == endLine) && (col <= endCol))
+                                                     || ((line > startLine) && (line < endLine))
+                            where
+                                col = _c + 1
+                                line = _l + 1
+                                (Point _c _l) = pt
                         eventChangesDecl (InsertChar p _) = declContainsPoint p
-                adjustMatchesLines = id
-                parseModuleMinusDecls decls = tracePrintOther decls parseFullModule
-                addCachedDecls (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) oldDecls = P.ParseOk (P.Module loc headers pragmas imports (decls++oldDecls), comments)
+                parseModuleMinusDecls decls = parseModuleLines linesToParse
+                    where
+                        linesToParse = foldr blankOutRange newTextLines rangesToBlankout
+                        blankOutRange (P.SrcSpan _ startLine startCol endLine endCol) tLines = prefix ++ body ++ suffix
+                        -- TODO: optimize this!
+                            where
+                                prefix = take (startLine - 1) tLines
+                                body = if (endLine == startLine) then singleLineBody else multiLineBody
+                                singleLineBody =  (map (\l -> (take (startCol - 1) l) ++ (replicate (endCol - startCol +1) ' ') ++ (drop endCol l)) . take 1 . drop (startLine - 1) $ tLines)
+                                multiLineBody =  (map (take (startCol - 1)) . take 1 . drop (startLine - 1) $ tLines)
+                                              ++ (replicate (endLine - startLine - 1) "")
+                                              ++ (map (\l -> (replicate (endCol) ' ') ++ (drop endCol l)) . take 1 . drop (endLine - 1) $ tLines)
+                                suffix = (drop (endLine ) $ tLines)
+                        rangesToBlankout = map (adjustRangeByEvents . P.srcInfoSpan . P.ann) decls
+                        adjustRangeByEvents range = maybe range (foldr adjustRangeByEvent range) sourceChangeEvents
+                        adjustRangeByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpan file startLine startCol endLine endCol) = 
+                                if needChange then P.SrcSpan file startLine startCol' endLine endCol'
+                                else range
+                            where
+                                needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
+                                startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
+                                endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
+                addCachedDecls (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) oldDecls = P.ParseOk (P.Module loc headers pragmas imports (oldDecls++decls), comments)
                 addCachedDecls res _ = res
                 
         declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
