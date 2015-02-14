@@ -26,6 +26,7 @@ import           Debug.Trace
 import           Filesystem.Path.CurrentOS           (decodeString,
                                                       encodeString, filename)
 import           Graphics.Rendering.Cairo
+import qualified Graphics.Rendering.Cairo as Cairo
 import           Graphics.UI.Gtk                     hiding (Point)
 import qualified Language.Haskell.Exts.Annotated     as P
 import           System.Glib.GObject                 (Quark)
@@ -73,7 +74,8 @@ data SourceChangeEvent = InsertChar (Point Int) Char -- ^ Point (col, line) befo
 data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [String],
-    parseResult               :: P.ParseResult (P.Module P.SrcSpanInfo, [P.Comment]),
+    ast                       :: Maybe (P.Module P.SrcSpanInfo, [P.Comment]),
+    parseErrorMessage         :: Maybe (Point Int, String),
     functionDefCache          :: FunctionCache,
     sourceBlocks              :: Blocks Int,
     varDeps                   :: ScopedVariableDependencies,
@@ -98,6 +100,7 @@ data EditorDrawingData = EditorDrawingData {
     textToShapeCache :: TextShapeCache,
     boundingRect     :: (PointD, PointD),
     cursorPosition   :: PointD,
+    errorPosition    :: Maybe PointD,
     backgroundPaths  :: Forest [PointD],
     colourGroupToRgb :: V.Vector (Double, Double, Double)
 }
@@ -250,12 +253,13 @@ newSourceDataFromText text = newSourceData Nothing newTextLines
 -- TODO: vector for lines?
 newSourceData :: Maybe (SourceData, [SourceChangeEvent]) -> [String] -> IO SourceData
 newSourceData sourceHistory newTextLines = do
---    debugPrint $ varDeps sd
+--    debugPrint $ parseErrorMessage sd
     return sd
     where
         oldSourceData = fmap fst sourceHistory
         sourceChangeEvents = fmap snd sourceHistory
         collectSourceInfoSpans = sort . concatMap (F.foldr (\a s -> P.srcInfoSpan a : s) [])
+        srcLocToPoint (P.SrcLoc _ l c) = Point (c-1) (l-1)
         nestInfoSpans :: [P.SrcSpan] -> Forest P.SrcSpan
         nestInfoSpans [] = []
         nestInfoSpans (el:els) = Node el (nestInfoSpans inTheRangeEls) : (nestInfoSpans furtherEls)
@@ -266,14 +270,16 @@ newSourceData sourceHistory newTextLines = do
                                 (Point (P.srcSpanStartColumn s - 1) (P.srcSpanStartLine s - 1))
                                 (Point (P.srcSpanEndColumn s - 1) (P.srcSpanEndLine s - 1))
         collectSourceBlocks = (fmap (fmap infoSpanToBlock)) . nestInfoSpans . collectSourceInfoSpans
-        parsedModule = case oldSourceData of
+        (parsedModule, errorMessage) = case ast =<< oldSourceData of
                         Nothing -> parseFullModule
-                        Just oldSource -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls . parseResult $ oldSource)
+                        Just oldAst -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls $ oldAst)
                                           in addCachedDecls (parseModuleMinusDecls notChangedDecls) notChangedDecls
             where
-                parseModuleLines = P.parseFileContentsWithComments P.defaultParseMode . unlines
+                parseModuleLines textToParse = case P.parseFileContentsWithComments P.defaultParseMode . unlines $ textToParse of
+                    P.ParseOk astInfo -> (Just astInfo, Nothing)
+                    P.ParseFailed srcLoc msg -> (Nothing, Just (srcLoc, msg))                                
                 parseFullModule = parseModuleLines newTextLines
-                allCachedDecls (P.ParseOk (P.Module _ _ _ _ decls, _)) = decls
+                allCachedDecls (P.Module _ _ _ _ decls, _) = decls
                 allCachedDecls _ = []
                 isNotChangedDecl decl = maybe False (null . filter eventChangesDecl) sourceChangeEvents
                     where
@@ -313,12 +319,11 @@ newSourceData sourceHistory newTextLines = do
                                 needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
                                 startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
                                 endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
-                addCachedDecls (P.ParseOk (P.Module loc headers pragmas imports decls, comments)) oldDecls = P.ParseOk (P.Module loc headers pragmas imports (oldDecls++decls), comments)
-                addCachedDecls res _ = res
+                addCachedDecls (Just (P.Module loc headers pragmas imports decls, comments), err) oldDecls = (Just (P.Module loc headers pragmas imports (oldDecls++decls), comments), err)
+                addCachedDecls (_, err) _ = (Nothing, err)
                 
-        declarations (P.ParseOk (P.Module _ _ _ _ decl, _)) = decl
-        declarations (P.ParseFailed _ _) = []
-        declarations _ = error "unsupported parse result"
+        declarations (Just (P.Module _ _ _ _ decl, _)) = decl
+        declarations _ = []
         (funcDefCache, newVarDeps) = findVariableDependencies (maybe M.empty functionDefCache oldSourceData) (fmap varDeps oldSourceData) . declarations $ parsedModule
         viariablesWithIds = zip [0..] . map (\(VariableDependency v _) -> v) . concat . M.elems $ newVarDeps
         foundDepsForVariable v = concat . concat . maybeToList $ foundVarDeps (concat . M.elems $ newVarDeps) >>= Just . map (\(VariableUsage targets _) -> targets)
@@ -334,7 +339,8 @@ newSourceData sourceHistory newTextLines = do
         sd = SourceData {
             isModified = False,
             textLines = newTextLines,
-            parseResult = parsedModule,
+            ast = parsedModule,
+            parseErrorMessage = fmap (\(loc, msg) -> (srcLocToPoint loc, msg)) errorMessage,
             functionDefCache = funcDefCache,
             sourceBlocks = collectSourceBlocks $ declarations parsedModule,
             varDeps = newVarDeps,
@@ -348,8 +354,9 @@ newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts 
 --    debugPrint (varDepGraph source)
   --  debugPrint $ reverse . topSort $ varDepGraph source
     (textShapesCache, lineData) <- newDrawableLineData (maybe M.empty textToShapeCache oldData) pangoContext source opts
-    let cursorP = sourcePointToDrawingPoint (drawableLineWidths lineData) (Point cursorCharNr cursorLineNr) opts
-    return $ ed textShapesCache lineData cursorP
+    let cursorP = sourceCoordsToDrawing lineData (Point cursorCharNr cursorLineNr)
+        errorPos = fmap (sourceCoordsToDrawing lineData . fst) (parseErrorMessage source)
+    return $ ed textShapesCache lineData cursorP errorPos
     where
         generateCielCHColours amount = [generateColor 0.2 1 (stepToHue i) | i <- [0..amount-1]]
             where
@@ -412,11 +419,12 @@ newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts 
                                 percent = toInteger $ 100 `quot` (length ids)
                                 addColourInFold c1 c2 = interpolate percent (c1, c2)
                 variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
-        ed textShapesCache lineData cursorP = EditorDrawingData {
+        ed textShapesCache lineData cursorP errorPos = EditorDrawingData {
             drawableLines = lineData,
             textToShapeCache = textShapesCache,
             boundingRect = getBoundingRect opts lineData,
             cursorPosition = cursorP,
+            errorPosition = errorPos,
             backgroundPaths = convertBlocks lineData (sourceBlocks source),
             colourGroupToRgb = variableDepsGraphEdges
         }
@@ -761,6 +769,7 @@ drawEditor fancyEditorDataHolder editorWidget = do
             translate textLeft textTop
             rect <- getClipRectangle
             drawPaths $ bgPathsToDraw rect
+            drawErrorPointer dData opts
             drawText (linesToDraw rect) (colourGroupToRgb dData)
             drawCursor dData opts
             restore
@@ -811,6 +820,15 @@ drawEditor fancyEditorDataHolder editorWidget = do
                 setTextColour (ColourGroup c) = do
                     let (r, g, b) = colourRgb V.! c
                     setSourceRGB r g b
+
+        drawErrorPointer dData opts = case errorPosition dData of
+                                          Just (Point errorLeft errorTop) -> do
+                                                                              setSourceRGBA 1 0.3 0.3 0.8
+                                                                              Cairo.rectangle errorLeft errorTop lh lh
+                                                                              fill
+                                          Nothing -> return ()
+            where
+                lh = fontAscent opts + fontDescent opts
 
         drawCursor dData opts = do
             setLineWidth 1
