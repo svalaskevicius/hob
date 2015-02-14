@@ -180,8 +180,6 @@ findElementsNonRec query a = let res = [] `mkQ` query $ a
                              in if null res then (concat $ gmapQ (findElementsNonRec query) a)
                              else res
 
--- TODO: this is a performance hog. both cpu and memory
--- TODO: add func as scope, use it for comparing later in cache
 findVariableDependencies :: FunctionCache -> Maybe ScopedVariableDependencies -> [P.Decl P.SrcSpanInfo] -> (FunctionCache, ScopedVariableDependencies)
 findVariableDependencies funcCache oldVarDeps decls = 
     let (funcs, funcCache') = S.runState findFuncs' funcCache 
