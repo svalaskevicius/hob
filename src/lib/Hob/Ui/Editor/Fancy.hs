@@ -55,7 +55,7 @@ data VariableDependency = VariableDependency
 
 type ScopedVariableDependencies = Map (P.Match P.SrcSpanInfo) [VariableDependency]
 type FunctionDef = (P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])
-type FunctionCache = Map (P.Decl P.SrcSpanInfo) [FunctionDef]
+type FunctionCache = Map (P.Decl P.SrcSpanInfo) [FunctionDef] -- TODO: this is still slow to lookup - find a better key for cache, maybe just an int tag for decls (e.g. generation int + srcspan)
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
@@ -323,6 +323,7 @@ newSourceData sourceHistory newTextLines = do
                 addStaleDeclsOnFailure (Just m, err) = (Just m, err)
 
                 adjustInfoSpanByEvents range = maybe range (foldr adjustInfoSpanByEvent range) sourceChangeEvents
+
                 adjustInfoSpanByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
                         if needChange then P.noInfoSpan $ P.SrcSpan file startLine startCol' endLine endCol'
                         else range
