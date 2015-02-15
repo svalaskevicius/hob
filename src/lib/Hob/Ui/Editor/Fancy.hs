@@ -271,14 +271,16 @@ newSourceData sourceHistory newTextLines = do
         (parsedModule, errorMessage) = case ast =<< oldSourceData of
                         Nothing -> parseFullModule
                         Just oldAst -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls $ oldAst)
-                                          in addCachedDecls (parseModuleMinusDecls notChangedDecls) notChangedDecls
+                                          in addStaleDeclsOnFailure $ addCachedDecls (parseModuleMinusDecls notChangedDecls) notChangedDecls
             where
                 parseModuleLines textToParse = case P.parseFileContentsWithComments P.defaultParseMode . unlines $ textToParse of
                     P.ParseOk astInfo -> (Just astInfo, Nothing)
                     P.ParseFailed srcLoc msg -> (Nothing, Just (srcLoc, msg))                                
                 parseFullModule = parseModuleLines newTextLines
+
                 allCachedDecls (P.Module _ _ _ _ decls, _) = decls
                 allCachedDecls _ = []
+
                 isNotChangedDecl decl = maybe False (null . filter eventChangesDecl) sourceChangeEvents
                     where
                         declInfoSpan = P.srcInfoSpan . P.ann $ decl
@@ -295,6 +297,7 @@ newSourceData sourceHistory newTextLines = do
                                 line = _l + 1
                                 (Point _c _l) = pt
                         eventChangesDecl (InsertChar p _) = declContainsPoint p
+
                 parseModuleMinusDecls decls = parseModuleLines linesToParse
                     where
                         linesToParse = foldr blankOutRange newTextLines rangesToBlankout
@@ -308,17 +311,25 @@ newSourceData sourceHistory newTextLines = do
                                               ++ (replicate (endLine - startLine - 1) "")
                                               ++ (map (\l -> (replicate (endCol) ' ') ++ (drop endCol l)) . take 1 . drop (endLine - 1) $ tLines)
                                 suffix = (drop (endLine ) $ tLines)
-                        rangesToBlankout = map (adjustRangeByEvents . P.srcInfoSpan . P.ann) decls
-                        adjustRangeByEvents range = maybe range (foldr adjustRangeByEvent range) sourceChangeEvents
-                        adjustRangeByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpan file startLine startCol endLine endCol) = 
-                                if needChange then P.SrcSpan file startLine startCol' endLine endCol'
-                                else range
-                            where
-                                needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
-                                startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
-                                endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
+                        rangesToBlankout = map (P.srcInfoSpan . adjustInfoSpanByEvents . P.ann) decls
                 addCachedDecls (Just (P.Module loc headers pragmas imports decls, comments), err) oldDecls = (Just (P.Module loc headers pragmas imports (oldDecls++decls), comments), err)
                 addCachedDecls (_, err) _ = (Nothing, err)
+
+                addStaleDeclsOnFailure (Nothing, err) = (fmap updateRangesByEvents $ ast =<< oldSourceData, err)
+                    where
+                        updateRangesByEvents (P.Module loc headers pragmas imports decls, comments) = (P.Module loc headers pragmas imports (fmap updateDecl decls), comments)
+                        updateRangesByEvents m = m
+                        updateDecl decl = fmap adjustInfoSpanByEvents decl
+                addStaleDeclsOnFailure (Just m, err) = (Just m, err)
+
+                adjustInfoSpanByEvents range = maybe range (foldr adjustInfoSpanByEvent range) sourceChangeEvents
+                adjustInfoSpanByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
+                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine startCol' endLine endCol'
+                        else range
+                    where
+                        needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
+                        startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
+                        endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
                 
         declarations (Just (P.Module _ _ _ _ decl, _)) = decl
         declarations _ = []
