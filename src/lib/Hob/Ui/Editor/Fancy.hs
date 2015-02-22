@@ -69,7 +69,7 @@ data ColouredRange = ColouredRange
                     deriving (Show, Eq)
 
 data SourceChangeEvent = InsertChar (Point Int) Char -- ^ Point (col, line) before the inserted char, Char that was inserted
---                       | DeleteChar (Point Int) -- ^ Point (col, line) before the delete char
+                       | DeleteRange (Point Int) (Point Int) -- ^ Point (col, line) pair of start and end position of the deleted range
 --                       | DeleteLineSeparator Int -- ^ line number after which the line separator was removed
 --                       | InsertLineSeparator (Point Int) -- ^ Point (col, line) after which the line separator was inserted
         deriving (Show)
@@ -301,7 +301,19 @@ newSourceData sourceHistory newTextLines = do
                                 col = _c + 1
                                 line = _l + 1
                                 (Point _c _l) = pt
+                        declIsInBetweenPoints p1 p2 = ((line1 == startLine) && (col1 <= startCol) && (line2 > endLine))
+                                                     || ((line2 == endLine) && (col2 >= endCol) && (line1 < startLine))
+                                                     || ((line1 == startLine) && (col1 <= startCol) && (line2 == endLine) && (col2 >= endCol))
+                                                     || ((line1 < startLine) && (line2 > endLine))
+                            where
+                                col1 = _c1 + 1
+                                line1 = _l1 + 1
+                                col2 = _c2 + 1
+                                line2 = _l2 + 1
+                                (Point _c1 _l1) = p1
+                                (Point _c2 _l2) = p2
                         eventChangesDecl (InsertChar p _) = declContainsPoint p
+                        eventChangesDecl (DeleteRange p1 p2) = declContainsPoint p1 || declContainsPoint p2 || declIsInBetweenPoints p1 p2
 
                 parseModuleMinusDecls decls = parseModuleLines linesToParse
                     where
@@ -317,15 +329,18 @@ newSourceData sourceHistory newTextLines = do
                                               ++ (map (\l -> (replicate (endCol) ' ') ++ (drop endCol l)) . take 1 . drop (endLine - 1) $ tLines)
                                 suffix = (drop (endLine ) $ tLines)
                         rangesToBlankout = map (P.srcInfoSpan . adjustInfoSpanByEvents . P.ann) decls
-                addCachedDecls (Just (P.Module loc headers pragmas imports decls, comments), err) oldDecls = (Just (P.Module loc headers pragmas imports (oldDecls++decls), comments), err)
+                addCachedDecls (Just (P.Module loc headers pragmas imports decls, comments), err) oldDecls = (Just (P.Module loc headers pragmas imports ((updateDeclsByEvents oldDecls)++decls), comments), err)
                 addCachedDecls (_, err) _ = (Nothing, err)
 
                 addStaleDeclsOnFailure (Nothing, err) = (fmap updateRangesByEvents $ ast =<< oldSourceData, err)
                     where
-                        updateRangesByEvents (P.Module loc headers pragmas imports decls, comments) = (P.Module loc headers pragmas imports (fmap updateDecl decls), comments)
+                        updateRangesByEvents (P.Module loc headers pragmas imports decls, comments) = (P.Module loc headers pragmas imports (updateDeclsByEvents decls), comments)
                         updateRangesByEvents m = m
-                        updateDecl decl = fmap adjustInfoSpanByEvents decl
                 addStaleDeclsOnFailure (Just m, err) = (Just m, err)
+                
+                updateDeclsByEvents = fmap updateDecl
+                    where
+                        updateDecl decl = fmap adjustInfoSpanByEvents decl
 
                 adjustInfoSpanByEvents range = maybe range (foldr adjustInfoSpanByEvent range) sourceChangeEvents
 
@@ -336,6 +351,17 @@ newSourceData sourceHistory newTextLines = do
                         needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
                         startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
                         endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
+                adjustInfoSpanByEvent (DeleteRange (Point sColumn sLine) (Point eColumn eLine)) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
+                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
+                        else range
+                    where
+                        needChange = (startLine == (sLine+1) && startCol >= (sColumn+1)) || (endLine == (eLine+1) && endCol >= (eColumn+1)) || (endLine > (eLine+1))
+                        lineAdj = eLine - sLine
+                        colAdj = if sLine == eLine then eColumn - sColumn else eColumn
+                        startLine' = max (sLine + 1) (startLine - lineAdj)
+                        startCol' = if (startLine == (eLine+1) && startCol >= (eColumn+1)) then max (sColumn+1) (startCol - colAdj) else startCol
+                        endLine' = max startLine' (endLine - lineAdj)
+                        endCol' = if (endLine == (eLine+1) && endLine >= (eColumn+1)) then if (sLine==eLine) then max startCol' (endCol - colAdj) else endCol - colAdj else endCol
                 
         declarations (Just (P.Module _ _ _ _ decl, _)) = decl
         declarations _ = []
@@ -643,7 +669,7 @@ insertEditorChar c = do
     S.modify $ \ed -> ed{sourceData = source''}
 
 deleteCharacterRange :: Point Int -> Point Int -> S.StateT FancyEditor IO ()
-deleteCharacterRange (Point sx sy) (Point ex ey) = do
+deleteCharacterRange startPoint@(Point sx sy) endPoint@(Point ex ey) = do
     source <- S.gets sourceData
     let tLines = textLines source
         (preLines, postLines1) = splitAt sy tLines
@@ -652,7 +678,7 @@ deleteCharacterRange (Point sx sy) (Point ex ey) = do
         startLine2 = map (drop ex) . take 1 $ postLines2
         startLine = (++) <$> startLine1 <*> startLine2
         tLines' = preLines ++ startLine ++ (drop 1 postLines2)
-    source' <- liftIO $ newSourceData (Just (source, [])) tLines' -- todo: add events
+    source' <- liftIO $ newSourceData (Just (source, [DeleteRange startPoint endPoint])) tLines'
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source'', cursorPos = (sx, sy, sx)}
         
