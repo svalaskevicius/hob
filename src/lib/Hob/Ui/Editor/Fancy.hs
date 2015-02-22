@@ -14,6 +14,7 @@ import           Data.Graph
 import           Data.List                           (groupBy, sortBy, nubBy, sort)
 import           Data.Maybe                          (catMaybes, listToMaybe,
                                                       maybeToList)
+import  Control.Applicative
 import qualified Data.Map as M
 import Data.Map (Map)
 import           Data.Prizm.Color
@@ -641,6 +642,52 @@ insertEditorChar c = do
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source''}
 
+deleteCharacterRange :: Point Int -> Point Int -> S.StateT FancyEditor IO ()
+deleteCharacterRange (Point sx sy) (Point ex ey) = do
+    source <- S.gets sourceData
+    let tLines = textLines source
+        (preLines, postLines1) = splitAt sy tLines
+        postLines2 = drop (ey-sy) postLines1
+        startLine1 = map (take sx) . take 1 $ postLines1
+        startLine2 = map (drop ex) . take 1 $ postLines2
+        startLine = (++) <$> startLine1 <*> startLine2
+        tLines' = preLines ++ startLine ++ (drop 1 postLines2)
+    source' <- liftIO $ newSourceData (Just (source, [])) tLines' -- todo: add events
+    let source'' = source'{isModified = True}
+    S.modify $ \ed -> ed{sourceData = source'', cursorPos = (sx, sy, sx)}
+        
+
+deleteCharactersFromCursor :: Int -> S.StateT FancyEditor IO ()
+deleteCharactersFromCursor amount = do
+    source <- S.gets sourceData
+    (cx, cy, _) <- S.gets cursorPos
+    let tLines = textLines source
+        (preLines, postLines) = splitAt cy tLines
+        (startx, endx) = if amount > 0 then (cx, cx+amount) else (cx+amount, cx)
+        (startx', adjsy) = adjustNegativePosByLengths (cx : (map length . reverse $ preLines)) startx
+        starty' = max 0 $ cy + adjsy
+        (endx', adjey) = adjustPositivePosByLengths (map length $ postLines) endx
+        endy' = cy + adjey
+    deleteCharacterRange (Point startx' starty') (Point endx' endy')
+    where
+        adjustNegativePosByLengths [] startx
+         | startx < 0 = (0, 0)
+         | otherwise = (startx, 0)
+        adjustNegativePosByLengths (tl:tls) startx
+         | startx < 0 = let (startx', adjusty) = adjustNegativePosByLengths tls backpos'
+                        in (startx', adjusty-1)
+         | otherwise = (startx, 0)
+            where
+                backpos = startx+tl+1
+                endOfPrevLine = head $ tls++[0]
+                backpos' = if backpos == 0 then endOfPrevLine else backpos
+        adjustPositivePosByLengths [] endx = (endx, 0)
+        adjustPositivePosByLengths (tl:tls) endx
+         | endx > tl = let (startx', adjusty) = adjustPositivePosByLengths tls (endx-tl-1)
+                        in (startx', adjusty+1)
+         | otherwise = (endx, 0)
+
+
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
     modifiers <- eventModifier
@@ -664,6 +711,8 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
         ([], "Left") -> invokeEditorCmd $ updateCursorX (-1)
         ([], "Up") -> invokeEditorCmd $ updateCursorY (-1)
         ([], "Down") -> invokeEditorCmd $ updateCursorY 1
+        ([], "BackSpace") -> invokeEditorCmd $ deleteCharactersFromCursor (-1)
+        ([], "Delete") -> invokeEditorCmd $ deleteCharactersFromCursor 1
         _ -> maybe (return False) (\c -> invokeEditorCmd $ insertEditorChar c >> updateCursorX 1) printableChar
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
