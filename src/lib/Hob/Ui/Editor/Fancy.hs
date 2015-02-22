@@ -28,8 +28,10 @@ import           Filesystem.Path.CurrentOS           (decodeString,
 import           Graphics.Rendering.Cairo
 import qualified Graphics.Rendering.Cairo as Cairo
 import           Graphics.UI.Gtk                     hiding (Point)
+import Graphics.UI.Gtk.General.Enums
 import qualified Language.Haskell.Exts.Annotated     as P
 import           System.Glib.GObject                 (Quark)
+import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 
 import           Hob.Context
 import           Hob.Context.UiContext
@@ -55,7 +57,7 @@ data VariableDependency = VariableDependency
 
 type ScopedVariableDependencies = Map (P.Match P.SrcSpanInfo) [VariableDependency]
 type FunctionDef = (P.Match P.SrcSpanInfo, P.Name P.SrcSpanInfo, [P.Pat P.SrcSpanInfo], P.Rhs P.SrcSpanInfo, [P.Decl P.SrcSpanInfo])
-type FunctionCache = Map (P.Decl P.SrcSpanInfo) [FunctionDef] -- TODO: this is still slow to lookup - find a better key for cache, maybe just an int tag for decls (e.g. generation int + srcspan)
+type FunctionCache = Map (P.Decl P.SrcSpanInfo) [FunctionDef] -- this is still slow to lookup - find a better key for cache, maybe just an int tag for decls (e.g. generation int + srcspan)
 
 data ColourGroup = DefaultColourGroup | ColourGroup Int deriving (Show, Eq)
 
@@ -96,19 +98,21 @@ data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphIte
 type TextShapeCache = Map String [(GlyphItem, (PangoRectangle, PangoRectangle), [Double])]
 
 data EditorDrawingData = EditorDrawingData {
-    drawableLines    :: [DrawableLine],
-    textToShapeCache :: TextShapeCache,
-    boundingRect     :: (PointD, PointD),
-    cursorPosition   :: PointD,
-    errorPosition    :: Maybe PointD,
-    backgroundPaths  :: Forest [PointD],
-    colourGroupToRgb :: V.Vector (Double, Double, Double)
+    drawableLines      :: [DrawableLine],
+    textToShapeCache   :: TextShapeCache,
+    boundingRect       :: (PointD, PointD),
+    cursorPosition     :: PointD,
+    errorPosition      :: Maybe PointD,
+    backgroundPaths    :: Forest [PointD],
+    colourGroupToRgb   :: V.Vector (Double, Double, Double),
+    sourceErrorMessage :: Maybe String
 }
 
 data EditorDrawingOptions = EditorDrawingOptions {
     lineHeight  :: Double,
     fontAscent  :: Double,
-    fontDescent :: Double
+    fontDescent :: Double,
+    reportError        :: Maybe String -> IO ()
 }
 
 data FancyEditor = FancyEditor {
@@ -429,6 +433,9 @@ newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts 
                                 percent = toInteger $ 100 `quot` (length ids)
                                 addColourInFold c1 c2 = interpolate percent (c1, c2)
                 variableVertexesInTopoOrder = reverse . topSort $ varDepGraph source
+        formattedErrorMessage = fmap formatError . parseErrorMessage $ source
+            where
+                formatError ((Point c l), msg) = msg ++ " at "++(show l)++":"++(show c)
         ed textShapesCache lineData cursorP errorPos = EditorDrawingData {
             drawableLines = lineData,
             textToShapeCache = textShapesCache,
@@ -436,11 +443,12 @@ newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts 
             cursorPosition = cursorP,
             errorPosition = errorPos,
             backgroundPaths = convertBlocks lineData (sourceBlocks source),
-            colourGroupToRgb = variableDepsGraphEdges
+            colourGroupToRgb = variableDepsGraphEdges,
+            sourceErrorMessage = formattedErrorMessage
         }
 
-newDrawingOptions :: PangoContext -> IO EditorDrawingOptions
-newDrawingOptions pangoContext = do
+newDrawingOptions :: PangoContext -> (Maybe String -> IO()) -> IO EditorDrawingOptions
+newDrawingOptions pangoContext errorReporter = do
     fontDescription <- contextGetFontDescription pangoContext
     fontSizeInfo <- contextGetMetrics pangoContext fontDescription emptyLanguage
     let a = ascent fontSizeInfo
@@ -448,13 +456,14 @@ newDrawingOptions pangoContext = do
     return EditorDrawingOptions {
         lineHeight = a + d + 5,
         fontAscent = a,
-        fontDescent = d
+        fontDescent = d,
+        reportError = errorReporter
     }
 
 -- TODO: maybe add pango context, widget, scrolling widget
-newFancyEditor :: PangoContext -> Text -> IO FancyEditor
-newFancyEditor pangoContext text = do
-    dOptions <- newDrawingOptions pangoContext
+newFancyEditor :: Label -> PangoContext -> Text -> IO FancyEditor
+newFancyEditor errLabel pangoContext text = do
+    dOptions <- newDrawingOptions pangoContext errorReporter
     sd <- newSourceDataFromText text
     dd <- newDrawingData Nothing pangoContext sd initialCursor dOptions
     return FancyEditor {
@@ -465,6 +474,10 @@ newFancyEditor pangoContext text = do
     }
     where
         initialCursor = (0, 0, 0)
+        errorReporter (Just err) = do
+            labelSetText errLabel err
+            widgetShowAll errLabel
+        errorReporter Nothing = widgetHide errLabel
 
 toEditor :: DrawingArea -> Editor
 toEditor widget = Editor {
@@ -512,10 +525,6 @@ newEditorForText targetNotebook filePath text = do
         newEditorScrolls editorWidget = do
             scrolledWindow <- scrolledWindowNew Nothing Nothing
             scrolledWindow `containerAdd` editorWidget
-            widgetShowAll scrolledWindow
-            tabNr <- notebookAppendPage targetNotebook scrolledWindow title
-            notebookSetCurrentPage targetNotebook tabNr
-            notebookSetShowTabs targetNotebook True
             return scrolledWindow
 
         newPangoContext = do
@@ -529,9 +538,26 @@ newEditorForText targetNotebook filePath text = do
         createNewEditor ctx = do
             editorWidget <- newEditorWidget =<< idGenerator ctx
             scrolledWindow <- newEditorScrolls editorWidget
+            
+            overl <- overlayNew
+            errorLabel <- labelNew (Just "")
+            labeltyleContext <- widgetGetStyleContext errorLabel
+            GtkSc.styleContextAddClass labeltyleContext "error"
+            widgetSetVAlign errorLabel AlignEnd
+            widgetSetHAlign errorLabel AlignStart
+            containerAdd overl scrolledWindow
+            overlayAdd overl errorLabel
+            
+            widgetShowAll overl
+            widgetHide errorLabel
+
+            tabNr <- notebookAppendPage targetNotebook overl title
+            notebookSetCurrentPage targetNotebook tabNr
+            notebookSetShowTabs targetNotebook True
+            
             pangoContext <- newPangoContext
 
-            fancyEditorDataHolder <- newMVar =<< newFancyEditor pangoContext text
+            fancyEditorDataHolder <- newMVar =<< newFancyEditor errorLabel pangoContext text
 
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
             _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
@@ -783,6 +809,8 @@ drawEditor fancyEditorDataHolder editorWidget = do
             drawText (linesToDraw rect) (colourGroupToRgb dData)
             drawCursor dData opts
             restore
+            liftIO $ (reportError opts) $ sourceErrorMessage dData
+
             where
                 linesToDraw Nothing = drawableLines dData
                 linesToDraw (Just (Rectangle _ ry _ rh)) = filterLines $ drawableLines dData
