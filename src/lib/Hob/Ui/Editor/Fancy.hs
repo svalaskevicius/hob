@@ -635,6 +635,22 @@ updateCursorX delta = do
     cx' <- clampCursorX cy $ cx + delta
     S.modify $ \ed -> ed{cursorPos = (cx', cy, cx')}
 
+moveCursorToTheEndOfTheLine :: S.StateT FancyEditor IO ()
+moveCursorToTheEndOfTheLine = do
+    source <- S.gets sourceData
+    (cx, cy, _) <- S.gets cursorPos
+    let tLines = textLines source
+        (preLines, postLines) = splitAt cy tLines
+        cx' = case take 1 $ postLines of
+            [l] -> length l
+            _ -> 0
+    S.modify $ \ed -> ed{cursorPos = (cx', cy, cx')}
+
+moveCursorToTheStartOfTheLine :: S.StateT FancyEditor IO ()
+moveCursorToTheStartOfTheLine = do
+    (_, cy, _) <- S.gets cursorPos
+    S.modify $ \ed -> ed{cursorPos = (0, cy, 0)}
+
 updateCursorY :: Int -> S.StateT FancyEditor IO ()
 updateCursorY delta = do
     (_, cy, cxn) <- S.gets cursorPos
@@ -755,16 +771,29 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
                 scrollEditorToCursor scrolledWindow
             widgetQueueDraw editorWidget
             return True
+            
+    let getLinesInOnePage = liftIO $ do
+            widgetHeight <- widgetGetAllocatedHeight scrolledWindow
+            editor <- readMVar fancyEditorDataHolder
+            return $ floor $ (fromIntegral widgetHeight) / (lineHeight . drawingOptions $ editor)
 
     case (modifiers, unpack $ keyName keyValue) of
         ([], "Right") -> invokeEditorCmd $ updateCursorX 1
         ([], "Left") -> invokeEditorCmd $ updateCursorX (-1)
         ([], "Up") -> invokeEditorCmd $ updateCursorY (-1)
         ([], "Down") -> invokeEditorCmd $ updateCursorY 1
+        ([], "Page_Up") -> do
+            linesToJump <- getLinesInOnePage
+            invokeEditorCmd $ updateCursorY (-linesToJump)
+        ([], "Page_Down") -> do
+            linesToJump <- getLinesInOnePage
+            invokeEditorCmd $ updateCursorY linesToJump
+        ([], "Home") -> invokeEditorCmd $ moveCursorToTheStartOfTheLine
+        ([], "End") -> invokeEditorCmd $ moveCursorToTheEndOfTheLine
         ([], "BackSpace") -> invokeEditorCmd $ deleteCharactersFromCursor (-1)
         ([], "Delete") -> invokeEditorCmd $ deleteCharactersFromCursor 1
         ([], "Return") -> invokeEditorCmd $ insertNewLine
-        _ -> maybe (return False) (\c -> invokeEditorCmd $ insertEditorChar c) printableChar
+        _ -> maybe ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False) (\c -> invokeEditorCmd $ insertEditorChar c) printableChar
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
 getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
