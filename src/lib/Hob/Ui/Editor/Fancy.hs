@@ -35,6 +35,7 @@ import           System.Glib.GObject                 (Quark)
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 
 import           Hob.Context
+import           Hob.Control
 import           Hob.Context.UiContext
 import qualified IPPrint
 import qualified Language.Haskell.HsColour           as HsColour
@@ -713,6 +714,18 @@ scrollEditorToCursor scrolledWindow = do
         vAdj <- scrolledWindowGetVAdjustment scrolledWindow
         adjustmentClampPage vAdj cursorTop (cursorTop+2*lHeight+30)
 
+deleteSelectedText :: S.StateT FancyEditor IO ()
+deleteSelectedText = do
+    selection <- S.gets selectionHead
+    cursor <- S.gets cursorHead
+    maybeDo (deleteTextBetweenCursors cursor) selection
+    inEditMode
+    where
+        deleteTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) = 
+            if c1 == c2 then return ()
+            else if c1 < c2 then deleteCharacterRange (Point x1 y1) (Point x2 y2)
+            else deleteCharacterRange (Point x2 y2) (Point x1 y1)
+
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
     source <- S.gets sourceData
@@ -803,6 +816,19 @@ inEditMode = do
         S.modify $ \ed -> ed{selectionHead = Nothing}
     else return ()
 
+deleteSelectionOrInvokeCommand :: (S.StateT FancyEditor IO ()) -> S.StateT FancyEditor IO ()
+deleteSelectionOrInvokeCommand cmd = do
+    selection <- S.gets selectionHead
+    if isJust selection then do
+        deleteSelectedText
+    else cmd
+
+deleteBackwards :: S.StateT FancyEditor IO ()
+deleteBackwards = deleteSelectionOrInvokeCommand $ deleteCharactersFromCursor (-1)
+
+deleteForwards :: S.StateT FancyEditor IO ()
+deleteForwards = deleteSelectionOrInvokeCommand $ deleteCharactersFromCursor 1
+
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
     modifiers <- eventModifier
@@ -846,10 +872,13 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             [] -> invokeEditorCmd $ inEditMode >> cmd
             _ -> return False
         Nothing ->  case (modifiers, key) of
-            ([], "BackSpace") -> invokeEditorCmd $ deleteCharactersFromCursor (-1)
-            ([], "Delete") -> invokeEditorCmd $ deleteCharactersFromCursor 1
-            ([], "Return") -> invokeEditorCmd $ insertNewLine
-            _ -> maybe ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False) (\c -> invokeEditorCmd $ insertEditorChar c) printableChar
+            ([], "BackSpace") -> invokeEditorCmd $ deleteBackwards
+            ([], "Delete") -> invokeEditorCmd $ deleteForwards
+            ([], "Return") -> invokeEditorCmd $ (deleteSelectedText >> insertNewLine)
+            _ -> maybe 
+                ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
+                (\c -> invokeEditorCmd $ (deleteSelectedText >> insertEditorChar c))
+                printableChar
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
 getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
