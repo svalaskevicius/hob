@@ -115,9 +115,12 @@ data EditorDrawingOptions = EditorDrawingOptions {
     reportError        :: Maybe String -> IO ()
 }
 
+data CursorHead = CursorHead Int Int Int -- ^ X, Y, X_{navigation}
+
 data FancyEditor = FancyEditor {
     sourceData     :: SourceData,
-    cursorPos      :: (Int, Int, Int), -- ^ X, Y, X_{navigation}
+    cursorHead     :: CursorHead,
+    selectionHead  :: Maybe CursorHead,
     drawingOptions :: EditorDrawingOptions,
     drawingData    :: EditorDrawingData
 }
@@ -399,8 +402,8 @@ newSourceData sourceHistory newTextLines = do
             varDepGraphLookupByKey = newVarDepGraphKeyToVertex
         }
 
-newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> (Int, Int, Int) -> EditorDrawingOptions -> IO EditorDrawingData
-newDrawingData oldData pangoContext source (cursorCharNr, cursorLineNr, _) opts = do
+newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> CursorHead -> EditorDrawingOptions -> IO EditorDrawingData
+newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr _) opts = do
 --    debugPrint (varDepGraph source)
   --  debugPrint $ reverse . topSort $ varDepGraph source
     (textShapesCache, lineData) <- newDrawableLineData (maybe M.empty textToShapeCache oldData) pangoContext source opts
@@ -504,12 +507,13 @@ newFancyEditor errLabel pangoContext text = do
     dd <- newDrawingData Nothing pangoContext sd initialCursor dOptions
     return FancyEditor {
         sourceData = sd,
-        cursorPos = initialCursor,
+        cursorHead = initialCursor,
+        selectionHead = Nothing,
         drawingOptions = dOptions,
         drawingData = dd
     }
     where
-        initialCursor = (0, 0, 0)
+        initialCursor = CursorHead 0 0 0
         errorReporter (Just err) = do
             labelSetText errLabel err
             widgetShowAll errLabel
@@ -608,7 +612,7 @@ modifyEditor fancyEditorDataHolder comp = modifyMVar_ fancyEditorDataHolder $ S.
 updateDrawingData :: PangoContext -> S.StateT FancyEditor IO ()
 updateDrawingData pangoContext = do
     source <- S.gets sourceData
-    cursor <- S.gets cursorPos
+    cursor <- S.gets cursorHead
     opts <- S.gets drawingOptions
     dData <- S.gets drawingData
     dData' <- liftIO $ newDrawingData (Just dData) pangoContext source cursor opts
@@ -631,32 +635,32 @@ clampCursorY pos
 
 updateCursorX :: Int -> S.StateT FancyEditor IO ()
 updateCursorX delta = do
-    (cx, cy, _) <- S.gets cursorPos
+    CursorHead cx cy _ <- S.gets cursorHead
     cx' <- clampCursorX cy $ cx + delta
-    S.modify $ \ed -> ed{cursorPos = (cx', cy, cx')}
+    S.modify $ \ed -> ed{cursorHead = CursorHead cx' cy cx'}
 
 moveCursorToTheEndOfTheLine :: S.StateT FancyEditor IO ()
 moveCursorToTheEndOfTheLine = do
     source <- S.gets sourceData
-    (cx, cy, _) <- S.gets cursorPos
+    CursorHead _ cy _ <- S.gets cursorHead
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
         cx' = case take 1 $ postLines of
             [l] -> length l
             _ -> 0
-    S.modify $ \ed -> ed{cursorPos = (cx', cy, cx')}
+    S.modify $ \ed -> ed{cursorHead = CursorHead cx' cy cx'}
 
 moveCursorToTheStartOfTheLine :: S.StateT FancyEditor IO ()
 moveCursorToTheStartOfTheLine = do
-    (_, cy, _) <- S.gets cursorPos
-    S.modify $ \ed -> ed{cursorPos = (0, cy, 0)}
+    CursorHead _ cy _ <- S.gets cursorHead
+    S.modify $ \ed -> ed{cursorHead = CursorHead 0 cy 0}
 
 updateCursorY :: Int -> S.StateT FancyEditor IO ()
 updateCursorY delta = do
-    (_, cy, cxn) <- S.gets cursorPos
+    CursorHead _ cy cxn <- S.gets cursorHead
     cy' <- clampCursorY $ cy + delta
     cx' <- clampCursorX cy' cxn
-    S.modify $ \ed -> ed{cursorPos = (cx', cy', cxn)}
+    S.modify $ \ed -> ed{cursorHead = CursorHead cx' cy' cxn}
 
 sourcePointToDrawingPoint :: [[Double]] -> PointI -> EditorDrawingOptions -> PointD
 sourcePointToDrawingPoint lineWidths (Point cx cy) opts = Point cursorLeft cursorTop
@@ -682,7 +686,7 @@ scrollEditorToCursor scrolledWindow = do
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
     source <- S.gets sourceData
-    (cx, cy, _) <- S.gets cursorPos
+    CursorHead cx cy _ <- S.gets cursorHead
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
         changedLine = fmap (\l -> let (preChars, postChars) = splitAt cx l
@@ -706,13 +710,13 @@ deleteCharacterRange startPoint@(Point sx sy) endPoint@(Point ex ey) = do
         tLines' = preLines ++ startLine ++ (drop 1 postLines2)
     source' <- liftIO $ newSourceData (Just (source, [DeleteRange startPoint endPoint])) tLines'
     let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source'', cursorPos = (sx, sy, sx)}
+    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead sx sy sx}
         
 
 deleteCharactersFromCursor :: Int -> S.StateT FancyEditor IO ()
 deleteCharactersFromCursor amount = do
     source <- S.gets sourceData
-    (cx, cy, _) <- S.gets cursorPos
+    CursorHead cx cy _ <- S.gets cursorHead
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
         (startx, endx) = if amount > 0 then (cx, cx+amount) else (cx+amount, cx)
@@ -743,7 +747,7 @@ deleteCharactersFromCursor amount = do
 insertNewLine :: S.StateT FancyEditor IO ()
 insertNewLine = do
     source <- S.gets sourceData
-    (cx, cy, _) <- S.gets cursorPos
+    CursorHead cx cy _ <- S.gets cursorHead
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
         splitLines = concat . fmap (\l -> let (preChars, postChars) = splitAt cx l
@@ -752,7 +756,7 @@ insertNewLine = do
         tLines' = preLines ++ splitLines ++ drop 1 postLines
     source' <- liftIO $ newSourceData (Just (source, [InsertLine (Point cx cy)])) tLines'
     let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source'', cursorPos=(0, cy+1, 0)}
+    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead 0 (cy+1) 0}
 
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
@@ -760,8 +764,6 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
     keyValue <- eventKeyVal
     let printableChar = (\c -> if isPrint c then Just c else Nothing) =<< keyToChar keyValue
     -- TODO: widgetQueueDraw should only redraw previous and next cursor regions
-    -- TODO: handle delete, backspace, enter
-    -- TODO: handle home, end, page down, page up
     -- TODO: handle text selection, cut, copy, paste
     let invokeEditorCmd :: S.StateT FancyEditor IO () -> EventM EKey Bool
         invokeEditorCmd cmd  = liftIO $ do
