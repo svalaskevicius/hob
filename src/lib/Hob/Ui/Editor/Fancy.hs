@@ -69,8 +69,7 @@ data ColouredRange = ColouredRange
                         ColourGroup -- ^ colour group
                     deriving (Show, Eq)
 
-data SourceChangeEvent = InsertChar (Point Int) Char -- ^ Point (col, line) before the inserted char, Char that was inserted
-                       | InsertLine (Point Int) -- ^ Point (col, line) before the inserted new line separator
+data SourceChangeEvent = InsertText (Point Int) [String] -- ^ Point (col, line) before the inserted text lines
                        | DeleteRange (Point Int) (Point Int) -- ^ Point (col, line) pair of start and end position of the deleted range
         deriving (Show)
         
@@ -322,8 +321,9 @@ newSourceData sourceHistory newTextLines = do
                                 line2 = _l2 + 1
                                 (Point _c1 _l1) = p1
                                 (Point _c2 _l2) = p2
-                        eventChangesDecl (InsertChar p _) = declContainsPoint p
-                        eventChangesDecl (InsertLine p) = declContainsPoint p
+--                        eventChangesDecl (InsertChar p _) = declContainsPoint p
+--                        eventChangesDecl (InsertLine p) = declContainsPoint p
+                        eventChangesDecl (InsertText p _) = declContainsPoint p
                         eventChangesDecl (DeleteRange p1 p2) = declContainsPoint p1 || declContainsPoint p2 || declIsInBetweenPoints p1 p2
 
                 parseModuleMinusDecls decls = parseModuleLines linesToParse
@@ -354,7 +354,7 @@ newSourceData sourceHistory newTextLines = do
                         updateDecl decl = fmap adjustInfoSpanByEvents decl
 
                 adjustInfoSpanByEvents range = maybe range (foldr adjustInfoSpanByEvent range) sourceChangeEvents
-
+{-
                 adjustInfoSpanByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
                         if needChange then P.noInfoSpan $ P.SrcSpan file startLine startCol' endLine endCol'
                         else range
@@ -371,10 +371,23 @@ newSourceData sourceHistory newTextLines = do
                         endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol - (pColumn+1) else endCol
                         startLine' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) || (startLine > (pLine+1)) then startLine + 1 else startLine
                         endLine' = if (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) then endLine + 1 else endLine
+-}
+                adjustInfoSpanByEvent (InsertText (Point pColumn pLine) newLines) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
+                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
+                        else range
+                    where
+                        needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) 
+                        multiline = length newLines > 1
+                        startCol' = if multiline then if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol - (length . head $ newLines) + (length . last $ newLines) else startCol
+                                    else if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + (length . head $ newLines) else startCol
+                        endCol' = if multiline then if (startLine == (pLine+1) && endCol >= (pColumn+1)) then endCol - (length . head $ newLines) + (length . last $ newLines) else endCol
+                                    else if (startLine == (pLine+1) && endCol >= (pColumn+1)) then endCol + (length . head $ newLines) else endCol
+                        startLine' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) || (startLine > (pLine+1)) then startLine + (length newLines - 1) else startLine
+                        endLine' = if (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) then endLine + (length newLines - 1) else endLine
                 adjustInfoSpanByEvent (DeleteRange (Point sColumn sLine) (Point eColumn eLine)) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
                         if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
                         else range
-                    where -- TODO: merge logic with the InsertChar handler, adjust start and end points independently rather than using maxes
+                    where
                         needChange = (startLine == (sLine+1) && startCol >= (sColumn+1)) || (endLine == (eLine+1) && endCol >= (eColumn+1)) || (endLine > (eLine+1))
                         lineAdj = eLine - sLine
                         colAdj = if sLine == eLine then eColumn - sColumn else eColumn
@@ -726,6 +739,60 @@ deleteSelectedText = do
             else if c1 < c2 then deleteCharacterRange (Point x1 y1) (Point x2 y2)
             else deleteCharacterRange (Point x2 y2) (Point x1 y1)
 
+getSelectedText :: S.StateT FancyEditor IO (Maybe String)
+getSelectedText = do
+    selection <- S.gets selectionHead
+    cursor <- S.gets cursorHead
+    maybe (return Nothing) (getTextBetweenCursors cursor) selection
+    where
+        getTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) = 
+            if c1 == c2 then return Nothing
+            else if c1 < c2 then return . Just =<< getTextInRange (Point x1 y1) (Point x2 y2)
+            else return . Just =<< getTextInRange (Point x2 y2) (Point x1 y1)
+
+getTextInRange :: PointI -> PointI -> S.StateT FancyEditor IO String
+getTextInRange (Point x1 y1) (Point x2 y2) = do
+    source <- S.gets sourceData
+    let tLines = textLines source
+        postLines = take (y2-y1+1) . drop y1 $ tLines
+        firstLine = map (drop x1) . take 1 $ postLines
+        (midLines, fullLastLine) = splitAt (y2-y1-1) . drop 1 $ postLines
+        lastLine = map (take x2) fullLastLine
+        multiline = y2 > y1
+        singleLine = head $ (map (take (x2-x1)) firstLine) ++ [""]
+        multipleLines = (unlines $ firstLine ++ midLines) ++ (head $ lastLine ++ [""])
+    return $ if multiline then multipleLines else singleLine
+
+putSelectedTextToClipboard :: S.StateT FancyEditor IO ()
+putSelectedTextToClipboard = do
+    selectedText <- getSelectedText
+    maybeDo (liftIO . putTextToClipboard) selectedText
+    where
+        putTextToClipboard text = do
+            cb <- clipboardGet selectionClipboard
+            clipboardSetText cb text
+
+insertEditorText :: String -> S.StateT FancyEditor IO ()
+insertEditorText text = do
+    source <- S.gets sourceData
+    CursorHead cx cy _ <- S.gets cursorHead
+    let newLines = lines text ++ (if null text then [] else if last text == '\n' then [""] else [])
+        tLines = textLines source
+        (preLines, allPostLines) = splitAt cy tLines
+        (currentLine, postLines) = splitAt 1 allPostLines
+        [(preText, postText)] = map (splitAt cx) currentLine
+        newLines' = if null currentLine then newLines 
+                    else let leadingText = map ((++) preText) . take 1 $ newLines
+                             (middleText, lastTextLine) = (splitAt (length newLines - 2) . drop 1 $ newLines)
+                             lastLine = map (flip (++) postText) lastTextLine
+                             singleLineText = map (flip (++) postText) leadingText
+                         in if length newLines == 1 then singleLineText else leadingText ++ middleText ++ lastLine
+        tLines' = preLines ++ newLines' ++ postLines
+    source' <- liftIO $ newSourceData (Just (source, [InsertText (Point cx cy) newLines])) tLines'
+    let source'' = source'{isModified = True}
+    S.modify $ \ed -> ed{sourceData = source''}
+--    updateCursorX 1 -- MOVE
+
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
     source <- S.gets sourceData
@@ -736,7 +803,7 @@ insertEditorChar c = do
                                   in preChars ++ [c] ++ postChars
                             ) . take 1 $ postLines
         tLines' = preLines ++ changedLine ++ drop 1 postLines
-    source' <- liftIO $ newSourceData (Just (source, [InsertChar (Point cx cy) c])) tLines'
+    source' <- liftIO $ newSourceData (Just (source, [InsertText (Point cx cy) [[c]]])) tLines'
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source''}
     updateCursorX 1
@@ -797,7 +864,7 @@ insertNewLine = do
                                   in [preChars, postChars]
                             ) . take 1 $ postLines
         tLines' = preLines ++ splitLines ++ drop 1 postLines
-    source' <- liftIO $ newSourceData (Just (source, [InsertLine (Point cx cy)])) tLines'
+    source' <- liftIO $ newSourceData (Just (source, [InsertText (Point cx cy) ["", ""]])) tLines'
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead 0 (cy+1) 0}
 
@@ -829,6 +896,14 @@ deleteBackwards = deleteSelectionOrInvokeCommand $ deleteCharactersFromCursor (-
 deleteForwards :: S.StateT FancyEditor IO ()
 deleteForwards = deleteSelectionOrInvokeCommand $ deleteCharactersFromCursor 1
 
+invokeEditorCommand :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> S.StateT FancyEditor IO () -> IO ()
+invokeEditorCommand fancyEditorDataHolder editorWidget pangoContext scrolledWindow cmd  = do
+    modifyEditor fancyEditorDataHolder $ do
+        cmd
+        updateDrawingData pangoContext
+        scrollEditorToCursor scrolledWindow
+    widgetQueueDraw editorWidget
+
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
     modifiers <- eventModifier
@@ -836,15 +911,14 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
     let printableChar = (\c -> if isPrint c then Just c else Nothing) =<< keyToChar keyValue
     -- TODO: widgetQueueDraw should only redraw previous and next cursor regions
     -- TODO: handle text selection, cut, copy, paste
-    let invokeEditorCmd :: S.StateT FancyEditor IO () -> EventM EKey Bool
-        invokeEditorCmd cmd  = liftIO $ do
-            modifyEditor fancyEditorDataHolder $ do
-                cmd
-                updateDrawingData pangoContext
-                scrollEditorToCursor scrolledWindow
-            widgetQueueDraw editorWidget
-            return True
-            
+    let invokeEditorCmd cmd  = (liftIO $ invokeEditorCommand fancyEditorDataHolder editorWidget pangoContext scrolledWindow cmd) >> return True
+
+    let insertTextFromClipboard = do
+            cb <- clipboardGet selectionClipboard
+            clipboardRequestText cb onTextReceived
+            where
+                onTextReceived = maybeDo (\text -> (invokeEditorCmd $ insertEditorText text) >> return())
+
     let getLinesInOnePage = do
             widgetHeight <- liftIO $ widgetGetAllocatedHeight scrolledWindow
             opts <- S.gets drawingOptions
@@ -872,13 +946,18 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             [] -> invokeEditorCmd $ inEditMode >> cmd
             _ -> return False
         Nothing ->  case (modifiers, key) of
+            ([Control], "c") -> invokeEditorCmd $ putSelectedTextToClipboard
+            ([Control], "x") -> invokeEditorCmd $ (putSelectedTextToClipboard >> deleteSelectedText)
+            ([Control], "v") -> (invokeEditorCmd deleteSelectedText) >> (liftIO $ insertTextFromClipboard) >> return True
             ([], "BackSpace") -> invokeEditorCmd $ deleteBackwards
             ([], "Delete") -> invokeEditorCmd $ deleteForwards
             ([], "Return") -> invokeEditorCmd $ (deleteSelectedText >> insertNewLine)
-            _ -> maybe 
-                ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
-                (\c -> invokeEditorCmd $ (deleteSelectedText >> insertEditorChar c))
-                printableChar
+            _ -> if null modifiers then
+                    maybe 
+                        ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
+                        (\c -> invokeEditorCmd $ (deleteSelectedText >> insertEditorChar c))
+                        printableChar
+                 else ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
 getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
