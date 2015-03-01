@@ -266,14 +266,14 @@ adjustPointByEvent :: SourceChangeEvent -> Point Int -> Point Int
 adjustPointByEvent (InsertText (Point pColumn pLine) newLines) (Point px py) = Point px' py'
     where
         multiline = length newLines > 1
-        px' = if multiline then if (pLine == py && pColumn < px) then px - (length . head $ newLines) + (length . last $ newLines) else px
-              else if (pLine == py && pColumn < px) then px + (length . head $ newLines) else px
-        py' = if (pLine == py && pColumn < px) || (pLine < py) then py + (length newLines - 1) else py
+        px' = if multiline then if (pLine == py && pColumn <= px) then (length . last $ newLines) else px
+              else if (pLine == py && pColumn <= px) then px + (length . head $ newLines) else px
+        py' = if (pLine == py && pColumn <= px) || (pLine < py) then py + (length newLines - 1) else py
 adjustPointByEvent (DeleteRange (Point sColumn sLine) (Point eColumn eLine)) (Point px py) = Point px' py'
     where
         lineAdj = eLine - sLine
         colAdj = if sLine == eLine then eColumn - sColumn else eColumn
-        px' = if (sLine == py && sColumn < px) then max sColumn (px - colAdj) else px
+        px' = if (sLine == py && sColumn <= px) then max sColumn (px - colAdj) else px
         py' = if (py > sLine) then max sLine (py - lineAdj) else py
 
 -- TODO: vector for lines?
@@ -769,10 +769,11 @@ insertEditorText text = do
                              singleLineText = map (flip (++) postText) leadingText
                          in if length newLines == 1 then singleLineText else leadingText ++ middleText ++ lastLine
         tLines' = preLines ++ newLines' ++ postLines
-    source' <- liftIO $ newSourceData (Just (source, [InsertText (Point cx cy) newLines])) tLines'
+    let events = [InsertText (Point cx cy) newLines]
+    source' <- liftIO $ newSourceData (Just (source, events)) tLines'
     let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source''}
---    updateCursorX 1 -- MOVE
+        (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
+    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead cx' cy' cx'}
 
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
@@ -784,10 +785,11 @@ insertEditorChar c = do
                                   in preChars ++ [c] ++ postChars
                             ) . take 1 $ postLines
         tLines' = preLines ++ changedLine ++ drop 1 postLines
-    source' <- liftIO $ newSourceData (Just (source, [InsertText (Point cx cy) [[c]]])) tLines'
+    let events = [InsertText (Point cx cy) [[c]]]
+    source' <- liftIO $ newSourceData (Just (source, events)) tLines'
     let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source''}
-    updateCursorX 1
+        (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
+    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead cx' cy' cx'}
 
 deleteCharacterRange :: Point Int -> Point Int -> S.StateT FancyEditor IO ()
 deleteCharacterRange startPoint@(Point sx sy) endPoint@(Point ex ey) = do
