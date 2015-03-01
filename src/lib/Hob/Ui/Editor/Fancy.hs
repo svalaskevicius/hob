@@ -87,7 +87,7 @@ data SourceData = SourceData {
 }
 
 -- | Point x y
-data Point a = Point a a deriving Show
+data Point a = Point a a deriving (Show, Eq)
 type PointD = Point Double
 type PointI = Point Int
 
@@ -262,6 +262,20 @@ newSourceDataFromText text = newSourceData Nothing newTextLines
     where
         newTextLines = lines . unpack $ text
 
+adjustPointByEvent :: SourceChangeEvent -> Point Int -> Point Int
+adjustPointByEvent (InsertText (Point pColumn pLine) newLines) (Point px py) = Point px' py'
+    where
+        multiline = length newLines > 1
+        px' = if multiline then if (pLine == py && pColumn < px) then px - (length . head $ newLines) + (length . last $ newLines) else px
+              else if (pLine == py && pColumn < px) then px + (length . head $ newLines) else px
+        py' = if (pLine == py && pColumn < px) || (pLine < py) then py + (length newLines - 1) else py
+adjustPointByEvent (DeleteRange (Point sColumn sLine) (Point eColumn eLine)) (Point px py) = Point px' py'
+    where
+        lineAdj = eLine - sLine
+        colAdj = if sLine == eLine then eColumn - sColumn else eColumn
+        px' = if (sLine == py && sColumn < px) then max sColumn (px - colAdj) else px
+        py' = if (py > sLine) then max sLine (py - lineAdj) else py
+
 -- TODO: vector for lines?
 newSourceData :: Maybe (SourceData, [SourceChangeEvent]) -> [String] -> IO SourceData
 newSourceData sourceHistory newTextLines = do
@@ -354,48 +368,15 @@ newSourceData sourceHistory newTextLines = do
                         updateDecl decl = fmap adjustInfoSpanByEvents decl
 
                 adjustInfoSpanByEvents range = maybe range (foldr adjustInfoSpanByEvent range) sourceChangeEvents
-{-
-                adjustInfoSpanByEvent (InsertChar (Point pColumn pLine) _) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
-                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine startCol' endLine endCol'
-                        else range
+                adjustInfoSpanByEvent evt range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) =
+                    if p1 == p1' && p2 == p2' then range
+                    else P.noInfoSpan $ P.SrcSpan file (p1y'+1) (p1x'+1) (p2y'+1) (p2x'+1)
                     where
-                        needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1))
-                        startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + 1 else startCol
-                        endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol + 1 else endCol
-                adjustInfoSpanByEvent (InsertLine (Point pColumn pLine)) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
-                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
-                        else range
-                    where
-                        needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) 
-                        startCol' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol - (pColumn+1) else startCol
-                        endCol' = if (endLine == (pLine+1) && endLine >= (pColumn+1)) then endCol - (pColumn+1) else endCol
-                        startLine' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) || (startLine > (pLine+1)) then startLine + 1 else startLine
-                        endLine' = if (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) then endLine + 1 else endLine
--}
-                adjustInfoSpanByEvent (InsertText (Point pColumn pLine) newLines) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
-                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
-                        else range
-                    where
-                        needChange = (startLine == (pLine+1) && startCol >= (pColumn+1)) || (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) 
-                        multiline = length newLines > 1
-                        startCol' = if multiline then if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol - (length . head $ newLines) + (length . last $ newLines) else startCol
-                                    else if (startLine == (pLine+1) && startCol >= (pColumn+1)) then startCol + (length . head $ newLines) else startCol
-                        endCol' = if multiline then if (startLine == (pLine+1) && endCol >= (pColumn+1)) then endCol - (length . head $ newLines) + (length . last $ newLines) else endCol
-                                    else if (startLine == (pLine+1) && endCol >= (pColumn+1)) then endCol + (length . head $ newLines) else endCol
-                        startLine' = if (startLine == (pLine+1) && startCol >= (pColumn+1)) || (startLine > (pLine+1)) then startLine + (length newLines - 1) else startLine
-                        endLine' = if (endLine == (pLine+1) && endCol >= (pColumn+1)) || (endLine > (pLine+1)) then endLine + (length newLines - 1) else endLine
-                adjustInfoSpanByEvent (DeleteRange (Point sColumn sLine) (Point eColumn eLine)) range@(P.SrcSpanInfo (P.SrcSpan file startLine startCol endLine endCol) _) = 
-                        if needChange then P.noInfoSpan $ P.SrcSpan file startLine' startCol' endLine' endCol'
-                        else range
-                    where
-                        needChange = (startLine == (sLine+1) && startCol >= (sColumn+1)) || (endLine == (eLine+1) && endCol >= (eColumn+1)) || (endLine > (eLine+1))
-                        lineAdj = eLine - sLine
-                        colAdj = if sLine == eLine then eColumn - sColumn else eColumn
-                        startLine' = max (sLine + 1) (startLine - lineAdj)
-                        startCol' = if (startLine == (eLine+1) && startCol >= (eColumn+1)) then max (sColumn+1) (startCol - colAdj) else startCol
-                        endLine' = max startLine' (endLine - lineAdj)
-                        endCol' = if (endLine == (eLine+1) && endLine >= (eColumn+1)) then if (sLine==eLine) then max startCol' (endCol - colAdj) else endCol - colAdj else endCol
-                
+                        p1 = Point (startCol-1) (startLine-1)
+                        p2 = Point (endCol-1) (endLine-1)
+                        p1'@(Point p1x' p1y') = adjustPointByEvent evt p1
+                        p2'@(Point p2x' p2y') = adjustPointByEvent evt p2
+
         declarations (Just (P.Module _ _ _ _ decl, _)) = decl
         declarations _ = []
         (funcDefCache, newVarDeps) = findVariableDependencies (maybe M.empty functionDefCache oldSourceData) (fmap varDeps oldSourceData) . declarations $ parsedModule
