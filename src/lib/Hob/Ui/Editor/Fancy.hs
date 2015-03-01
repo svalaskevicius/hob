@@ -13,7 +13,7 @@ import           Data.Generics
 import           Data.Graph
 import           Data.List                           (groupBy, sortBy, nubBy, sort)
 import           Data.Maybe                          (catMaybes, listToMaybe,
-                                                      maybeToList)
+                                                      maybeToList, isJust)
 import  Control.Applicative
 import qualified Data.Map as M
 import Data.Map (Map)
@@ -101,6 +101,7 @@ data EditorDrawingData = EditorDrawingData {
     drawableLines      :: [DrawableLine],
     textToShapeCache   :: TextShapeCache,
     boundingRect       :: (PointD, PointD),
+    selectionContour   :: [PointD],
     cursorPosition     :: PointD,
     errorPosition      :: Maybe PointD,
     backgroundPaths    :: Forest [PointD],
@@ -116,6 +117,12 @@ data EditorDrawingOptions = EditorDrawingOptions {
 }
 
 data CursorHead = CursorHead Int Int Int -- ^ X, Y, X_{navigation}
+
+instance Eq CursorHead where
+    (CursorHead x1 y1 _) == (CursorHead x2 y2 _) = (x1 == x2) && (y1 == y2)
+
+instance Ord CursorHead where
+    (CursorHead x1 y1 _) <= (CursorHead x2 y2 _) = (y1 < y2) || ((y2 == y1) && (x1 <= x2))
 
 data FancyEditor = FancyEditor {
     sourceData     :: SourceData,
@@ -402,8 +409,8 @@ newSourceData sourceHistory newTextLines = do
             varDepGraphLookupByKey = newVarDepGraphKeyToVertex
         }
 
-newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> CursorHead -> EditorDrawingOptions -> IO EditorDrawingData
-newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr _) opts = do
+newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> CursorHead -> CursorHead -> EditorDrawingOptions -> IO EditorDrawingData
+newDrawingData oldData pangoContext source cursor@(CursorHead cursorCharNr cursorLineNr _) selection@(CursorHead selectionCharNr selectionLineNr _) opts = do
 --    debugPrint (varDepGraph source)
   --  debugPrint $ reverse . topSort $ varDepGraph source
     (textShapesCache, lineData) <- newDrawableLineData (maybe M.empty textToShapeCache oldData) pangoContext source opts
@@ -428,7 +435,7 @@ newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr
                                         (Point _ sy2) = br
                                     in sy2 > sy1
                         dTopLeft = sourceCoordsToDrawing lineData tl
-                        dBottomRight = movePointToMaxRightOfTheRange tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br
+                        dBottomRight = movePointToMaxRightOfTheRange lineData tl br . movePointToLineBottom $ sourceCoordsToDrawing lineData br
                         dTopRight = let (Point _ tly) = dTopLeft
                                         (Point brx _) = dBottomRight
                                     in Point brx tly
@@ -454,12 +461,19 @@ newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr
                         lineWhiteSpacePrefixWidths = zipWith (\l w -> sum $ take l w) lineWhiteSpacePrefixLengths lineWidthRange
                         lineWidthRange :: [[Double]]
                         lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
-                movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
-                movePointToMaxRightOfTheRange (Point _ l1) (Point _ l2) (Point px py) = Point (max px maxRight) py
+        movePointToLineBottom (Point px py) = Point px (py + (lineHeight opts))
+        movePointToMaxRightOfTheRange :: [DrawableLine] -> PointI -> PointI -> PointD -> PointD
+        movePointToMaxRightOfTheRange lineData (Point _ l1) (Point _ l2) (Point px py) = Point (max px maxRight) py
+            where
+                maxRight = maximum . (0:) . map sum $ lineWidthRange
                     where
-                        maxRight = maximum . (0:) . map sum $ lineWidthRange
-                            where
-                                lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
+                        lineWidthRange = take (l2-l1) . drop (l1) $ (drawableLineWidths lineData)
+        movePointToMaxRightOfTheLine :: [DrawableLine] -> Int -> PointD -> PointD
+        movePointToMaxRightOfTheLine lineData l (Point _ py) = Point maxRight py
+            where
+                maxRight = maximum . (0:) . map sum $ lineWidthRange
+                    where
+                        lineWidthRange = take 1 . drop l $ (drawableLineWidths lineData)
         variableDepsGraphEdges = V.fromList . map (cielChToRgbTuple . vertexDepColour) $ variableVertexesInTopoOrder
             where
                 uniqueVarColours = V.fromList . generateCielCHColours $ length . concat . M.elems . varDeps $ source
@@ -475,6 +489,21 @@ newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr
         formattedErrorMessage = fmap formatError . parseErrorMessage $ source
             where
                 formatError ((Point c l), msg) = msg ++ " at "++(show l)++":"++(show c)
+        newSelectionContour lineData = if cursor == selection then []
+                                       else if cursor < selection 
+                                       then textContour lineData (cursorCharNr, cursorLineNr) (selectionCharNr, selectionLineNr)
+                                       else textContour lineData (selectionCharNr, selectionLineNr) (cursorCharNr, cursorLineNr)
+        textContour lineData (x1, y1) (x2, y2) = (concatMap rightPoints [y1..y2]) ++ (concatMap leftPoints . reverse $ [y1..y2])
+            where
+                rightPoints l = [topRightOfLine l, bottomRightOfLine l]
+                leftPoints l = [bottomLeftOfLine l, topLeftOfLine l]
+                topLeftOfLine l = if l > y1 then sourceCoordsToDrawing lineData (Point 0 l)
+                                  else sourceCoordsToDrawing lineData (Point x1 y1)
+                bottomLeftOfLine = movePointToLineBottom . topLeftOfLine
+                topRightOfLine l = if l < y2 then movePointToMaxRightOfTheLine lineData l $ sourceCoordsToDrawing lineData (Point 0 l)
+                                   else sourceCoordsToDrawing lineData (Point x2 y2)
+                bottomRightOfLine = movePointToLineBottom . topRightOfLine
+                                   
         ed textShapesCache lineData cursorP errorPos = EditorDrawingData {
             drawableLines = lineData,
             textToShapeCache = textShapesCache,
@@ -483,7 +512,8 @@ newDrawingData oldData pangoContext source (CursorHead cursorCharNr cursorLineNr
             errorPosition = errorPos,
             backgroundPaths = convertBlocks lineData (sourceBlocks source),
             colourGroupToRgb = variableDepsGraphEdges,
-            sourceErrorMessage = formattedErrorMessage
+            sourceErrorMessage = formattedErrorMessage,
+            selectionContour = newSelectionContour lineData
         }
 
 newDrawingOptions :: PangoContext -> (Maybe String -> IO()) -> IO EditorDrawingOptions
@@ -504,7 +534,7 @@ newFancyEditor :: Label -> PangoContext -> Text -> IO FancyEditor
 newFancyEditor errLabel pangoContext text = do
     dOptions <- newDrawingOptions pangoContext errorReporter
     sd <- newSourceDataFromText text
-    dd <- newDrawingData Nothing pangoContext sd initialCursor dOptions
+    dd <- newDrawingData Nothing pangoContext sd initialCursor initialCursor dOptions
     return FancyEditor {
         sourceData = sd,
         cursorHead = initialCursor,
@@ -613,9 +643,10 @@ updateDrawingData :: PangoContext -> S.StateT FancyEditor IO ()
 updateDrawingData pangoContext = do
     source <- S.gets sourceData
     cursor <- S.gets cursorHead
+    selection <- S.gets selectionHead
     opts <- S.gets drawingOptions
     dData <- S.gets drawingData
-    dData' <- liftIO $ newDrawingData (Just dData) pangoContext source cursor opts
+    dData' <- liftIO $ newDrawingData (Just dData) pangoContext source cursor (maybe cursor id selection) opts
     S.modify $ \ed -> ed{drawingData = dData'}
 
 nrOfCharsOnCursorLine :: Int -> S.StateT FancyEditor IO Int
@@ -644,8 +675,7 @@ moveCursorToTheEndOfTheLine = do
     source <- S.gets sourceData
     CursorHead _ cy _ <- S.gets cursorHead
     let tLines = textLines source
-        (preLines, postLines) = splitAt cy tLines
-        cx' = case take 1 $ postLines of
+        cx' = case take 1 . drop cy $ tLines of
             [l] -> length l
             _ -> 0
     S.modify $ \ed -> ed{cursorHead = CursorHead cx' cy cx'}
@@ -758,6 +788,21 @@ insertNewLine = do
     let source'' = source'{isModified = True}
     S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead 0 (cy+1) 0}
 
+inSelectionMode :: S.StateT FancyEditor IO ()
+inSelectionMode = do
+    selection <- S.gets selectionHead
+    if not $ isJust selection then do
+        cursor <- S.gets cursorHead
+        S.modify $ \ed -> ed{selectionHead = Just cursor}
+    else return ()
+
+inEditMode :: S.StateT FancyEditor IO ()
+inEditMode = do
+    selection <- S.gets selectionHead
+    if isJust selection then do
+        S.modify $ \ed -> ed{selectionHead = Nothing}
+    else return ()
+
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do
     modifiers <- eventModifier
@@ -774,28 +819,37 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             widgetQueueDraw editorWidget
             return True
             
-    let getLinesInOnePage = liftIO $ do
-            widgetHeight <- widgetGetAllocatedHeight scrolledWindow
-            editor <- readMVar fancyEditorDataHolder
-            return $ floor $ (fromIntegral widgetHeight) / (lineHeight . drawingOptions $ editor)
+    let getLinesInOnePage = do
+            widgetHeight <- liftIO $ widgetGetAllocatedHeight scrolledWindow
+            opts <- S.gets drawingOptions
+            return $ floor $ (fromIntegral widgetHeight) / (lineHeight opts)
 
-    case (modifiers, unpack $ keyName keyValue) of
-        ([], "Right") -> invokeEditorCmd $ updateCursorX 1
-        ([], "Left") -> invokeEditorCmd $ updateCursorX (-1)
-        ([], "Up") -> invokeEditorCmd $ updateCursorY (-1)
-        ([], "Down") -> invokeEditorCmd $ updateCursorY 1
-        ([], "Page_Up") -> do
-            linesToJump <- getLinesInOnePage
-            invokeEditorCmd $ updateCursorY (-linesToJump)
-        ([], "Page_Down") -> do
-            linesToJump <- getLinesInOnePage
-            invokeEditorCmd $ updateCursorY linesToJump
-        ([], "Home") -> invokeEditorCmd $ moveCursorToTheStartOfTheLine
-        ([], "End") -> invokeEditorCmd $ moveCursorToTheEndOfTheLine
-        ([], "BackSpace") -> invokeEditorCmd $ deleteCharactersFromCursor (-1)
-        ([], "Delete") -> invokeEditorCmd $ deleteCharactersFromCursor 1
-        ([], "Return") -> invokeEditorCmd $ insertNewLine
-        _ -> maybe ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False) (\c -> invokeEditorCmd $ insertEditorChar c) printableChar
+    let key = unpack $ keyName keyValue
+        navigationCmd = case key of
+            "Right" -> Just $ updateCursorX 1
+            "Left" -> Just $ updateCursorX (-1)
+            "Up" -> Just $ updateCursorY (-1)
+            "Down" -> Just $ updateCursorY 1
+            "Page_Up" -> Just $ do
+                linesToJump <- getLinesInOnePage
+                updateCursorY (-linesToJump)
+            "Page_Down" -> Just $ do
+                linesToJump <- getLinesInOnePage
+                updateCursorY linesToJump
+            "Home" -> Just $ moveCursorToTheStartOfTheLine
+            "End" -> Just $ moveCursorToTheEndOfTheLine
+            _ -> Nothing
+            
+    case navigationCmd of
+        Just cmd -> case modifiers of 
+            [Shift] -> invokeEditorCmd $ inSelectionMode >> cmd
+            [] -> invokeEditorCmd $ inEditMode >> cmd
+            _ -> return False
+        Nothing ->  case (modifiers, key) of
+            ([], "BackSpace") -> invokeEditorCmd $ deleteCharactersFromCursor (-1)
+            ([], "Delete") -> invokeEditorCmd $ deleteCharactersFromCursor 1
+            ([], "Return") -> invokeEditorCmd $ insertNewLine
+            _ -> maybe ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False) (\c -> invokeEditorCmd $ insertEditorChar c) printableChar
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
 getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
@@ -919,23 +973,21 @@ drawEditor fancyEditorDataHolder editorWidget = do
             where
                 (_, Point textRight textBottom) = boundingRect dData
 
-        drawPaths paths = traverse (traverse drawPath) paths >> return()
-            where
-                drawPath [] = return()
-                drawPath ((Point px py):ps) = do
-                    moveTo px py
-                    mapM_ (\(Point lx ly) -> lineTo lx ly) ps
-                    closePath
-                    setSourceRGBA 0.3 0.3 0.4 0.05
-                    strokePreserve
-                    setSourceRGBA 0.69 0.65 0.5 0.15
-                    fill
+        drawPaths cmds paths = traverse (traverse $ drawPath cmds) paths >> return()
+
+        drawPath _ [] = return()
+        drawPath pathCmds ((Point px py):ps) = do
+            moveTo px py
+            mapM_ (\(Point lx ly) -> lineTo lx ly) ps
+            closePath
+            pathCmds
 
         drawContents (dData, opts) = do
             save
             translate textLeft textTop
             rect <- getClipRectangle
-            drawPaths $ bgPathsToDraw rect
+            drawPaths bgBackgroundPainter $ bgPathsToDraw rect
+            drawPath selectionBackgroundPainter $ selectionContour dData
             drawErrorPointer dData opts
             drawText (linesToDraw rect) (colourGroupToRgb dData)
             drawCursor dData opts
@@ -943,6 +995,17 @@ drawEditor fancyEditorDataHolder editorWidget = do
             liftIO $ (reportError opts) $ sourceErrorMessage dData
 
             where
+                bgBackgroundPainter = do
+                    setSourceRGBA 0.3 0.3 0.4 0.05
+                    strokePreserve
+                    setSourceRGBA 0.69 0.65 0.5 0.15
+                    fill
+                selectionBackgroundPainter = do
+                    setSourceRGBA 1 1 0.5 0.7
+                    strokePreserve
+                    setSourceRGBA 1 1 0.7 0.9
+                    fill
+
                 linesToDraw Nothing = drawableLines dData
                 linesToDraw (Just (Rectangle _ ry _ rh)) = filterLines $ drawableLines dData
                     where
