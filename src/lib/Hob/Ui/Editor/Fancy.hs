@@ -655,9 +655,9 @@ clampCursorX yPos pos
 clampCursorY :: Int -> S.StateT FancyEditor IO Int
 clampCursorY pos
  | pos < 0 = return 0
- | otherwise = liftM (min pos) nrOfLines
+ | otherwise = liftM (min pos) maxCursorY
  where
-    nrOfLines = liftM (length . textLines) $ S.gets sourceData
+    maxCursorY = liftM ((flip (-) 1) . length . textLines) $ S.gets sourceData
 
 updateCursorX :: Int -> S.StateT FancyEditor IO ()
 updateCursorX delta = do
@@ -781,9 +781,11 @@ insertEditorChar c = do
     CursorHead cx cy _ <- S.gets cursorHead
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
-        changedLine = fmap (\l -> let (preChars, postChars) = splitAt cx l
-                                  in preChars ++ [c] ++ postChars
-                            ) . take 1 $ postLines
+        changedLine = case take 1 $ postLines of
+                          [] -> [[c]]
+                          [l] -> let (preChars, postChars) = splitAt cx l
+                                 in [preChars ++ [c] ++ postChars]
+                          _ -> error "unexpected branching"
         tLines' = preLines ++ changedLine ++ drop 1 postLines
     let events = [InsertText (Point cx cy) [[c]]]
     source' <- liftIO $ newSourceData (Just (source, events)) tLines'
