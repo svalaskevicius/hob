@@ -1,5 +1,5 @@
 module Hob.Ui.Editor.Fancy (
-    newEditorForText
+    newEditorForText, getActiveEditorWidget
     ) where
 
 import           Control.Concurrent.MVar             (MVar, modifyMVar_,
@@ -1239,14 +1239,34 @@ drawEditor fancyEditorDataHolder editorWidget = do
 getActiveEditor :: Context -> IO (Maybe DrawingArea)
 getActiveEditor = maybe (return Nothing) getEditorFromNotebookTab <=< getActiveEditorTab
 
+getActiveEditorWidget :: Context -> IO (Maybe Widget)
+getActiveEditorWidget = maybe (return Nothing) getEditorWidgetFromNotebookTab <=< getActiveEditorTab
+
+getEditorWidgetFromNotebookTab :: Widget -> IO (Maybe Widget)
+getEditorWidgetFromNotebookTab = recurseInBin
+    where
+        binChild widget = if widget `isA` gTypeBin then do
+                                  binGetChild $ castToBin widget
+                              else return Nothing
+
+        recurseInBin widget = do
+                                  mChild <- binChild widget
+                                  case mChild of
+                                      Just child -> recurseInBin child
+                                      Nothing -> return $ Just widget
+
 getEditorFromNotebookTab :: Widget -> IO (Maybe DrawingArea)
-getEditorFromNotebookTab currentlyActiveEditor =
-    if currentlyActiveEditor `isA` gTypeScrolledWindow then do
-        let textEditScroller = castToScrolledWindow currentlyActiveEditor
-        textEdit <- binGetChild textEditScroller
-        let areaa = (\area -> if isA area gTypeDrawingArea then Just area else Nothing) =<< textEdit
-        return $ fmap castToDrawingArea areaa
-    else return Nothing
+getEditorFromNotebookTab mainWidget = asDrawingArea <~=< getEditorWidgetFromNotebookTab mainWidget
+    where
+        asDrawingArea widget = if widget `isA` gTypeDrawingArea then do
+                                   return $ Just $ castToDrawingArea widget
+                               else do
+                                   return Nothing
+
+        target <~=< source = do
+            res <- source
+            maybe (return Nothing) target res
+        infixr 9 <~=<
 
 getActiveEditorTab :: Context -> IO (Maybe Widget)
 getActiveEditorTab ctx = do
