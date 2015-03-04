@@ -1004,7 +1004,7 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             ([], "BackSpace") -> invokeEditorCmd $ deleteBackwards
             ([], "Delete") -> invokeEditorCmd $ deleteForwards
             ([], "Return") -> invokeEditorCmd $ (deleteSelectedText >> insertNewLine)
-            _ -> if null modifiers then
+            _ -> if (null modifiers) || (modifiers == [Shift]) then
                     maybe 
                         ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
                         (\c -> invokeEditorCmd $ (deleteSelectedText >> insertEditorChar c))
