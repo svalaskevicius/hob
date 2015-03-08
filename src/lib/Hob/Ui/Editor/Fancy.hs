@@ -1,5 +1,5 @@
 module Hob.Ui.Editor.Fancy (
-    newEditorForText, getActiveEditorWidget
+    newEditorForText, getActiveEditorWidget, initModule
     ) where
 
 import           Control.Concurrent.MVar             (MVar, modifyMVar_,
@@ -134,6 +134,16 @@ data FancyEditor = FancyEditor {
     drawingData    :: EditorDrawingData
 }
 
+editorFilePathChange :: [Char]
+editorFilePathChange = "editor.filePath.change"
+
+initModule :: App()
+initModule = do
+    registerParametrisedEventHandler editorFilePathChange handleFilePathChangeEvent
+    where
+        handleFilePathChangeEvent :: Editor -> App()
+        handleFilePathChangeEvent e = do
+            liftIO $ putStrLn "got editor"
 
 debugColourPrefs :: HsColour.ColourPrefs
 debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }
@@ -617,7 +627,11 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
     ,
     getEditorFilePath = \_ -> return filePath
     ,    
-    setEditorFilePath = \editor filePath' -> return editor{ getEditorFilePath =  \_ -> return filePath' }
+    setEditorFilePath = \editor filePath' -> let editor' = editor{ getEditorFilePath =  \_ -> return filePath' }
+                                             in do
+                                                 liftIO $ setEditorTitle widget (tabTitleForFile filePath')
+                                                 emitParametrisedEvent "editor.filePath.change" editor'
+                                                 return editor'
     ,    
     getEditorContents = \_ -> liftIO $ do
         fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
@@ -638,6 +652,21 @@ numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
 liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
 liftTupledMaybe (xx, Just xy) = Just (xx, xy)
 liftTupledMaybe (_, Nothing) = Nothing
+
+setEditorTitle :: DrawingArea -> String -> IO ()
+setEditorTitle editorWidget title = do
+    mNotebook <- findParentNotebook (castToWidget editorWidget)
+    maybeDo (\(notebook, tabWidget) -> notebookSetTabLabelText notebook tabWidget title) mNotebook
+    
+    where
+        findParentNotebook :: Widget -> IO (Maybe (Notebook, Widget))
+        findParentNotebook widget = do
+            mParent <- widgetGetParent widget
+            case mParent of
+                Just parent -> if parent `isA` gTypeNotebook then
+                                   return $ Just (castToNotebook parent, widget)
+                               else findParentNotebook parent
+                Nothing -> return $ Nothing
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
@@ -696,8 +725,10 @@ newEditorForText targetNotebook filePath text = do
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
             _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
             _ <- editorWidget `on` buttonPressEvent $ liftIO $ widgetGrabFocus editorWidget >> return True
+            
+            let editor = toEditor editorWidget filePath fancyEditorDataHolder
 
-            return $ toEditor editorWidget filePath fancyEditorDataHolder
+            return editor
 
 modifyEditor :: MVar FancyEditor -> S.StateT FancyEditor IO () -> IO ()
 modifyEditor fancyEditorDataHolder comp = modifyMVar_ fancyEditorDataHolder $ S.execStateT comp
@@ -1335,14 +1366,7 @@ getEditorModes editor = do
     case mRet of
         Just ret -> return ret
         Nothing -> error "editor has no modes assigned"
-{-
-updateEditorTitle :: WidgetClass a => a -> Editor -> IO ()
-updateEditorTitle editorWidget editor = do
-    Just scrolledW <- widgetGetParent editorWidget
-    Just notebookW <- widgetGetParent scrolledW
-    let notebook = castToNotebook notebookW
-    notebookSetTabLabelText notebook scrolledW =<< tabTitleForEditor editor
--}
+
 fileNameQuark :: IO Quark
 fileNameQuark = quarkFromString "fileName"
 

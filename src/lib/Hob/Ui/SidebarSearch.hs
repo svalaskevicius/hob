@@ -210,7 +210,7 @@ newSideBarFileTreeSearch ctx = do
     let treeView = sidebarTree.uiContext $ ctx
     let searchEntry = sidebarTreeSearch.uiContext $ ctx
     index <- newMVar =<< runApp ctx initFileTreeIndex
-    runApp ctx $ registerEventHandler (Event "core.sidebar.reload") (initFileTreeIndex >>= (liftIO . swapMVar index) >> return())
+    runApp ctx $ registerEventHandler (EventName "core.sidebar.reload") (EventHandler . const $ initFileTreeIndex >>= (liftIO . swapMVar index) >> return())
     _ <- treeView `on` keyPressEvent $ do
         key <- eventKeyVal
         maybe (return False) startSearch $ keyToChar key

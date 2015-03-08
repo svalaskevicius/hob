@@ -1,7 +1,10 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE DeriveDataTypeable #-}
 
 module Hob.Context.Types (
     App,
+    EventName(..),
     EventBus(..),
     Context(..),
     PreviewCommandHandler(..),
@@ -13,9 +16,10 @@ module Hob.Context.Types (
     TextCommandMatcher,
     Mode(..),
     Event(..),
+    EventHandler(..),
     Editor(..),
     EditorList(..),
-    fromContext,
+    fromContext
     ) where
 
 import           Control.Monad.Reader
@@ -30,10 +34,19 @@ import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.DirectoryTree
 
+import Data.Typeable
 
 type App = ReaderT Context IO
 
-newtype Event = Event String deriving (Eq, Show)
+newtype EventName = EventName String deriving (Eq, Show)
+
+data Event = Event EventName | forall a. (Typeable a) => EventWithParams EventName a
+
+instance Show Event where
+    show (Event a) = "Event: " ++ (show a)
+    show (EventWithParams a _) = "Event: " ++ (show a)
+
+newtype EventHandler = EventHandler (Event -> App())
 
 data Editor = Editor {
     editorId           :: Editor -> App Int,
@@ -45,11 +58,11 @@ data Editor = Editor {
     setEditorFilePath  :: Editor -> Maybe FilePath -> App Editor,
     getEditorContents  :: Editor -> App Text,
     activateEditor     :: Editor -> Notebook -> App ()
-}
+} deriving (Typeable)
 
 data EventBus = EventBus {
-    addListener       :: Event -> App() -> IO(),
-    listenersForEvent :: Event -> IO [App()]
+    addListener       :: EventName -> EventHandler -> IO(),
+    listenersForEvent :: EventName -> IO [EventHandler]
 }
 
 data EditorList = EditorList {

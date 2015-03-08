@@ -45,7 +45,7 @@ enterMode mode = do
     updateActiveEditor $ \editor -> do
         editor' <- clearEditorModes editor
         runOnEditor enterEditorMode editor' mode
-    emitEvent $ Event "core.mode.change"
+    emitNamedEvent "core.mode.change"
     where clearEditorModes editor = do
               modes <- runOnEditor modeStack editor
               if not . null $ modes then do
@@ -61,7 +61,7 @@ activeModes = do
 exitLastMode :: App()
 exitLastMode = do
     updateActiveEditor $ \editor -> runOnEditor exitLastEditorMode editor
-    emitEvent $ Event "core.mode.change"
+    emitNamedEvent "core.mode.change"
 
 updateActiveEditor :: (Editor -> App Editor) -> App()
 updateActiveEditor actions = do

@@ -5,8 +5,7 @@ module Hob.Ui.Editor (
                getActiveEditor,
                invokeOnActiveEditor,
                getEditorText,
-               getEditorFromNotebookTab,
-               updateEditorTitle
+               getEditorFromNotebookTab
                ) where
 
 import           Control.Monad.Reader
@@ -67,6 +66,7 @@ gtkEditor sourceView = Editor
             
             , setEditorFilePath = \editor fp -> do
                 liftIO $ setSourceViewFilePath sourceView fp
+                liftIO $ updateEditorTitle sourceView
                 return editor
                 
             , getEditorContents = \_ -> liftIO $ do

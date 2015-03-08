@@ -68,7 +68,7 @@ reloadSidebarTree = do
     let fileTreeLoader = contextFileTreeLoader fileCtx
     liftIO $ LTS.treeStoreClear treeStore
     liftIO $ LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
-    emitEvent $ Event "core.sidebar.reload"
+    emitNamedEvent "core.sidebar.reload"
 
 
 activateSidebarPath :: TreeViewClass tv => tv -> TreePath -> IO ()
