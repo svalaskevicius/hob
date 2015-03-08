@@ -10,7 +10,6 @@ import           Graphics.UI.Gtk
 import           Hob.Context
 import           Hob.Context.UiContext
 import           Hob.Control
-import           Hob.Ui.Editor
 import           Hob.Ui.Editor.Fancy
 
 focusCommandEntryCommandHandler :: CommandHandler

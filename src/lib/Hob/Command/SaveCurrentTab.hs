@@ -5,13 +5,12 @@ module Hob.Command.SaveCurrentTab (
 
 import           Control.Monad.Reader
 import           Graphics.UI.Gtk
-import           Graphics.UI.Gtk.SourceView (SourceView)
 
 import           Hob.Context
 import           Hob.Context.FileContext
 import           Hob.Context.UiContext
 import           Hob.Control
-import           Hob.Ui.Editor
+import           Hob.Context.Editor
 
 type NewFileNameChooser = IO (Maybe FilePath)
 
@@ -30,30 +29,28 @@ saveCurrentEditorTab = CommandHandler Nothing (do
 
 saveCurrentEditorTabHandler :: NewFileNameChooser -> App()
 saveCurrentEditorTabHandler newFileNameChooser = do
-    ctx <- ask
-    maybeEditor <- liftIO $ getActiveEditor ctx
+    maybeEditor <- currentEditor
     maybeDo (saveInContext newFileNameChooser) maybeEditor
 
 
-saveInContext :: NewFileNameChooser -> SourceView -> App ()
+saveInContext :: NewFileNameChooser -> Editor -> App ()
 saveInContext newFileNameChooser editor = do
     ctx <- ask
-    liftIO $ saveEditor ctx
+    saveEditor ctx
     where fileWriter ctx = contextFileWriter . fileContext $ ctx
           saveEditor ctx = do
-              path <- getEditorFilePath editor
+              path <- getEditorFilePath editor editor
               case path of
                   Just filePath -> saveEditorContents ctx filePath
                   Nothing -> askForFile $ saveAsNewFile ctx
-          askForFile onSuccess = newFileNameChooser >>= maybe (return()) onSuccess
+          askForFile onSuccess = liftIO newFileNameChooser >>= maybe (return()) onSuccess
           saveAsNewFile ctx filePath = do
               saveEditorContents ctx filePath
-              setEditorFilePath editor $ Just filePath
-              updateEditorTitle editor
+              updateEditor editor $ (\e -> setEditorFilePath e e $ Just filePath)
+--              liftIO $ updateEditorTitle editor
 
           saveEditorContents ctx filePath = do
-              textBuf <- textViewGetBuffer editor
-              text <- get textBuf textBufferText
-              fileWriter ctx filePath text
-              textBuf `set` [textBufferModified := False]
+              text <- getEditorContents editor editor
+              liftIO $ fileWriter ctx filePath text
+--              textBuf `set` [textBufferModified := False]
               return ()

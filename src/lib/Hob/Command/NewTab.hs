@@ -6,7 +6,6 @@ module Hob.Command.NewTab (
 
 
 import           Control.Monad.Reader
-import           Data.Maybe              (mapMaybe)
 import           Data.Text               (pack)
 import           Graphics.UI.Gtk
 
@@ -25,20 +24,17 @@ editNewFileCommandHandler = CommandHandler Nothing editNewFile
 launchNewFileEditor :: Context -> Notebook -> NewFileEditorLauncher
 launchNewFileEditor ctx targetNotebook filePath = do
     let fileLoader = contextFileLoader . fileContext $ ctx
-    currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ targetNotebook
-    editorsForFile <- filterM (\(_, ed) -> isEditorFileMatching ed ) $ numberedJusts currentEditors
-    case alreadyLoadedPage editorsForFile of
-        Just nr -> notebookSetCurrentPage targetNotebook nr
-        Nothing -> maybeDo launchEditor =<< fileLoader filePath
+    editorsForFile <- filterM isEditorFileMatching =<< (getEditors . editors $ ctx)
+    case editorsForFile of
+        [e] -> runApp ctx $ activateEditor e e targetNotebook
+        _ -> maybeDo launchEditor =<< fileLoader filePath
 
     where launchEditor text = deferredRunner ctx $ launcherFunction targetNotebook (Just filePath) text
           isFancy = (reverse . take 6 . reverse $ filePath) == ".fancy"
           launcherFunction = if isFancy then Fancy.newEditorForText else newEditorForText
           isEditorFileMatching editor = do
-              f <- getEditorFilePath editor
+              f <- runApp ctx $ getEditorFilePath editor editor
               return $ maybe False (filePath ==) f
-          alreadyLoadedPage [(nr, _)] = Just nr
-          alreadyLoadedPage _ = Nothing
 
 editNewFile :: App()
 editNewFile = do
@@ -46,9 +42,3 @@ editNewFile = do
     let tabbed = mainNotebook.uiContext $ ctx
     newEditorForText tabbed Nothing $ pack ""
 
-liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
-liftTupledMaybe (x, Just y) = Just (x, y)
-liftTupledMaybe (_, Nothing) = Nothing
-
-numberedJusts :: [Maybe a] -> [(Int, a)]
-numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a

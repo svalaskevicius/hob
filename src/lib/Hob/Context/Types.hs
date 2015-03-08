@@ -21,8 +21,9 @@ module Hob.Context.Types (
 import           Control.Monad.Reader
 import           Data.Maybe               (isJust)
 import           Data.Monoid
-import           Graphics.UI.Gtk          (Modifier)
+import           Graphics.UI.Gtk          (Modifier, Notebook)
 import           GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Data.Text                  (Text)
 
 import           Hob.Context.FileContext
 import           Hob.Context.StyleContext
@@ -39,7 +40,11 @@ data Editor = Editor {
     enterEditorMode    :: Editor -> Mode -> App Editor,
     exitLastEditorMode :: Editor -> App Editor,
     modeStack          :: Editor -> App [Mode],
-    isCurrentlyActive  :: Editor -> App Bool
+    isCurrentlyActive  :: Editor -> App Bool,
+    getEditorFilePath  :: Editor -> App (Maybe FilePath),
+    setEditorFilePath  :: Editor -> Maybe FilePath -> App Editor,
+    getEditorContents  :: Editor -> App Text,
+    activateEditor     :: Editor -> Notebook -> App ()
 }
 
 data EventBus = EventBus {

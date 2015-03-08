@@ -13,13 +13,13 @@ import           Data.Generics
 import           Data.Graph
 import           Data.List                           (groupBy, sortBy, nubBy, sort)
 import           Data.Maybe                          (catMaybes, listToMaybe,
-                                                      maybeToList, isJust)
+                                                      maybeToList, isJust, mapMaybe)
 import  Control.Applicative
 import qualified Data.Map as M
 import Data.Map (Map)
 import           Data.Prizm.Color
 import           Data.Prizm.Color.CIE.LCH
-import           Data.Text                           (Text, unpack)
+import           Data.Text                           (Text, unpack, pack)
 import           Data.Traversable                    (traverse)
 import           Data.Tree
 import qualified Data.Vector                         as V
@@ -591,8 +591,8 @@ newFancyEditor errLabel pangoContext text = do
             widgetShowAll errLabel
         errorReporter Nothing = widgetHide errLabel
 
-toEditor :: DrawingArea -> Editor
-toEditor widget = Editor {
+toEditor :: DrawingArea -> Maybe FilePath -> MVar FancyEditor -> Editor
+toEditor widget filePath fancyEditorDataHolder = Editor {
     editorId = const . liftIO $ getEditorId widget
     ,
     enterEditorMode = \editor mode -> do
@@ -614,8 +614,30 @@ toEditor widget = Editor {
         ctx <- ask
         active <- liftIO $ getActiveEditor ctx
         return $ active == Just widget
+    ,
+    getEditorFilePath = \_ -> return filePath
+    ,    
+    setEditorFilePath = \editor filePath' -> return editor{ getEditorFilePath =  \_ -> return filePath' }
+    ,    
+    getEditorContents = \_ -> liftIO $ do
+        fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
+        let text = pack . unlines . textLines . sourceData $ fancyEditorData
+        return text
+    ,
+    activateEditor = \_ notebook -> liftIO $ do
+        currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ notebook
+        let editorsForFile = take 1 . filter (\(_, ed) -> widget == ed ) . numberedJusts $ currentEditors
+        case editorsForFile of
+            [(nr, _)] ->  notebookSetCurrentPage notebook nr
+            _ -> return()
 }
 
+numberedJusts :: [Maybe a] -> [(Int, a)]
+numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
+
+liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
+liftTupledMaybe (xx, Just xy) = Just (xx, xy)
+liftTupledMaybe (_, Nothing) = Nothing
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
@@ -675,7 +697,7 @@ newEditorForText targetNotebook filePath text = do
             _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
             _ <- editorWidget `on` buttonPressEvent $ liftIO $ widgetGrabFocus editorWidget >> return True
 
-            return $ toEditor editorWidget
+            return $ toEditor editorWidget filePath fancyEditorDataHolder
 
 modifyEditor :: MVar FancyEditor -> S.StateT FancyEditor IO () -> IO ()
 modifyEditor fancyEditorDataHolder comp = modifyMVar_ fancyEditorDataHolder $ S.execStateT comp

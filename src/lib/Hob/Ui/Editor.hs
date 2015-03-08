@@ -5,8 +5,6 @@ module Hob.Ui.Editor (
                getActiveEditor,
                invokeOnActiveEditor,
                getEditorText,
-               getEditorFilePath,
-               setEditorFilePath,
                getEditorFromNotebookTab,
                updateEditorTitle
                ) where
@@ -39,6 +37,7 @@ import           Hob.Context.FileContext
 import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.Control
+import Data.Maybe(mapMaybe)
 
 gtkEditor :: SourceView -> Editor
 gtkEditor sourceView = Editor
@@ -63,7 +62,33 @@ gtkEditor sourceView = Editor
                 ctx <- ask
                 active <- liftIO $ getActiveEditor ctx
                 return $ active == Just sourceView
+            
+            , getEditorFilePath = \_ -> liftIO $ getSourceViewFilePath sourceView
+            
+            , setEditorFilePath = \editor fp -> do
+                liftIO $ setSourceViewFilePath sourceView fp
+                return editor
+                
+            , getEditorContents = \_ -> liftIO $ do
+                  textBuf <- textViewGetBuffer sourceView
+                  text <- get textBuf textBufferText
+                  return text
+                  
+            , activateEditor = \_ notebook -> liftIO $ do
+                  currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ notebook
+                  let editorsForFile = take 1 . filter (\(_, ed) -> sourceView == ed ) . numberedJusts $ currentEditors
+                  case editorsForFile of
+                      [(nr, _)] ->  notebookSetCurrentPage notebook nr
+                      _ -> return()
             }
+
+numberedJusts :: [Maybe a] -> [(Int, a)]
+numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
+
+liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
+liftTupledMaybe (x, Just y) = Just (x, y)
+liftTupledMaybe (_, Nothing) = Nothing
+
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
@@ -111,7 +136,7 @@ newEditorForText targetNotebook filePath text = do
 
             _ <- buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
 
-            setEditorFilePath editor filePath
+            setSourceViewFilePath editor filePath
             return editor
 
 
@@ -159,18 +184,18 @@ tabTitleForFile Nothing = "(new file)"
 
 tabTitleForEditor :: SourceView -> IO String
 tabTitleForEditor editor = do
-    filePath <- getEditorFilePath editor
+    filePath <- getSourceViewFilePath editor
     buffer <- textViewGetBuffer editor
     modified <- buffer `get` textBufferModified
     return $ if modified then tabTitleForFile filePath ++ "*" else tabTitleForFile filePath
 
-setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
-setEditorFilePath editor filePath = do
+setSourceViewFilePath :: SourceView -> Maybe FilePath -> IO ()
+setSourceViewFilePath editor filePath = do
     quark <- fileNameQuark
     objectSetAttribute quark editor filePath
 
-getEditorFilePath :: SourceView -> IO (Maybe FilePath)
-getEditorFilePath editor = do
+getSourceViewFilePath :: SourceView -> IO (Maybe FilePath)
+getSourceViewFilePath editor = do
     quark <- fileNameQuark
     objectGetAttributeUnsafe quark editor
 
