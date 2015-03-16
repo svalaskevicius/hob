@@ -45,12 +45,11 @@ saveInContext newFileNameChooser editor = do
                   Nothing -> askForFile $ saveAsNewFile ctx
           askForFile onSuccess = liftIO newFileNameChooser >>= maybe (return()) onSuccess
           saveAsNewFile ctx filePath = do
-              saveEditorContents ctx filePath
               updateEditor editor $ (\e -> setEditorFilePath e e $ Just filePath)
---              liftIO $ updateEditorTitle editor
+              saveEditorContents ctx filePath
 
           saveEditorContents ctx filePath = do
               text <- getEditorContents editor editor
               liftIO $ fileWriter ctx filePath text
---              textBuf `set` [textBufferModified := False]
+              updateEditor editor (\e -> setModifiedState e e False)
               return ()

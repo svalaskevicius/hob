@@ -80,6 +80,12 @@ gtkEditor sourceView = Editor
                   case editorsForFile of
                       [(nr, _)] ->  notebookSetCurrentPage notebook nr
                       _ -> return()
+            
+            , setModifiedState = \editor newState -> do
+                  liftIO $ do
+                      textBuf <- textViewGetBuffer sourceView
+                      textBuf `set` [textBufferModified := newState]
+                  return editor
             }
 
 numberedJusts :: [Maybe a] -> [(Int, a)]

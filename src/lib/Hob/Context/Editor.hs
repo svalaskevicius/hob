@@ -6,7 +6,8 @@ module Hob.Context.Editor (
     exitLastMode,
     activeModes,
     getActiveCommands,
-    currentEditor
+    currentEditor,
+    editorById
     ) where
 
 import           Control.Concurrent.MVar
@@ -39,6 +40,14 @@ currentEditor = do
     return $
         if null active then Nothing
         else Just $ head active
+
+editorById :: Int -> App (Maybe Editor)
+editorById eid = do
+    editorList <- fromContext editors
+    matches <- filterM (\e -> (editorId e e) >>= (return . ((==)eid))) =<< liftIO (getEditors editorList)
+    return $
+        if null matches then Nothing
+        else Just $ head matches
 
 enterMode :: Mode -> App()
 enterMode mode = do

@@ -57,7 +57,8 @@ data Editor = Editor {
     getEditorFilePath  :: Editor -> App (Maybe FilePath),
     setEditorFilePath  :: Editor -> Maybe FilePath -> App Editor,
     getEditorContents  :: Editor -> App Text,
-    activateEditor     :: Editor -> Notebook -> App ()
+    activateEditor     :: Editor -> Notebook -> App (),
+    setModifiedState   :: Editor -> Bool -> App Editor
 } deriving (Typeable)
 
 data EventBus = EventBus {

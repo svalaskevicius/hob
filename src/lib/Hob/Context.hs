@@ -15,10 +15,12 @@ module Hob.Context (
     EditorList(..),
     initContext,
     runOnEditor,
+    editorById,
     enterMode,
     exitLastMode,
     activeModes,
     deferredRunner,
+    defer,
     registerEventHandler,
     registerParametrisedEventHandler,
     emitEvent,
@@ -77,6 +79,11 @@ runMessage  ctx (AppAction action) = runApp ctx action >> return ctx
 
 deferredRunner :: Context -> App() -> IO()
 deferredRunner ctx actions = postGUIAsync $ messageLoop ctx ctx $ AppAction actions
+
+defer :: App() -> App()
+defer actions = do
+    ctx <- ask
+    liftIO $ deferredRunner ctx actions
 
 initIdGenerator :: IO (IO Int)
 initIdGenerator = do

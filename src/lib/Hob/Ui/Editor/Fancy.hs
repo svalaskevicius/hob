@@ -1,9 +1,11 @@
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Hob.Ui.Editor.Fancy (
     newEditorForText, getActiveEditorWidget, initModule
     ) where
 
-import           Control.Concurrent.MVar             (MVar, modifyMVar_,
-                                                      newMVar, readMVar)
+import           Control.Concurrent.MVar             (MVar, modifyMVar_, putMVar, newEmptyMVar,
+                                                      readMVar)
 import           Control.Monad.Reader
 import qualified Control.Monad.State.Lazy            as S
 import           Data.Char                           (isPrint, isSpace)
@@ -131,19 +133,25 @@ data FancyEditor = FancyEditor {
     cursorHead     :: CursorHead,
     selectionHead  :: Maybe CursorHead,
     drawingOptions :: EditorDrawingOptions,
-    drawingData    :: EditorDrawingData
-}
-
-editorFilePathChange :: [Char]
-editorFilePathChange = "editor.filePath.change"
+    drawingData    :: EditorDrawingData,
+    editorApiId    :: Int,
+    emitInternalEditorEvent :: String -> IO(),
+    emitEditorEvent :: String -> IO(),
+    drawingAreaWidget :: DrawingArea
+} deriving Typeable
 
 initModule :: App()
 initModule = do
-    registerParametrisedEventHandler editorFilePathChange handleFilePathChangeEvent
+    registerParametrisedEventHandler "editor.filePath.change" updateEditorTitle
+    registerParametrisedEventHandler "editor.modified.change" updateEditorTitle
     where
-        handleFilePathChangeEvent :: Editor -> App()
-        handleFilePathChangeEvent e = do
-            liftIO $ putStrLn "got editor"
+        updateEditorTitle :: (MVar FancyEditor, Editor) -> App()
+        updateEditorTitle (fancyEditorHolder, editorApi) = do
+            filePath <- getEditorFilePath editorApi editorApi
+            facyEditor <- liftIO $ readMVar fancyEditorHolder
+            let modifiedState = isModified . sourceData $ facyEditor
+                widget = drawingAreaWidget facyEditor
+            liftIO $ setEditorTitle widget (tabTitleForFile filePath modifiedState) 
 
 debugColourPrefs :: HsColour.ColourPrefs
 debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }
@@ -582,19 +590,39 @@ newDrawingOptions pangoContext errorReporter = do
     }
 
 -- TODO: maybe add pango context, widget, scrolling widget
-newFancyEditor :: Label -> PangoContext -> Text -> IO FancyEditor
-newFancyEditor errLabel pangoContext text = do
-    dOptions <- newDrawingOptions pangoContext errorReporter
-    sd <- newSourceDataFromText text
-    dd <- newDrawingData Nothing pangoContext sd initialCursor initialCursor dOptions
-    return FancyEditor {
-        sourceData = sd,
-        cursorHead = initialCursor,
-        selectionHead = Nothing,
-        drawingOptions = dOptions,
-        drawingData = dd
-    }
+newFancyEditor :: DrawingArea -> Int -> Label -> PangoContext -> Text -> App (MVar FancyEditor)
+newFancyEditor widget newEditorId errLabel pangoContext text = do
+    ctx <- ask
+    liftIO $ do
+        holder <- newEmptyMVar
+        putMVar holder =<< createFancyEditor ctx holder
+        return holder
     where
+        createFancyEditor ctx holder = do
+            dOptions <- newDrawingOptions pangoContext errorReporter
+            sd <- newSourceDataFromText text
+            dd <- newDrawingData Nothing pangoContext sd initialCursor initialCursor dOptions
+            return FancyEditor {
+                sourceData = sd,
+                cursorHead = initialCursor,
+                selectionHead = Nothing,
+                drawingOptions = dOptions,
+                drawingData = dd,
+                editorApiId = newEditorId,
+                emitInternalEditorEvent = \name -> do
+                    deferredRunner ctx $ do
+                        me <- editorById newEditorId
+                        case me of
+                            Just e -> emitParametrisedEvent name (holder, e)
+                            Nothing -> return(),
+                emitEditorEvent = \name -> do
+                    deferredRunner ctx $ do
+                        me <- editorById newEditorId
+                        case me of
+                            Just e -> emitParametrisedEvent name e
+                            Nothing -> return(),
+                drawingAreaWidget = widget
+            }
         initialCursor = CursorHead 0 0 0
         errorReporter (Just err) = do
             labelSetText errLabel err
@@ -629,8 +657,7 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
     ,    
     setEditorFilePath = \editor filePath' -> let editor' = editor{ getEditorFilePath =  \_ -> return filePath' }
                                              in do
-                                                 liftIO $ setEditorTitle widget (tabTitleForFile filePath')
-                                                 emitParametrisedEvent "editor.filePath.change" editor'
+                                                 defer $ emitParametrisedEvent "editor.filePath.change" (fancyEditorDataHolder, editor')
                                                  return editor'
     ,    
     getEditorContents = \_ -> liftIO $ do
@@ -644,7 +671,22 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
         case editorsForFile of
             [(nr, _)] ->  notebookSetCurrentPage notebook nr
             _ -> return()
+    ,
+    setModifiedState = \editor newState -> do
+        liftIO $ modifyEditor fancyEditorDataHolder $ setEditorModifiedState newState
+        return editor
 }
+
+
+setEditorModifiedState :: Bool -> S.StateT FancyEditor IO ()
+setEditorModifiedState newState = do
+    source <- S.gets sourceData
+    let source' = source{isModified = newState}
+    emitter <- S.gets emitInternalEditorEvent
+    liftIO $ emitter "editor.modified.change"
+    S.modify $ \ed -> ed{sourceData = source'}
+  
+
 
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
@@ -675,7 +717,7 @@ newEditorForText targetNotebook filePath text = do
         editor <- createNewEditor ctx
         updateEditors (editors ctx) $ \oldEditors -> return $ oldEditors ++ [editor]
     where
-        title = tabTitleForFile filePath
+        title = tabTitleForFile filePath False
 
         newEditorWidget newId = do
             editorWidget <- drawingAreaNew
@@ -699,7 +741,8 @@ newEditorForText targetNotebook filePath text = do
             return pangoContext
 
         createNewEditor ctx = do
-            editorWidget <- newEditorWidget =<< idGenerator ctx
+            newEditorId <- idGenerator ctx
+            editorWidget <- newEditorWidget newEditorId
             scrolledWindow <- newEditorScrolls editorWidget
             
             overl <- overlayNew
@@ -720,7 +763,7 @@ newEditorForText targetNotebook filePath text = do
             
             pangoContext <- newPangoContext
 
-            fancyEditorDataHolder <- newMVar =<< newFancyEditor errorLabel pangoContext text
+            fancyEditorDataHolder <- runApp ctx $ newFancyEditor editorWidget newEditorId errorLabel pangoContext text
 
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
             _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
@@ -863,9 +906,9 @@ insertEditorText text = do
     let newLines = textSnippetToLines text
         events = [InsertText (Point cx cy) newLines]
     source' <- liftIO $ newSourceData (Left (source, events))
-    let source'' = source'{isModified = True}
-        (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
-    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead cx' cy' cx'}
+    let (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
+    S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead cx' cy' cx'}
+    setEditorModifiedState True
 
 insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
@@ -873,9 +916,9 @@ insertEditorChar c = do
     CursorHead cx cy _ <- S.gets cursorHead
     let events = [InsertText (Point cx cy) (textSnippetToLines [c])]
     source' <- liftIO $ newSourceData (Left (source, events))
-    let source'' = source'{isModified = True}
-        (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
-    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead cx' cy' cx'}
+    let (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
+    S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead cx' cy' cx'}
+    setEditorModifiedState True
 
 deleteCharacterRange :: Point Int -> Point Int -> S.StateT FancyEditor IO ()
 deleteCharacterRange startPoint@(Point sx sy) endPoint = do
@@ -883,8 +926,8 @@ deleteCharacterRange startPoint@(Point sx sy) endPoint = do
     deletedText <- getTextInRange startPoint endPoint
     let deletedLines = textSnippetToLines deletedText
     source' <- liftIO $ newSourceData (Left (source, [DeleteText startPoint deletedLines]))
-    let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead sx sy sx}
+    S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead sx sy sx}
+    setEditorModifiedState True
         
 
 deleteCharactersFromCursor :: Int -> S.StateT FancyEditor IO ()
@@ -923,8 +966,8 @@ insertNewLine = do
     source <- S.gets sourceData
     CursorHead cx cy _ <- S.gets cursorHead
     source' <- liftIO $ newSourceData (Left (source, [InsertText (Point cx cy) (textSnippetToLines "\n")])) -- tLines'
-    let source'' = source'{isModified = True}
-    S.modify $ \ed -> ed{sourceData = source'', cursorHead = CursorHead 0 (cy+1) 0}
+    S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead 0 (cy+1) 0}
+    setEditorModifiedState True
 
 inSelectionMode :: S.StateT FancyEditor IO ()
 inSelectionMode = do
@@ -964,12 +1007,12 @@ undoLast = do
         let reversedEvents = reverseEditorEvent currentEvent
         source' <- liftIO $ newSourceData (Left (source, reversedEvents))
         let source'' = source'{
-                           isModified = True,
                            history = restOfTheEvents,
                            undoneHistory = currentEvent : (undoneHistory source')
                        }
         S.modify $ \ed -> ed{sourceData = source''}
         adjustCursorsByEvents reversedEvents
+        setEditorModifiedState True
 
 redoLast :: S.StateT FancyEditor IO ()
 redoLast = do
@@ -980,11 +1023,11 @@ redoLast = do
         let (currentEvent, restOfTheEvents) = splitAt 1 eventHistory
         source' <- liftIO $ newSourceData (Left (source, currentEvent))
         let source'' = source'{
-                           isModified = True,
                            undoneHistory = restOfTheEvents
                        }
         S.modify $ \ed -> ed{sourceData = source''}
         adjustCursorsByEvents currentEvent
+        setEditorModifiedState True
 
 adjustCursorsByEvents :: [SourceChangeEvent] -> S.StateT FancyEditor IO ()
 adjustCursorsByEvents events = do
@@ -1331,10 +1374,12 @@ getActiveEditorTab ctx = do
         return $ Just $ tabs!!pageNum
     where tabbed = mainNotebook.uiContext $ ctx
 
-tabTitleForFile :: Maybe FilePath -> String
-tabTitleForFile (Just filePath) = filename' filePath
-    where filename' = encodeString . filename . decodeString
-tabTitleForFile Nothing = "(new file)"
+tabTitleForFile :: Maybe FilePath -> Bool -> String
+tabTitleForFile mFilePath modifiedState = if modifiedState then baseTitle mFilePath ++ "*" else baseTitle mFilePath
+    where
+        baseTitle (Just filePath) = filename' filePath
+        baseTitle Nothing = "(new file)"
+        filename' = encodeString . filename . decodeString
 
 setEditorWidgetFilePath :: WidgetClass a => a -> Maybe FilePath -> IO ()
 setEditorWidgetFilePath editor filePath = do
