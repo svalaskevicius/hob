@@ -58,7 +58,16 @@ data Editor = Editor {
     setEditorFilePath  :: Editor -> Maybe FilePath -> App Editor,
     getEditorContents  :: Editor -> App Text,
     activateEditor     :: Editor -> Notebook -> App (),
-    setModifiedState   :: Editor -> Bool -> App Editor
+    setModifiedState   :: Editor -> Bool -> App Editor,
+    highlightSearchPreview :: Editor -> String -> App Editor,
+    resetSearchPreview     :: Editor -> App Editor,
+    findFirstFromCursor    :: Editor -> String -> App Editor,
+    findNext               :: Editor -> App Editor,
+    findPrevious           :: Editor -> App Editor,
+    resetSearch            :: Editor -> App Editor,
+    startReplace           :: Editor -> String -> String -> App Editor,
+    replaceNext            :: Editor -> App Editor,
+    resetReplace           :: Editor -> App Editor
 } deriving (Typeable)
 
 data EventBus = EventBus {

@@ -7,7 +7,8 @@ module Hob.Context.Editor (
     activeModes,
     getActiveCommands,
     currentEditor,
-    editorById
+    editorById,
+    updateActiveEditor
     ) where
 
 import           Control.Concurrent.MVar

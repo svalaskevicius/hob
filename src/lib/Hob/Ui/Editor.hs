@@ -36,6 +36,8 @@ import           Hob.Context.FileContext
 import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.Control
+import qualified Hob.Ui.Editor.Search as ES
+
 import Data.Maybe(mapMaybe)
 
 gtkEditor :: SourceView -> Editor
@@ -80,12 +82,50 @@ gtkEditor sourceView = Editor
                   case editorsForFile of
                       [(nr, _)] ->  notebookSetCurrentPage notebook nr
                       _ -> return()
-            
+                  liftIO $ widgetGrabFocus sourceView
+
             , setModifiedState = \editor newState -> do
                   liftIO $ do
                       textBuf <- textViewGetBuffer sourceView
                       textBuf `set` [textBufferModified := newState]
                   return editor
+                  
+            , highlightSearchPreview = \editor text -> liftIO $ do
+                  ES.highlightSearchPreview sourceView text
+                  return editor
+
+            , resetSearchPreview = \editor -> liftIO $ do
+                  ES.resetSearchPreview sourceView
+                  return editor
+            
+            , findFirstFromCursor = \editor text -> liftIO $ do
+                  ES.findFirstFromCursor sourceView text
+                  return editor
+
+            , findNext = \editor -> liftIO $ do
+                  ES.findNext sourceView
+                  return editor
+            
+            , findPrevious = \editor -> liftIO $ do
+                  ES.findPrevious sourceView
+                  return editor
+            
+            , resetSearch = \editor -> liftIO $ do
+                  ES.resetSearch sourceView
+                  return editor
+            
+            , startReplace = \editor search replace -> liftIO $ do
+                  ES.startReplace sourceView search replace
+                  return editor
+            
+            , replaceNext = \editor -> liftIO $ do
+                  ES.replaceNext sourceView
+                  return editor
+            
+            , resetReplace = \editor -> liftIO $ do
+                  ES.resetReplace sourceView
+                  return editor
+            
             }
 
 numberedJusts :: [Maybe a] -> [(Int, a)]
