@@ -22,6 +22,7 @@ import Data.Map (Map)
 import           Data.Prizm.Color
 import           Data.Prizm.Color.CIE.LCH
 import           Data.Text                           (Text, unpack, pack)
+import    qualified       Data.Text                as T
 import           Data.Traversable                    (traverse)
 import           Data.Tree
 import qualified Data.Vector                         as V
@@ -71,13 +72,13 @@ data ColouredRange = ColouredRange
                         ColourGroup -- ^ colour group
                     deriving (Show, Eq)
 
-data SourceChangeEvent = InsertText (Point Int) [String] -- ^ Point (col, line) before the inserted text lines
-                       | DeleteText (Point Int) [String] -- ^ Point (col, line) before the deleted text lines
+data SourceChangeEvent = InsertText (Point Int) [Text] -- ^ Point (col, line) before the inserted text lines
+                       | DeleteText (Point Int) [Text] -- ^ Point (col, line) before the deleted text lines
         deriving (Show)
         
 data SourceData = SourceData {
     isModified                :: Bool,
-    textLines                 :: [String],
+    textLines                 :: [Text],
     ast                       :: Maybe (P.Module P.SrcSpanInfo, [P.Comment]),
     parseErrorMessage         :: Maybe (Point Int, String),
     functionDefCache          :: FunctionCache,
@@ -280,25 +281,25 @@ findVariableDependencies funcCache oldVarDeps decls =
 newSourceDataFromText :: Text -> IO SourceData
 newSourceDataFromText text = newSourceData $ Right newTextLines
     where
-        newTextLines = lines . unpack $ text
+        newTextLines = T.lines text
 
-movePointByTextLines :: PointI -> [String] -> PointI
+movePointByTextLines :: PointI -> [Text] -> PointI
 movePointByTextLines (Point px py) tLines = 
     if multiline then Point lastXOfLastLine py' else Point (px+lengthOfFirstLine) py
     where
         lineLength = length tLines
         multiline = lineLength > 1
         py' = py + lineLength - 1
-        lastXOfLastLine = length . last $ tLines ++ [""]
-        lengthOfFirstLine = length . head $ tLines ++ [""]
+        lastXOfLastLine = T.length . last $ tLines ++ [T.empty]
+        lengthOfFirstLine = T.length . head $ tLines ++ [T.empty]
 
 
 adjustPointByEvent :: SourceChangeEvent -> Point Int -> Point Int
 adjustPointByEvent (InsertText (Point pColumn pLine) newLines) (Point px py) = Point px' py'
     where
         multiline = length newLines > 1
-        px' = if multiline then if (pLine == py && pColumn <= px) then (length . last $ newLines) else px
-              else if (pLine == py && pColumn <= px) then px + (length . head $ newLines) else px
+        px' = if multiline then if (pLine == py && pColumn <= px) then (T.length . last $ newLines) else px
+              else if (pLine == py && pColumn <= px) then px + (T.length . head $ newLines) else px
         py' = if (pLine == py && pColumn <= px) || (pLine < py) then py + (length newLines - 1) else py
 adjustPointByEvent (DeleteText p@(Point sColumn sLine) tLines) (Point px py) = Point px' py'
     where
@@ -313,33 +314,35 @@ reverseEditorEvent (InsertText p l) = [DeleteText p l]
 reverseEditorEvent (DeleteText p l) = [InsertText p l]
 
 -- TODO: vector for lines?
-newSourceData :: Either (SourceData, [SourceChangeEvent]) [String] -> IO SourceData
+newSourceData :: Either (SourceData, [SourceChangeEvent]) [Text] -> IO SourceData
 newSourceData infoSource = do
 --    debugPrint $ parseErrorMessage sd
     return sd
     where
         sourceHistory = either Just (const Nothing) infoSource
-        newTextLines = either (sourceUpdatedByEvents) id infoSource
+        newTextLines :: [Text]
+        newTextLines = either sourceUpdatedByEvents id infoSource
+        sourceUpdatedByEvents :: (SourceData, [SourceChangeEvent]) -> [Text]
         sourceUpdatedByEvents (oldSource, events)= foldl playEventOnText (textLines oldSource) events
             where
                 playEventOnText tLines (InsertText (Point px py) newLines) = 
                     let (preLines, allPostLines) = splitAt py tLines
                         (currentLine, postLines) = splitAt 1 allPostLines
-                        [(preText, postText)] = map (splitAt px) currentLine
+                        [(preText, postText)] = map (T.splitAt px) currentLine
                         newLines' = if null currentLine then newLines 
-                                    else let leadingText = map ((++) preText) . take 1 $ newLines
+                                    else let leadingText = map (T.append preText) . take 1 $ newLines
                                              (middleText, lastTextLine) = (splitAt (length newLines - 2) . drop 1 $ newLines)
-                                             lastLine = map (flip (++) postText) lastTextLine
-                                             singleLineText = map (flip (++) postText) leadingText
+                                             lastLine = map (flip T.append postText) lastTextLine
+                                             singleLineText = map (flip T.append postText) leadingText
                                          in if length newLines == 1 then singleLineText else leadingText ++ middleText ++ lastLine
                     in preLines ++ newLines' ++ postLines
                 playEventOnText tLines (DeleteText p@(Point px py) deletedLines) = 
                     let (preLines, postLines1) = splitAt py tLines
                         (Point ex ey) = movePointByTextLines p deletedLines
                         postLines2 = drop (ey-py) postLines1
-                        startLine1 = map (take px) . take 1 $ postLines1
-                        startLine2 = map (drop ex) . take 1 $ postLines2
-                        startLine = (++) <$> startLine1 <*> startLine2
+                        startLine1 = map (T.take px) . take 1 $ postLines1
+                        startLine2 = map (T.drop ex) . take 1 $ postLines2
+                        startLine = T.append <$> startLine1 <*> startLine2
                     in preLines ++ startLine ++ (drop 1 postLines2)
 
 
@@ -362,7 +365,7 @@ newSourceData infoSource = do
                         Just oldAst -> let notChangedDecls = (filter isNotChangedDecl . allCachedDecls $ oldAst)
                                           in addStaleDeclsOnFailure $ addCachedDecls (parseModuleMinusDecls notChangedDecls) notChangedDecls
             where
-                parseModuleLines textToParse = case P.parseFileContentsWithComments P.defaultParseMode . unlines $ textToParse of
+                parseModuleLines textToParse = case P.parseFileContentsWithComments P.defaultParseMode . T.unpack . T.unlines $ textToParse of
                     P.ParseOk astInfo -> (Just astInfo, Nothing)
                     P.ParseFailed srcLoc msg -> (Nothing, Just (srcLoc, msg))                                
                 parseFullModule = parseModuleLines newTextLines
@@ -411,10 +414,10 @@ newSourceData infoSource = do
                             where
                                 prefix = take (startLine - 1) tLines
                                 body = if (endLine == startLine) then singleLineBody else multiLineBody
-                                singleLineBody =  (map (\l -> (take (startCol - 1) l) ++ (replicate (endCol - startCol +1) ' ') ++ (drop endCol l)) . take 1 . drop (startLine - 1) $ tLines)
-                                multiLineBody =  (map (take (startCol - 1)) . take 1 . drop (startLine - 1) $ tLines)
-                                              ++ (replicate (endLine - startLine - 1) "")
-                                              ++ (map (\l -> (replicate (endCol) ' ') ++ (drop endCol l)) . take 1 . drop (endLine - 1) $ tLines)
+                                singleLineBody =  (map (\l -> (T.take (startCol - 1) l) `T.append` (T.pack $ replicate (endCol - startCol +1) ' ') `T.append` (T.drop endCol l)) . take 1 . drop (startLine - 1) $ tLines)
+                                multiLineBody =  (map (T.take (startCol - 1)) . take 1 . drop (startLine - 1) $ tLines)
+                                              ++ (replicate (endLine - startLine - 1) T.empty)
+                                              ++ (map (\l -> (T.pack $ replicate (endCol) ' ') `T.append` (T.drop endCol l)) . take 1 . drop (endLine - 1) $ tLines)
                                 suffix = (drop (endLine ) $ tLines)
                         rangesToBlankout = map (P.srcInfoSpan . adjustInfoSpanByEvents . P.ann) decls
                 addCachedDecls (Just (P.Module loc headers pragmas imports decls, comments), err) oldDecls = (Just (P.Module loc headers pragmas imports ((updateDeclsByEvents oldDecls)++decls), comments), err)
@@ -513,10 +516,10 @@ newDrawingData oldData pangoContext source cursor@(CursorHead cursorCharNr curso
                 leftMostCharBetween l1 l2 = maximum . (0:) $ lineWhiteSpacePrefixWidths
                     where
                         lineTextRange = take (l2-l1) . drop (l1) $ (textLines source)
-                        lineWhiteSpacePrefixes :: [String]
-                        lineWhiteSpacePrefixes = map (takeWhile isSpace) lineTextRange
+                        lineWhiteSpacePrefixes :: [Text]
+                        lineWhiteSpacePrefixes = map (T.takeWhile isSpace) lineTextRange
                         lineWhiteSpacePrefixLengths :: [Int]
-                        lineWhiteSpacePrefixLengths = map length lineWhiteSpacePrefixes
+                        lineWhiteSpacePrefixLengths = map T.length lineWhiteSpacePrefixes
                         lineWhiteSpacePrefixWidths :: [Double]
                         lineWhiteSpacePrefixWidths = zipWith (\l w -> sum $ take l w) lineWhiteSpacePrefixLengths lineWidthRange
                         lineWidthRange :: [[Double]]
@@ -662,7 +665,7 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
     ,    
     getEditorContents = \_ -> liftIO $ do
         fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
-        let text = pack . unlines . textLines . sourceData $ fancyEditorData
+        let text = T.unlines . textLines . sourceData $ fancyEditorData
         return text
     ,
     activateEditor = \_ notebook -> liftIO $ do
@@ -677,7 +680,7 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
         return editor
     ,
     highlightSearchPreview = \editor text -> liftIO $ do
-        liftIO $ modifyEditor fancyEditorDataHolder $ setEditorModifiedState newState
+        liftIO $ modifyEditor fancyEditorDataHolder $ fancyHighlightSearchPreview text
         return editor
     ,
     resetSearchPreview = \editor -> liftIO $ do
@@ -713,6 +716,12 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
         return editor
             
 }
+
+fancyHighlightSearchPreview :: String -> S.StateT FancyEditor IO ()
+fancyHighlightSearchPreview text = do
+    source <- S.gets sourceData
+    let tLines = textLines source
+    return()
 
 
 setEditorModifiedState :: Bool -> S.StateT FancyEditor IO ()
@@ -824,7 +833,7 @@ updateDrawingData pangoContext = do
     S.modify $ \ed -> ed{drawingData = dData'}
 
 nrOfCharsOnCursorLine :: Int -> S.StateT FancyEditor IO Int
-nrOfCharsOnCursorLine yPos = liftM (maybe 0 length . listToMaybe . take 1 . drop yPos . textLines) $ S.gets sourceData
+nrOfCharsOnCursorLine yPos = liftM (maybe 0 T.length . listToMaybe . take 1 . drop yPos . textLines) $ S.gets sourceData
 
 clampCursorX :: Int -> Int -> S.StateT FancyEditor IO Int
 clampCursorX yPos pos
@@ -850,7 +859,7 @@ moveCursorToTheEndOfTheLine = do
     CursorHead _ cy _ <- S.gets cursorHead
     let tLines = textLines source
         cx' = case take 1 . drop cy $ tLines of
-            [l] -> length l
+            [l] -> T.length l
             _ -> 0
     S.modify $ \ed -> ed{cursorHead = CursorHead cx' cy cx'}
 
@@ -899,7 +908,7 @@ deleteSelectedText = do
             else if c1 < c2 then deleteCharacterRange (Point x1 y1) (Point x2 y2)
             else deleteCharacterRange (Point x2 y2) (Point x1 y1)
 
-getSelectedText :: S.StateT FancyEditor IO (Maybe String)
+getSelectedText :: S.StateT FancyEditor IO (Maybe Text)
 getSelectedText = do
     selection <- S.gets selectionHead
     cursor <- S.gets cursorHead
@@ -910,17 +919,17 @@ getSelectedText = do
             else if c1 < c2 then return . Just =<< getTextInRange (Point x1 y1) (Point x2 y2)
             else return . Just =<< getTextInRange (Point x2 y2) (Point x1 y1)
 
-getTextInRange :: PointI -> PointI -> S.StateT FancyEditor IO String
+getTextInRange :: PointI -> PointI -> S.StateT FancyEditor IO Text
 getTextInRange (Point x1 y1) (Point x2 y2) = do
     source <- S.gets sourceData
     let tLines = textLines source
         postLines = take (y2-y1+1) . drop y1 $ tLines
-        firstLine = map (drop x1) . take 1 $ postLines
+        firstLine = map (T.drop x1) . take 1 $ postLines
         (midLines, fullLastLine) = splitAt (y2-y1-1) . drop 1 $ postLines
-        lastLine = map (take x2) fullLastLine
+        lastLine = map (T.take x2) fullLastLine
         multiline = y2 > y1
-        singleLine = head $ (map (take (x2-x1)) firstLine) ++ [""]
-        multipleLines = (unlines $ firstLine ++ midLines) ++ (head $ lastLine ++ [""])
+        singleLine = head $ (map (T.take (x2-x1)) firstLine) ++ [T.empty]
+        multipleLines = (T.unlines $ firstLine ++ midLines) `T.append` (head $ lastLine ++ [T.empty])
     return $ if multiline then multipleLines else singleLine
 
 putSelectedTextToClipboard :: S.StateT FancyEditor IO ()
@@ -932,10 +941,10 @@ putSelectedTextToClipboard = do
             cb <- clipboardGet selectionClipboard
             clipboardSetText cb text
 
-textSnippetToLines :: String -> [String]
-textSnippetToLines text = lines text ++ (if null text then [] else if last text == '\n' then [""] else [])
+textSnippetToLines :: Text -> [Text]
+textSnippetToLines text = (T.lines text) ++ (if T.null text then [] else if T.last text == '\n' then [T.empty] else [])
 
-insertEditorText :: String -> S.StateT FancyEditor IO ()
+insertEditorText :: Text -> S.StateT FancyEditor IO ()
 insertEditorText text = do
     source <- S.gets sourceData
     CursorHead cx cy _ <- S.gets cursorHead
@@ -950,7 +959,7 @@ insertEditorChar :: Char -> S.StateT FancyEditor IO ()
 insertEditorChar c = do
     source <- S.gets sourceData
     CursorHead cx cy _ <- S.gets cursorHead
-    let events = [InsertText (Point cx cy) (textSnippetToLines [c])]
+    let events = [InsertText (Point cx cy) (textSnippetToLines (T.singleton c))]
     source' <- liftIO $ newSourceData (Left (source, events))
     let (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
     S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead cx' cy' cx'}
@@ -973,9 +982,9 @@ deleteCharactersFromCursor amount = do
     let tLines = textLines source
         (preLines, postLines) = splitAt cy tLines
         (startx, endx) = if amount > 0 then (cx, cx+amount) else (cx+amount, cx)
-        (startx', adjsy) = adjustNegativePosByLengths (cx : (map length . reverse $ preLines)) startx
+        (startx', adjsy) = adjustNegativePosByLengths (cx : (map T.length . reverse $ preLines)) startx
         starty' = max 0 $ cy + adjsy
-        (endx', adjey) = adjustPositivePosByLengths (map length $ postLines) endx
+        (endx', adjey) = adjustPositivePosByLengths (map T.length $ postLines) endx
         endy' = cy + adjey
     deleteCharacterRange (Point startx' starty') (Point endx' endy')
     where
@@ -1001,7 +1010,7 @@ insertNewLine :: S.StateT FancyEditor IO ()
 insertNewLine = do
     source <- S.gets sourceData
     CursorHead cx cy _ <- S.gets cursorHead
-    source' <- liftIO $ newSourceData (Left (source, [InsertText (Point cx cy) (textSnippetToLines "\n")])) -- tLines'
+    source' <- liftIO $ newSourceData (Left (source, [InsertText (Point cx cy) (textSnippetToLines (T.singleton '\n'))])) -- tLines'
     S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead 0 (cy+1) 0}
     setEditorModifiedState True
 
@@ -1144,7 +1153,7 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
                  else ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
 
 -- | [(String, [(Int, Int)]) = [(line, [ColouredRange])]
-getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(String, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
+getLineShapesWithWidths :: TextShapeCache -> PangoContext -> [(Text, [ColouredRange])] -> IO (TextShapeCache, [[(Double, ColourGroup, GlyphItem)]], [[Double]])
 getLineShapesWithWidths textShapeCache pangoContext linesToDraw = do
     (pangoLineShapeData, textShapeCache') <- S.runStateT (mapM (\partLine -> do
             (return . concat) =<< mapM partLineToShapes partLine
@@ -1155,7 +1164,7 @@ getLineShapesWithWidths textShapeCache pangoContext linesToDraw = do
         lineWordWidths = map (map (\(_, _, w) -> w)) pangoLineShapeData
     return (textShapeCache', sizedLineShapes pangoLineShapes extents, map concat lineWordWidths)
     where
-        lineParts = map (\(line, pieces) -> listToPieces (relativePiecePositions pieces) line) breakPointedLines
+        lineParts = map (\(line, pieces) -> listToPieces (relativePiecePositions pieces) (T.unpack line)) breakPointedLines
 
         partLineToShapes partLine = do
             cache <- S.get
