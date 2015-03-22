@@ -675,6 +675,43 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
     setModifiedState = \editor newState -> do
         liftIO $ modifyEditor fancyEditorDataHolder $ setEditorModifiedState newState
         return editor
+    ,
+    highlightSearchPreview = \editor text -> liftIO $ do
+        liftIO $ modifyEditor fancyEditorDataHolder $ setEditorModifiedState newState
+        return editor
+    ,
+    resetSearchPreview = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    findFirstFromCursor = \editor text -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    findNext = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    findPrevious = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    resetSearch = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    startReplace = \editor search replace -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    replaceNext = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+    ,
+    resetReplace = \editor -> liftIO $ do
+        error "not implemented"
+        return editor
+            
 }
 
 
@@ -686,8 +723,7 @@ setEditorModifiedState newState = do
     liftIO $ emitter "editor.modified.change"
     S.modify $ \ed -> ed{sourceData = source'}
   
-
-
+  
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
 
