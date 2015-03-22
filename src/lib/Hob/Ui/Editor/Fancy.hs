@@ -23,6 +23,8 @@ import           Data.Prizm.Color
 import           Data.Prizm.Color.CIE.LCH
 import           Data.Text                           (Text, unpack, pack)
 import    qualified       Data.Text                as T
+import Data.Text.Internal.Search (indices)
+
 import           Data.Traversable                    (traverse)
 import           Data.Tree
 import qualified Data.Vector                         as V
@@ -79,6 +81,7 @@ data SourceChangeEvent = InsertText (Point Int) [Text] -- ^ Point (col, line) be
 data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [Text],
+    textHighlights            :: [[(Int, Int)]],
     ast                       :: Maybe (P.Module P.SrcSpanInfo, [P.Comment]),
     parseErrorMessage         :: Maybe (Point Int, String),
     functionDefCache          :: FunctionCache,
@@ -138,7 +141,8 @@ data FancyEditor = FancyEditor {
     editorApiId    :: Int,
     emitInternalEditorEvent :: String -> IO(),
     emitEditorEvent :: String -> IO(),
-    drawingAreaWidget :: DrawingArea
+    drawingAreaWidget :: DrawingArea,
+    redraw :: S.StateT FancyEditor IO ()
 } deriving Typeable
 
 initModule :: App()
@@ -322,6 +326,7 @@ newSourceData infoSource = do
         sourceHistory = either Just (const Nothing) infoSource
         newTextLines :: [Text]
         newTextLines = either sourceUpdatedByEvents id infoSource
+        newTextHighlights = either (textHighlights . fst) (const []) infoSource
         sourceUpdatedByEvents :: (SourceData, [SourceChangeEvent]) -> [Text]
         sourceUpdatedByEvents (oldSource, events)= foldl playEventOnText (textLines oldSource) events
             where
@@ -460,6 +465,7 @@ newSourceData infoSource = do
         sd = SourceData {
             isModified = False,
             textLines = newTextLines,
+            textHighlights = newTextHighlights,
             ast = parsedModule,
             parseErrorMessage = fmap (\(loc, msg) -> (srcLocToPoint loc, msg)) errorMessage,
             functionDefCache = funcDefCache,
@@ -624,7 +630,10 @@ newFancyEditor widget newEditorId errLabel pangoContext text = do
                         case me of
                             Just e -> emitParametrisedEvent name e
                             Nothing -> return(),
-                drawingAreaWidget = widget
+                drawingAreaWidget = widget,
+                redraw = do
+                    updateDrawingData pangoContext
+                    liftIO $ widgetQueueDraw widget
             }
         initialCursor = CursorHead 0 0 0
         errorReporter (Just err) = do
@@ -680,11 +689,11 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
         return editor
     ,
     highlightSearchPreview = \editor text -> liftIO $ do
-        liftIO $ modifyEditor fancyEditorDataHolder $ fancyHighlightSearchPreview text
+        liftIO $ modifyEditor fancyEditorDataHolder $ fancyHighlightSearchPreview (T.pack text)
         return editor
     ,
     resetSearchPreview = \editor -> liftIO $ do
-        error "not implemented"
+--        error "not implemented"
         return editor
     ,
     findFirstFromCursor = \editor text -> liftIO $ do
@@ -717,11 +726,18 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
             
 }
 
-fancyHighlightSearchPreview :: String -> S.StateT FancyEditor IO ()
-fancyHighlightSearchPreview text = do
+fancyHighlightSearchPreview :: Text -> S.StateT FancyEditor IO ()
+fancyHighlightSearchPreview text 
+ | T.null text = error "empty text to preview"
+ | otherwise = do
     source <- S.gets sourceData
     let tLines = textLines source
-    return()
+        len = T.length text
+        foundIndices = map (map (flip (,) len) . indices text) $ tLines
+        source' = source{textHighlights = foundIndices}
+    S.modify $ \ed -> ed{sourceData = source'}
+    invokeDraw <- S.gets redraw
+    invokeDraw
 
 
 setEditorModifiedState :: Bool -> S.StateT FancyEditor IO ()
@@ -1091,9 +1107,9 @@ invokeEditorCommand :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEdito
 invokeEditorCommand fancyEditorDataHolder editorWidget pangoContext scrolledWindow cmd  = do
     modifyEditor fancyEditorDataHolder $ do
         cmd
-        updateDrawingData pangoContext
         scrollEditorToCursor scrolledWindow
-    widgetQueueDraw editorWidget
+        invokeDraw <- S.gets redraw
+        invokeDraw
 
 keyEventHandler :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> EventM EKey Bool
 keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow = do

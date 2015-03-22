@@ -24,6 +24,7 @@ searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
 searchPreview :: String -> App()
+searchPreview "" = searchResetPreview
 searchPreview text = updateActiveEditor (flip (runOnEditor highlightSearchPreview) text)
 
 searchReset :: App()
