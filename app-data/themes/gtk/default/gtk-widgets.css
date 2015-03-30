@@ -47,6 +47,8 @@
     /* outline-radius: 4px; unsupported by older gtk */
     outline-style: dashed;
     outline-color: @internal_element_color;
+
+    font: sans-serif 14px;
 }
 
 /***************
@@ -2173,6 +2175,6 @@ GsmFailWhaleDialog .button:active {
 GtkSourceView {
     background-color: @theme_bg_color;
     color: @theme_fg_color;
-    font: monospace;
+    font: Monaco 16;
 }
 

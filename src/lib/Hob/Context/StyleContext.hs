@@ -37,4 +37,4 @@ sourceStyleScheme ctx _ = do
     return $ Just style
 
 sourceStyleFont :: StyleContext -> Maybe FilePath -> IO (Maybe FontDescription)
-sourceStyleFont _ _ = liftM Just $ fontDescriptionFromString "monospace 12"
+sourceStyleFont _ _ = liftM Just $ fontDescriptionFromString "Monaco 16"

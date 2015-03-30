@@ -796,7 +796,7 @@ newEditorForText targetNotebook filePath text = do
         newPangoContext = do
             pangoContext <- cairoCreateContext Nothing
             fontDescription <- fontDescriptionNew
-            fontDescriptionSetFamily fontDescription "Ubuntu Mono"
+            fontDescriptionSetFamily fontDescription "Monaco"
             fontDescriptionSetSize fontDescription 12
             contextSetFontDescription pangoContext fontDescription
             return pangoContext
