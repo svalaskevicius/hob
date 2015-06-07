@@ -1,7 +1,8 @@
 module Hob.Ui.Editor.Fancy.Parser (
   newSourceData,
   newSourceDataFromText,
-  reverseEditorEvent
+  reverseEditorEvent,
+  adjustPointByEvent
     ) where
 
 import Control.Arrow ((***), first)
@@ -332,3 +333,4 @@ newSourceData infoSource =
             history = maybe [] reverse sourceChangeEvents ++ maybe [] history oldSourceData,
             undoneHistory = maybe [] undoneHistory oldSourceData
         }
+

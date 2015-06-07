@@ -40,6 +40,7 @@ library
                          Hob.Ui.SidebarSearch, Hob.Ui.Editor.Search, Hob.Ui.Editor.Fancy,
                          Hob.Ui.Editor.Fancy.Types,
                          Hob.Ui.Editor.Fancy.Parser,
+                         Hob.Ui.Editor.Fancy.Shapes,
                          Hob.Command.FindText, Hob.Command.ReplaceText, Hob.Command.CloseCurrentTab,
                          Hob.Command.SaveCurrentTab, Hob.Command.NewTab, Hob.Command.FocusCommandEntry,
                          Hob.Command.FocusNextTab, Hob.Command.ReloadSidebarTree, Hob.Command.FocusSidebar,
