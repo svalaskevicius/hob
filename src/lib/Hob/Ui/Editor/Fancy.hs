@@ -77,7 +77,7 @@ data ColouredRange = ColouredRange
 data SourceChangeEvent = InsertText (Point Int) [Text] -- ^ Point (col, line) before the inserted text lines
                        | DeleteText (Point Int) [Text] -- ^ Point (col, line) before the deleted text lines
         deriving (Show)
-        
+
 data SourceData = SourceData {
     isModified                :: Bool,
     textLines                 :: [Text],
@@ -101,7 +101,7 @@ type PointI = Point Int
 
 --data DrawableG
 -- | DrawableLine (y position) (x position of each char) [(width of the glyph, colour group, glyph to draw)]
-data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)] 
+data DrawableLine = DrawableLine Double [Double] [(Double, ColourGroup, GlyphItem)]
 
 type TextShapeCache = Map String [(GlyphItem, (PangoRectangle, PangoRectangle), [Double])]
 
@@ -156,7 +156,7 @@ initModule = do
             facyEditor <- liftIO $ readMVar fancyEditorHolder
             let modifiedState = isModified . sourceData $ facyEditor
                 widget = drawingAreaWidget facyEditor
-            liftIO $ setEditorTitle widget (tabTitleForFile filePath modifiedState) 
+            liftIO $ setEditorTitle widget (tabTitleForFile filePath modifiedState)
 
 debugColourPrefs :: HsColour.ColourPrefs
 debugColourPrefs = HsColour.defaultColourPrefs { HsColour.conid = [HsColour.Foreground HsColour.Yellow, HsColour.Bold], HsColour.conop = [HsColour.Foreground HsColour.Yellow], HsColour.string = [HsColour.Foreground HsColour.Green], HsColour.char = [HsColour.Foreground HsColour.Cyan], HsColour.number = [HsColour.Foreground HsColour.Red, HsColour.Bold], HsColour.layout = [HsColour.Foreground HsColour.White], HsColour.keyglyph = [HsColour.Foreground HsColour.White] }
@@ -220,17 +220,17 @@ findElementsNonRec query a = let res = [] `mkQ` query $ a
                              else res
 
 findVariableDependencies :: FunctionCache -> Maybe ScopedVariableDependencies -> [P.Decl P.SrcSpanInfo] -> (FunctionCache, ScopedVariableDependencies)
-findVariableDependencies funcCache oldVarDeps decls = 
-    let (funcs, funcCache') = S.runState findFuncs' funcCache 
+findVariableDependencies funcCache oldVarDeps decls =
+    let (funcs, funcCache') = S.runState findFuncs' funcCache
         deps = varDepsForFunctions funcs
     in (funcCache', deps)
     where
         varDepsForFunctions = foldr (\f m -> M.insert (varDepMapKey f) (varDepsForFunctionMatch f) m) M.empty
 
         varDepsForFunctionMatch f = maybe (findVarDeps f) id $ M.lookup (varDepMapKey f) =<< oldVarDeps
-        
+
         varDepMapKey (match, _, _, _, _) = match
-        
+
         insertVarDep varDep [] = [varDep]
         insertVarDep (varDep@(VariableDependency vName vUsage)) ((dep@(VariableDependency dName dUsage)):deps)
          | vName == dName = (VariableDependency dName (vUsage++dUsage)):deps
@@ -248,7 +248,7 @@ findVariableDependencies funcCache oldVarDeps decls =
                                     S.put $ M.insert d funcs c
                                     return funcs
                         Just funcs -> return funcs
-            
+
 
         findVarDeps = foldr insertVarDep [] . patternDependencies -- TODO subDelcs, do notation
             where
@@ -288,7 +288,7 @@ newSourceDataFromText text = newSourceData $ Right newTextLines
         newTextLines = T.lines text
 
 movePointByTextLines :: PointI -> [Text] -> PointI
-movePointByTextLines (Point px py) tLines = 
+movePointByTextLines (Point px py) tLines =
     if multiline then Point lastXOfLastLine py' else Point (px+lengthOfFirstLine) py
     where
         lineLength = length tLines
@@ -330,18 +330,18 @@ newSourceData infoSource = do
         sourceUpdatedByEvents :: (SourceData, [SourceChangeEvent]) -> [Text]
         sourceUpdatedByEvents (oldSource, events)= foldl playEventOnText (textLines oldSource) events
             where
-                playEventOnText tLines (InsertText (Point px py) newLines) = 
+                playEventOnText tLines (InsertText (Point px py) newLines) =
                     let (preLines, allPostLines) = splitAt py tLines
                         (currentLine, postLines) = splitAt 1 allPostLines
                         [(preText, postText)] = map (T.splitAt px) currentLine
-                        newLines' = if null currentLine then newLines 
+                        newLines' = if null currentLine then newLines
                                     else let leadingText = map (T.append preText) . take 1 $ newLines
                                              (middleText, lastTextLine) = (splitAt (length newLines - 2) . drop 1 $ newLines)
                                              lastLine = map (flip T.append postText) lastTextLine
                                              singleLineText = map (flip T.append postText) leadingText
                                          in if length newLines == 1 then singleLineText else leadingText ++ middleText ++ lastLine
                     in preLines ++ newLines' ++ postLines
-                playEventOnText tLines (DeleteText p@(Point px py) deletedLines) = 
+                playEventOnText tLines (DeleteText p@(Point px py) deletedLines) =
                     let (preLines, postLines1) = splitAt py tLines
                         (Point ex ey) = movePointByTextLines p deletedLines
                         postLines2 = drop (ey-py) postLines1
@@ -372,7 +372,7 @@ newSourceData infoSource = do
             where
                 parseModuleLines textToParse = case P.parseFileContentsWithComments P.defaultParseMode . T.unpack . T.unlines $ textToParse of
                     P.ParseOk astInfo -> (Just astInfo, Nothing)
-                    P.ParseFailed srcLoc msg -> (Nothing, Just (srcLoc, msg))                                
+                    P.ParseFailed srcLoc msg -> (Nothing, Just (srcLoc, msg))
                 parseFullModule = parseModuleLines newTextLines
 
                 allCachedDecls (P.Module _ _ _ _ decls, _) = decls
@@ -410,7 +410,7 @@ newSourceData infoSource = do
                         eventChangesDecl (DeleteText p tLines) = declContainsPoint p || declContainsPoint pEnd || declIsInBetweenPoints p pEnd
                             where
                                 pEnd = movePointByTextLines p tLines
-                        
+
                 parseModuleMinusDecls decls = parseModuleLines linesToParse
                     where
                         linesToParse = foldr blankOutRange newTextLines rangesToBlankout
@@ -433,7 +433,7 @@ newSourceData infoSource = do
                         updateRangesByEvents (P.Module loc headers pragmas imports decls, comments) = (P.Module loc headers pragmas imports (updateDeclsByEvents decls), comments)
                         updateRangesByEvents m = m
                 addStaleDeclsOnFailure (Just m, err) = (Just m, err)
-                
+
                 updateDeclsByEvents = fmap updateDecl
                     where
                         updateDecl decl = fmap adjustInfoSpanByEvents decl
@@ -559,7 +559,7 @@ newDrawingData oldData pangoContext source cursor@(CursorHead cursorCharNr curso
             where
                 formatError ((Point c l), msg) = msg ++ " at "++(show l)++":"++(show c)
         newSelectionContour lineData = if cursor == selection then []
-                                       else if cursor < selection 
+                                       else if cursor < selection
                                        then textContour lineData (cursorCharNr, cursorLineNr) (selectionCharNr, selectionLineNr)
                                        else textContour lineData (selectionCharNr, selectionLineNr) (cursorCharNr, cursorLineNr)
         textContour lineData (x1, y1) (x2, y2) = (concatMap rightPoints [y1..y2]) ++ (concatMap leftPoints . reverse $ [y1..y2])
@@ -572,7 +572,7 @@ newDrawingData oldData pangoContext source cursor@(CursorHead cursorCharNr curso
                 topRightOfLine l = if l < y2 then movePointToMaxRightOfTheLine lineData l $ sourceCoordsToDrawing lineData (Point 0 l)
                                    else sourceCoordsToDrawing lineData (Point x2 y2)
                 bottomRightOfLine = movePointToLineBottom . topRightOfLine
-                                   
+
         ed textShapesCache lineData cursorP errorPos = EditorDrawingData {
             drawableLines = lineData,
             textToShapeCache = textShapesCache,
@@ -666,12 +666,12 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
         return $ active == Just widget
     ,
     getEditorFilePath = \_ -> return filePath
-    ,    
+    ,
     setEditorFilePath = \editor filePath' -> let editor' = editor{ getEditorFilePath =  \_ -> return filePath' }
                                              in do
                                                  defer $ emitParametrisedEvent "editor.filePath.change" (fancyEditorDataHolder, editor')
                                                  return editor'
-    ,    
+    ,
     getEditorContents = \_ -> liftIO $ do
         fancyEditorData <- liftIO $ readMVar fancyEditorDataHolder
         let text = T.unlines . textLines . sourceData $ fancyEditorData
@@ -723,11 +723,11 @@ toEditor widget filePath fancyEditorDataHolder = Editor {
     resetReplace = \editor -> liftIO $ do
         error "not implemented"
         return editor
-            
+
 }
 
 fancyHighlightSearchPreview :: Text -> S.StateT FancyEditor IO ()
-fancyHighlightSearchPreview text 
+fancyHighlightSearchPreview text
  | T.null text = error "empty text to preview"
  | otherwise = do
     source <- S.gets sourceData
@@ -747,8 +747,8 @@ setEditorModifiedState newState = do
     emitter <- S.gets emitInternalEditorEvent
     liftIO $ emitter "editor.modified.change"
     S.modify $ \ed -> ed{sourceData = source'}
-  
-  
+
+
 numberedJusts :: [Maybe a] -> [(Int, a)]
 numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
 
@@ -760,7 +760,7 @@ setEditorTitle :: DrawingArea -> String -> IO ()
 setEditorTitle editorWidget title = do
     mNotebook <- findParentNotebook (castToWidget editorWidget)
     maybeDo (\(notebook, tabWidget) -> notebookSetTabLabelText notebook tabWidget title) mNotebook
-    
+
     where
         findParentNotebook :: Widget -> IO (Maybe (Notebook, Widget))
         findParentNotebook widget = do
@@ -805,7 +805,7 @@ newEditorForText targetNotebook filePath text = do
             newEditorId <- idGenerator ctx
             editorWidget <- newEditorWidget newEditorId
             scrolledWindow <- newEditorScrolls editorWidget
-            
+
             overl <- overlayNew
             errorLabel <- labelNew (Just "")
             labeltyleContext <- widgetGetStyleContext errorLabel
@@ -814,14 +814,14 @@ newEditorForText targetNotebook filePath text = do
             widgetSetHAlign errorLabel AlignStart
             containerAdd overl scrolledWindow
             overlayAdd overl errorLabel
-            
+
             widgetShowAll overl
             widgetHide errorLabel
 
             tabNr <- notebookAppendPage targetNotebook overl title
             notebookSetCurrentPage targetNotebook tabNr
             notebookSetShowTabs targetNotebook True
-            
+
             pangoContext <- newPangoContext
 
             fancyEditorDataHolder <- runApp ctx $ newFancyEditor editorWidget newEditorId errorLabel pangoContext text
@@ -829,7 +829,7 @@ newEditorForText targetNotebook filePath text = do
             _ <- editorWidget `on` keyPressEvent $ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow
             _ <- editorWidget `on` draw $ drawEditor fancyEditorDataHolder editorWidget
             _ <- editorWidget `on` buttonPressEvent $ liftIO $ widgetGrabFocus editorWidget >> return True
-            
+
             let editor = toEditor editorWidget filePath fancyEditorDataHolder
 
             return editor
@@ -919,7 +919,7 @@ deleteSelectedText = do
     maybeDo (deleteTextBetweenCursors cursor) selection
     inEditMode
     where
-        deleteTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) = 
+        deleteTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) =
             if c1 == c2 then return ()
             else if c1 < c2 then deleteCharacterRange (Point x1 y1) (Point x2 y2)
             else deleteCharacterRange (Point x2 y2) (Point x1 y1)
@@ -930,7 +930,7 @@ getSelectedText = do
     cursor <- S.gets cursorHead
     maybe (return Nothing) (getTextBetweenCursors cursor) selection
     where
-        getTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) = 
+        getTextBetweenCursors c1@(CursorHead x1 y1 _) c2@(CursorHead x2 y2 _) =
             if c1 == c2 then return Nothing
             else if c1 < c2 then return . Just =<< getTextInRange (Point x1 y1) (Point x2 y2)
             else return . Just =<< getTextInRange (Point x2 y2) (Point x1 y1)
@@ -989,7 +989,7 @@ deleteCharacterRange startPoint@(Point sx sy) endPoint = do
     source' <- liftIO $ newSourceData (Left (source, [DeleteText startPoint deletedLines]))
     S.modify $ \ed -> ed{sourceData = source', cursorHead = CursorHead sx sy sx}
     setEditorModifiedState True
-        
+
 
 deleteCharactersFromCursor :: Int -> S.StateT FancyEditor IO ()
 deleteCharactersFromCursor amount = do
@@ -1146,9 +1146,9 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             "Home" -> Just $ moveCursorToTheStartOfTheLine
             "End" -> Just $ moveCursorToTheEndOfTheLine
             _ -> Nothing
-            
+
     case navigationCmd of
-        Just cmd -> case modifiers of 
+        Just cmd -> case modifiers of
             [Shift] -> invokeEditorCmd $ inSelectionMode >> cmd
             [] -> invokeEditorCmd $ inEditMode >> cmd
             _ -> return False
@@ -1162,7 +1162,7 @@ keyEventHandler fancyEditorDataHolder editorWidget pangoContext scrolledWindow =
             ([], "Delete") -> invokeEditorCmd $ deleteForwards
             ([], "Return") -> invokeEditorCmd $ (deleteSelectedText >> insertNewLine)
             _ -> if (null modifiers) || (modifiers == [Shift]) then
-                    maybe 
+                    maybe
                         ((liftIO $ debugPrint (modifiers, unpack $ keyName keyValue)) >> return False)
                         (\c -> invokeEditorCmd $ (deleteSelectedText >> insertEditorChar c))
                         printableChar
