@@ -36,9 +36,9 @@ import           Hob.Context.FileContext
 import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.Control
-import qualified Hob.Ui.Editor.Search as ES
+import qualified Hob.Ui.Editor.Search       as ES
 
-import Data.Maybe(mapMaybe)
+import           Data.Maybe                 (mapMaybe)
 
 gtkEditor :: SourceView -> Editor
 gtkEditor sourceView = Editor
@@ -63,19 +63,19 @@ gtkEditor sourceView = Editor
                 ctx <- ask
                 active <- liftIO $ getActiveEditor ctx
                 return $ active == Just sourceView
-            
+
             , getEditorFilePath = \_ -> liftIO $ getSourceViewFilePath sourceView
-            
+
             , setEditorFilePath = \editor fp -> do
                 liftIO $ setSourceViewFilePath sourceView fp
                 liftIO $ updateEditorTitle sourceView
                 return editor
-                
+
             , getEditorContents = \_ -> liftIO $ do
                   textBuf <- textViewGetBuffer sourceView
                   text <- get textBuf textBufferText
                   return text
-                  
+
             , activateEditor = \_ notebook -> liftIO $ do
                   currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ notebook
                   let editorsForFile = take 1 . filter (\(_, ed) -> sourceView == ed ) . numberedJusts $ currentEditors
@@ -89,7 +89,7 @@ gtkEditor sourceView = Editor
                       textBuf <- textViewGetBuffer sourceView
                       textBuf `set` [textBufferModified := newState]
                   return editor
-                  
+
             , highlightSearchPreview = \editor text -> liftIO $ do
                   ES.highlightSearchPreview sourceView text
                   return editor
@@ -97,7 +97,7 @@ gtkEditor sourceView = Editor
             , resetSearchPreview = \editor -> liftIO $ do
                   ES.resetSearchPreview sourceView
                   return editor
-            
+
             , findFirstFromCursor = \editor text -> liftIO $ do
                   ES.findFirstFromCursor sourceView text
                   return editor
@@ -105,27 +105,27 @@ gtkEditor sourceView = Editor
             , findNext = \editor -> liftIO $ do
                   ES.findNext sourceView
                   return editor
-            
+
             , findPrevious = \editor -> liftIO $ do
                   ES.findPrevious sourceView
                   return editor
-            
+
             , resetSearch = \editor -> liftIO $ do
                   ES.resetSearch sourceView
                   return editor
-            
+
             , startReplace = \editor search replace -> liftIO $ do
                   ES.startReplace sourceView search replace
                   return editor
-            
+
             , replaceNext = \editor -> liftIO $ do
                   ES.replaceNext sourceView
                   return editor
-            
+
             , resetReplace = \editor -> liftIO $ do
                   ES.resetReplace sourceView
                   return editor
-            
+
             }
 
 numberedJusts :: [Maybe a] -> [(Int, a)]

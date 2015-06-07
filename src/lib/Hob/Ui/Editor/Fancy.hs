@@ -2,30 +2,30 @@ module Hob.Ui.Editor.Fancy (
     newEditorForText, getActiveEditorWidget, initModule
     ) where
 
-import           Control.Concurrent.MVar             (MVar, putMVar, newEmptyMVar,
-                                                      readMVar)
+import           Control.Concurrent.MVar              (MVar, newEmptyMVar,
+                                                       putMVar, readMVar)
 import           Control.Monad.Reader
-import qualified Control.Monad.State.Lazy            as S
-import           Data.Maybe                          (mapMaybe, fromMaybe)
-import           Data.Text                           (Text)
-import    qualified       Data.Text                as T
-import Data.Text.Internal.Search (indices)
+import qualified Control.Monad.State.Lazy             as S
+import           Data.Maybe                           (fromMaybe, mapMaybe)
+import           Data.Text                            (Text)
+import qualified Data.Text                            as T
+import           Data.Text.Internal.Search            (indices)
 
-import           Filesystem.Path.CurrentOS           (decodeString,
-                                                      encodeString, filename)
-import           Graphics.UI.Gtk                     hiding (Point)
-import Graphics.UI.Gtk.General.Enums
-import           System.Glib.GObject                 (Quark)
+import           Filesystem.Path.CurrentOS            (decodeString,
+                                                       encodeString, filename)
+import           Graphics.UI.Gtk                      hiding (Point)
+import           Graphics.UI.Gtk.General.Enums
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
+import           System.Glib.GObject                  (Quark)
 
 import           Hob.Context
-import           Hob.Control
 import           Hob.Context.UiContext
+import           Hob.Control
 
-import Hob.Ui.Editor.Fancy.Types
-import Hob.Ui.Editor.Fancy.Commands
-import Hob.Ui.Editor.Fancy.Shapes
-import Hob.Ui.Editor.Fancy.Renderer
+import           Hob.Ui.Editor.Fancy.Commands
+import           Hob.Ui.Editor.Fancy.Renderer
+import           Hob.Ui.Editor.Fancy.Shapes
+import           Hob.Ui.Editor.Fancy.Types
 
 initModule :: App()
 initModule = do

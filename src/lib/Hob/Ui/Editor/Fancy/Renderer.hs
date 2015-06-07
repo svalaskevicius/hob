@@ -2,18 +2,18 @@ module Hob.Ui.Editor.Fancy.Renderer (
   drawEditor
     ) where
 
-import           Control.Concurrent.MVar             (MVar, readMVar)
+import           Control.Concurrent.MVar   (MVar, readMVar)
 import           Control.Monad.Reader
 import           Data.Graph
 
-import           Data.Traversable                    (traverse)
+import           Data.Traversable          (traverse)
 import           Data.Tree
-import qualified Data.Vector                         as V
+import qualified Data.Vector               as V
 import           Graphics.Rendering.Cairo
-import qualified Graphics.Rendering.Cairo as Cairo
-import           Graphics.UI.Gtk                     hiding (Point)
+import qualified Graphics.Rendering.Cairo  as Cairo
+import           Graphics.UI.Gtk           hiding (Point)
 
-import Hob.Ui.Editor.Fancy.Types
+import           Hob.Ui.Editor.Fancy.Types
 
 data ComparisonResult1DRange = Before | Inside | After deriving (Eq, Show)
 

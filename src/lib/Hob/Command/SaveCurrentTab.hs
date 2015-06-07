@@ -7,10 +7,10 @@ import           Control.Monad.Reader
 import           Graphics.UI.Gtk
 
 import           Hob.Context
+import           Hob.Context.Editor
 import           Hob.Context.FileContext
 import           Hob.Context.UiContext
 import           Hob.Control
-import           Hob.Context.Editor
 
 type NewFileNameChooser = IO (Maybe FilePath)
 

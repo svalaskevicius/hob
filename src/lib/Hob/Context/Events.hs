@@ -10,8 +10,8 @@ module Hob.Context.Events (
 import           Control.Concurrent.MVar
 import           Control.Monad.Reader
 
+import           Data.Typeable
 import           Hob.Context.Types
-import Data.Typeable
 
 eventName :: Event -> EventName
 eventName (Event name) = name
@@ -47,10 +47,10 @@ registerEventHandler event handler = do
 
 registerParametrisedEventHandler :: (Typeable a) => String -> (a -> App()) -> App()
 registerParametrisedEventHandler name handler = registerEventHandler (EventName name) (EventHandler . handleParametrisedEvent $ handler)
-            
+
 handleParametrisedEvent :: (Typeable a) => (a -> App()) -> Event -> App()
 handleParametrisedEvent handler (EventWithParams _ d) = do
-    case cast d of 
+    case cast d of
         Just handlerData -> handler handlerData
         Nothing -> error "unexpected event data"
     return ()

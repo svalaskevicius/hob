@@ -5,20 +5,20 @@ module Hob.Ui.Editor.Fancy.Commands (
   setEditorModifiedState,
     ) where
 
-import           Control.Concurrent.MVar             (MVar, modifyMVar_)
+import           Control.Concurrent.MVar    (MVar, modifyMVar_)
 import           Control.Monad.Reader
-import qualified Control.Monad.State.Lazy            as S
-import           Data.Char                           (isPrint)
-import           Data.Maybe                          (listToMaybe, isJust)
-import           Data.Text                           (Text, unpack)
-import    qualified       Data.Text                as T
+import qualified Control.Monad.State.Lazy   as S
+import           Data.Char                  (isPrint)
+import           Data.Maybe                 (isJust, listToMaybe)
+import           Data.Text                  (Text, unpack)
+import qualified Data.Text                  as T
 
-import           Graphics.UI.Gtk                     hiding (Point)
+import           Graphics.UI.Gtk            hiding (Point)
 
 import           Hob.Control
 
-import Hob.Ui.Editor.Fancy.Types
-import Hob.Ui.Editor.Fancy.Parser
+import           Hob.Ui.Editor.Fancy.Parser
+import           Hob.Ui.Editor.Fancy.Types
 
 
 nrOfCharsOnCursorLine :: Int -> S.StateT FancyEditor IO Int
@@ -264,7 +264,7 @@ adjustCursorsByEvents events = do
                 (Point cx' cy') = foldr adjustPointByEvent (Point cx cy) events
 
 invokeEditorCommand :: (ScrolledWindowClass s, WidgetClass w) => MVar FancyEditor -> w -> PangoContext -> s -> S.StateT FancyEditor IO () -> IO ()
-invokeEditorCommand fancyEditorDataHolder _ _ scrolledWindow cmd  = 
+invokeEditorCommand fancyEditorDataHolder _ _ scrolledWindow cmd  =
     modifyEditor fancyEditorDataHolder $ do
         cmd
         scrollEditorToCursor scrolledWindow

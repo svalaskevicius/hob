@@ -29,7 +29,7 @@ module Hob.Ui.Editor.Fancy.Types (
 import qualified Control.Monad.State.Lazy            as S
 import           Data.Generics
 import           Data.Graph
-import Data.Map (Map)
+import           Data.Map                            (Map)
 import           Data.Text                           (Text)
 
 import qualified Data.Vector                         as V
@@ -85,8 +85,8 @@ data SourceData = SourceData {
     varDepGraph               :: Graph,
     varDepGraphLookupByVertex :: Vertex -> (P.Name P.SrcSpanInfo, Int, [Int]),
     varDepGraphLookupByKey    :: Int -> Maybe Vertex,
-    history            :: [SourceChangeEvent],
-    undoneHistory      :: [SourceChangeEvent]
+    history                   :: [SourceChangeEvent],
+    undoneHistory             :: [SourceChangeEvent]
 }
 
 -- | Point x y
@@ -116,7 +116,7 @@ data EditorDrawingOptions = EditorDrawingOptions {
     lineHeight  :: Double,
     fontAscent  :: Double,
     fontDescent :: Double,
-    reportError        :: Maybe String -> IO ()
+    reportError :: Maybe String -> IO ()
 }
 
 data CursorHead = CursorHead Int Int Int -- ^ X, Y, X_{navigation}
@@ -128,16 +128,16 @@ instance Ord CursorHead where
     (CursorHead x1 y1 _) <= (CursorHead x2 y2 _) = (y1 < y2) || ((y2 == y1) && (x1 <= x2))
 
 data FancyEditor = FancyEditor {
-    sourceData     :: SourceData,
-    cursorHead     :: CursorHead,
-    selectionHead  :: Maybe CursorHead,
-    drawingOptions :: EditorDrawingOptions,
-    drawingData    :: EditorDrawingData,
-    editorApiId    :: Int,
+    sourceData              :: SourceData,
+    cursorHead              :: CursorHead,
+    selectionHead           :: Maybe CursorHead,
+    drawingOptions          :: EditorDrawingOptions,
+    drawingData             :: EditorDrawingData,
+    editorApiId             :: Int,
     emitInternalEditorEvent :: String -> IO(),
-    emitEditorEvent :: String -> IO(),
-    drawingAreaWidget :: DrawingArea,
-    redraw :: S.StateT FancyEditor IO ()
+    emitEditorEvent         :: String -> IO(),
+    drawingAreaWidget       :: DrawingArea,
+    redraw                  :: S.StateT FancyEditor IO ()
 } deriving Typeable
 
 

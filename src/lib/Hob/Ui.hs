@@ -32,9 +32,9 @@ import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.Ui.CommandEntry
 import           Hob.Ui.Editor
+import qualified Hob.Ui.Editor.Fancy                  as FancyEditor (initModule)
 import           Hob.Ui.Sidebar
 import           Hob.Ui.SidebarSearch
-import qualified Hob.Ui.Editor.Fancy as FancyEditor (initModule)
 
 loadGui :: FileContext -> StyleContext -> IO Context
 loadGui fileCtx styleCtx = do

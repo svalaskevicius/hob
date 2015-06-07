@@ -5,22 +5,22 @@ module Hob.Ui.Editor.Fancy.Parser (
   adjustPointByEvent
     ) where
 
-import Control.Arrow ((***), first)
-import qualified Control.Monad.State.Lazy            as S
-import qualified Data.Foldable                       as F
+import           Control.Applicative
+import           Control.Arrow                   (first, (***))
+import qualified Control.Monad.State.Lazy        as S
+import qualified Data.Foldable                   as F
 import           Data.Generics
 import           Data.Graph
-import           Data.List                           (nubBy, sort)
-import           Data.Maybe                          (fromMaybe,
-                                                      maybeToList, mapMaybe)
-import  Control.Applicative
-import qualified Data.Map as M
-import           Data.Text                           (Text)
-import    qualified       Data.Text                as T
+import           Data.List                       (nubBy, sort)
+import qualified Data.Map                        as M
+import           Data.Maybe                      (fromMaybe, mapMaybe,
+                                                  maybeToList)
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
 
-import qualified Language.Haskell.Exts.Annotated     as P
+import qualified Language.Haskell.Exts.Annotated as P
 
-import Hob.Ui.Editor.Fancy.Types
+import           Hob.Ui.Editor.Fancy.Types
 
 
 findVars :: P.Exp P.SrcSpanInfo -> [P.Name P.SrcSpanInfo]

@@ -4,13 +4,13 @@ module Hob.Command.ReplaceText (
         replaceNextCommandHandler,
     ) where
 
-import           Data.Monoid          (mconcat)
+import           Data.Monoid           (mconcat)
 import           Graphics.UI.Gtk
 
 import           Hob.Command.FindText
 import           Hob.Context
+import           Hob.Context.Editor
 import           Hob.Context.UiContext
-import Hob.Context.Editor
 
 createMatcherForReplace :: Char -> (String -> String -> CommandHandler) -> CommandMatcher
 createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match

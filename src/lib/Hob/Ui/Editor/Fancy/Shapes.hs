@@ -3,25 +3,25 @@ module Hob.Ui.Editor.Fancy.Shapes (
   newDrawingOptions
     ) where
 
+import           Control.Arrow                   (second, (&&&))
 import           Control.Monad.Reader
-import qualified Control.Monad.State.Lazy            as S
-import Control.Arrow ((&&&), second)
-import           Data.Char                           (isSpace)
-import qualified Data.Function                       as F
+import qualified Control.Monad.State.Lazy        as S
+import           Data.Char                       (isSpace)
+import qualified Data.Function                   as F
 import           Data.Graph
-import           Data.List                           (groupBy, sortBy)
-import           Data.Maybe                          (listToMaybe)
-import qualified Data.Map as M
+import           Data.List                       (groupBy, sortBy)
+import qualified Data.Map                        as M
+import           Data.Maybe                      (listToMaybe)
 import           Data.Prizm.Color
 import           Data.Prizm.Color.CIE.LCH
-import           Data.Text                           (Text)
-import    qualified       Data.Text                as T
+import           Data.Text                       (Text)
+import qualified Data.Text                       as T
 
-import qualified Data.Vector                         as V
-import           Graphics.UI.Gtk                     hiding (Point)
-import qualified Language.Haskell.Exts.Annotated     as P
+import qualified Data.Vector                     as V
+import           Graphics.UI.Gtk                 hiding (Point)
+import qualified Language.Haskell.Exts.Annotated as P
 
-import Hob.Ui.Editor.Fancy.Types
+import           Hob.Ui.Editor.Fancy.Types
 
 
 newDrawingData :: Maybe EditorDrawingData -> PangoContext -> SourceData -> CursorHead -> CursorHead -> EditorDrawingOptions -> IO EditorDrawingData

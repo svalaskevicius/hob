@@ -1,6 +1,6 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable        #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
 
 module Hob.Context.Types (
     App,
@@ -25,16 +25,16 @@ module Hob.Context.Types (
 import           Control.Monad.Reader
 import           Data.Maybe               (isJust)
 import           Data.Monoid
+import           Data.Text                (Text)
 import           Graphics.UI.Gtk          (Modifier, Notebook)
 import           GtkExtras.LargeTreeStore as LTS (TreeStore)
-import           Data.Text                  (Text)
 
 import           Hob.Context.FileContext
 import           Hob.Context.StyleContext
 import           Hob.Context.UiContext
 import           Hob.DirectoryTree
 
-import Data.Typeable
+import           Data.Typeable
 
 type App = ReaderT Context IO
 
@@ -49,16 +49,16 @@ instance Show Event where
 newtype EventHandler = EventHandler (Event -> App())
 
 data Editor = Editor {
-    editorId           :: Editor -> App Int,
-    enterEditorMode    :: Editor -> Mode -> App Editor,
-    exitLastEditorMode :: Editor -> App Editor,
-    modeStack          :: Editor -> App [Mode],
-    isCurrentlyActive  :: Editor -> App Bool,
-    getEditorFilePath  :: Editor -> App (Maybe FilePath),
-    setEditorFilePath  :: Editor -> Maybe FilePath -> App Editor,
-    getEditorContents  :: Editor -> App Text,
-    activateEditor     :: Editor -> Notebook -> App (),
-    setModifiedState   :: Editor -> Bool -> App Editor,
+    editorId               :: Editor -> App Int,
+    enterEditorMode        :: Editor -> Mode -> App Editor,
+    exitLastEditorMode     :: Editor -> App Editor,
+    modeStack              :: Editor -> App [Mode],
+    isCurrentlyActive      :: Editor -> App Bool,
+    getEditorFilePath      :: Editor -> App (Maybe FilePath),
+    setEditorFilePath      :: Editor -> Maybe FilePath -> App Editor,
+    getEditorContents      :: Editor -> App Text,
+    activateEditor         :: Editor -> Notebook -> App (),
+    setModifiedState       :: Editor -> Bool -> App Editor,
     highlightSearchPreview :: Editor -> String -> App Editor,
     resetSearchPreview     :: Editor -> App Editor,
     findFirstFromCursor    :: Editor -> String -> App Editor,

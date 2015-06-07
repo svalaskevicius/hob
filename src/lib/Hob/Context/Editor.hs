@@ -17,7 +17,7 @@ import           Data.Monoid
 
 import           Hob.Context.Events
 import           Hob.Context.Types
-import Hob.Control
+import           Hob.Control
 
 
 runOnEditor :: (Editor -> Editor -> a) -> Editor -> a
