@@ -3,14 +3,14 @@ module Hob.Command.FocusSidebar (
     syncFocusSidebarCommandHandler
     ) where
 
-import Control.Monad.Reader
-import Graphics.UI.Gtk
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.Ui.Editor         (getActiveEditor, getEditorFilePath)
-import Hob.Ui.Sidebar        (syncPathToSidebar)
+import           Hob.Context
+import           Hob.Context.Editor
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.Ui.Sidebar        (syncPathToSidebar)
 
 focusSidebarCommandHandler :: CommandHandler
 focusSidebarCommandHandler = CommandHandler Nothing focusSidebar
@@ -26,9 +26,9 @@ focusSidebar = do
 syncActiveEditorPathToSidebar :: App()
 syncActiveEditorPathToSidebar = do
     ctx <- ask
-    editor <- liftIO $ getActiveEditor ctx
+    editor <- currentEditor
     maybeDo syncToEditor editor
-    where syncToEditor editor = maybeDo syncPathToSidebar =<< liftIO (getEditorFilePath editor)
+    where syncToEditor editor = maybeDo syncPathToSidebar =<< getEditorFilePath editor editor
 
 
 syncFocusSidebar :: App()

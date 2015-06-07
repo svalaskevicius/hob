@@ -7,15 +7,12 @@ module Hob.Context.StyleContext (
     sourceStyleFont
 ) where
 
-import Control.Monad                 (liftM)
-import Graphics.Rendering.Pango.Font (FontDescription,
-                                      fontDescriptionFromString)
-import Graphics.UI.Gtk.SourceView    (SourceStyleScheme,
-                                      SourceStyleSchemeManager,
-                                      sourceStyleSchemeManagerGetDefault,
-                                      sourceStyleSchemeManagerGetScheme,
-                                      sourceStyleSchemeManagerSetSearchPath)
-import System.FilePath               ((</>))
+import           Control.Monad                 (liftM)
+import           Graphics.Rendering.Pango.Font (FontDescription,
+                                                fontDescriptionFromString)
+import           Graphics.UI.Gtk.SourceView    (SourceStyleScheme,
+                                                SourceStyleSchemeManager, sourceStyleSchemeManagerGetDefault, sourceStyleSchemeManagerGetScheme, sourceStyleSchemeManagerSetSearchPath)
+import           System.FilePath               ((</>))
 
 data StyleContext = StyleContext {
     contextDataPath     :: FilePath,
@@ -40,4 +37,4 @@ sourceStyleScheme ctx _ = do
     return $ Just style
 
 sourceStyleFont :: StyleContext -> Maybe FilePath -> IO (Maybe FontDescription)
-sourceStyleFont _ _ = liftM Just $ fontDescriptionFromString "monospace 12"
+sourceStyleFont _ _ = liftM Just $ fontDescriptionFromString "Monaco 16"

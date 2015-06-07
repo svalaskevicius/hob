@@ -20,12 +20,12 @@ import           Graphics.UI.Gtk
 import           Graphics.UI.Gtk.General.StyleContext (styleContextAddClass,
                                                        styleContextRemoveClass)
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.DirectoryTree
-import Hob.Ui.Sidebar
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.DirectoryTree
+import           Hob.Ui.Sidebar
 
 {-| Index based on suffix arrays
 
@@ -210,7 +210,7 @@ newSideBarFileTreeSearch ctx = do
     let treeView = sidebarTree.uiContext $ ctx
     let searchEntry = sidebarTreeSearch.uiContext $ ctx
     index <- newMVar =<< runApp ctx initFileTreeIndex
-    runApp ctx $ registerEventHandler (Event "core.sidebar.reload") (initFileTreeIndex >>= (liftIO . swapMVar index) >> return())
+    runApp ctx $ registerEventHandler (EventName "core.sidebar.reload") (EventHandler . const $ initFileTreeIndex >>= (liftIO . swapMVar index) >> return())
     _ <- treeView `on` keyPressEvent $ do
         key <- eventKeyVal
         maybe (return False) startSearch $ keyToChar key

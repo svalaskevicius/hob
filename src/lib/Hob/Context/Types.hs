@@ -1,7 +1,10 @@
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE DeriveDataTypeable        #-}
+{-# LANGUAGE ExistentialQuantification #-}
+{-# LANGUAGE MultiParamTypeClasses     #-}
 
 module Hob.Context.Types (
     App,
+    EventName(..),
     EventBus(..),
     Context(..),
     PreviewCommandHandler(..),
@@ -13,38 +16,63 @@ module Hob.Context.Types (
     TextCommandMatcher,
     Mode(..),
     Event(..),
+    EventHandler(..),
     Editor(..),
     EditorList(..),
-    fromContext,
+    fromContext
     ) where
 
-import Control.Monad.Reader
-import Data.Maybe               (isJust)
-import Data.Monoid
-import Graphics.UI.Gtk          (Modifier)
-import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Control.Monad.Reader
+import           Data.Maybe               (isJust)
+import           Data.Monoid
+import           Data.Text                (Text)
+import           Graphics.UI.Gtk          (Modifier, Notebook)
+import           GtkExtras.LargeTreeStore as LTS (TreeStore)
 
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.DirectoryTree
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.DirectoryTree
 
+import           Data.Typeable
 
 type App = ReaderT Context IO
 
-newtype Event = Event String deriving (Eq, Show)
+newtype EventName = EventName String deriving (Eq, Show)
+
+data Event = Event EventName | forall a. (Typeable a) => EventWithParams EventName a
+
+instance Show Event where
+    show (Event a) = "Event: " ++ (show a)
+    show (EventWithParams a _) = "Event: " ++ (show a)
+
+newtype EventHandler = EventHandler (Event -> App())
 
 data Editor = Editor {
-    editorId           :: Editor -> App Int,
-    enterEditorMode    :: Editor -> Mode -> App Editor,
-    exitLastEditorMode :: Editor -> App Editor,
-    modeStack          :: Editor -> App [Mode],
-    isCurrentlyActive  :: Editor -> App Bool
-}
+    editorId               :: Editor -> App Int,
+    enterEditorMode        :: Editor -> Mode -> App Editor,
+    exitLastEditorMode     :: Editor -> App Editor,
+    modeStack              :: Editor -> App [Mode],
+    isCurrentlyActive      :: Editor -> App Bool,
+    getEditorFilePath      :: Editor -> App (Maybe FilePath),
+    setEditorFilePath      :: Editor -> Maybe FilePath -> App Editor,
+    getEditorContents      :: Editor -> App Text,
+    activateEditor         :: Editor -> Notebook -> App (),
+    setModifiedState       :: Editor -> Bool -> App Editor,
+    highlightSearchPreview :: Editor -> String -> App Editor,
+    resetSearchPreview     :: Editor -> App Editor,
+    findFirstFromCursor    :: Editor -> String -> App Editor,
+    findNext               :: Editor -> App Editor,
+    findPrevious           :: Editor -> App Editor,
+    resetSearch            :: Editor -> App Editor,
+    startReplace           :: Editor -> String -> String -> App Editor,
+    replaceNext            :: Editor -> App Editor,
+    resetReplace           :: Editor -> App Editor
+} deriving (Typeable)
 
 data EventBus = EventBus {
-    addListener       :: Event -> App() -> IO(),
-    listenersForEvent :: Event -> IO [App()]
+    addListener       :: EventName -> EventHandler -> IO(),
+    listenersForEvent :: EventName -> IO [EventHandler]
 }
 
 data EditorList = EditorList {

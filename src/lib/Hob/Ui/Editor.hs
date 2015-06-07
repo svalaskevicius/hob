@@ -5,40 +5,40 @@ module Hob.Ui.Editor (
                getActiveEditor,
                invokeOnActiveEditor,
                getEditorText,
-               getEditorFilePath,
-               setEditorFilePath,
-               getEditorFromNotebookTab,
-               updateEditorTitle
+               getEditorFromNotebookTab
                ) where
 
-import Control.Monad.Reader
-import Data.Text                  (Text)
-import Filesystem.Path.CurrentOS  (decodeString, encodeString, filename)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..), SourceView,
-                                   castToSourceView,
-                                   sourceBufferBeginNotUndoableAction,
-                                   sourceBufferEndNotUndoableAction,
-                                   sourceBufferNew,
-                                   sourceBufferSetHighlightSyntax,
-                                   sourceBufferSetLanguage,
-                                   sourceBufferSetStyleScheme,
-                                   sourceViewNewWithBuffer,
-                                   sourceViewSetAutoIndent,
-                                   sourceViewSetDrawSpaces,
-                                   sourceViewSetHighlightCurrentLine,
-                                   sourceViewSetIndentOnTab,
-                                   sourceViewSetIndentWidth,
-                                   sourceViewSetInsertSpacesInsteadOfTabs,
-                                   sourceViewSetShowLineNumbers,
-                                   sourceViewSetTabWidth)
-import System.Glib.GObject        (Quark)
+import           Control.Monad.Reader
+import           Data.Text                  (Text)
+import           Filesystem.Path.CurrentOS  (decodeString, encodeString,
+                                             filename)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.SourceView (SourceDrawSpacesFlags (..),
+                                             SourceView, castToSourceView,
+                                             sourceBufferBeginNotUndoableAction,
+                                             sourceBufferEndNotUndoableAction,
+                                             sourceBufferNew,
+                                             sourceBufferSetHighlightSyntax,
+                                             sourceBufferSetLanguage,
+                                             sourceBufferSetStyleScheme,
+                                             sourceViewNewWithBuffer,
+                                             sourceViewSetAutoIndent,
+                                             sourceViewSetDrawSpaces,
+                                             sourceViewSetHighlightCurrentLine,
+                                             sourceViewSetIndentOnTab,
+                                             sourceViewSetIndentWidth, sourceViewSetInsertSpacesInsteadOfTabs,
+                                             sourceViewSetShowLineNumbers,
+                                             sourceViewSetTabWidth)
+import           System.Glib.GObject        (Quark)
 
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.Control
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import qualified Hob.Ui.Editor.Search       as ES
+
+import           Data.Maybe                 (mapMaybe)
 
 gtkEditor :: SourceView -> Editor
 gtkEditor sourceView = Editor
@@ -63,7 +63,78 @@ gtkEditor sourceView = Editor
                 ctx <- ask
                 active <- liftIO $ getActiveEditor ctx
                 return $ active == Just sourceView
+
+            , getEditorFilePath = \_ -> liftIO $ getSourceViewFilePath sourceView
+
+            , setEditorFilePath = \editor fp -> do
+                liftIO $ setSourceViewFilePath sourceView fp
+                liftIO $ updateEditorTitle sourceView
+                return editor
+
+            , getEditorContents = \_ -> liftIO $ do
+                  textBuf <- textViewGetBuffer sourceView
+                  text <- get textBuf textBufferText
+                  return text
+
+            , activateEditor = \_ notebook -> liftIO $ do
+                  currentEditors <- mapM getEditorFromNotebookTab <=< containerGetChildren $ notebook
+                  let editorsForFile = take 1 . filter (\(_, ed) -> sourceView == ed ) . numberedJusts $ currentEditors
+                  case editorsForFile of
+                      [(nr, _)] ->  notebookSetCurrentPage notebook nr
+                      _ -> return()
+                  liftIO $ widgetGrabFocus sourceView
+
+            , setModifiedState = \editor newState -> do
+                  liftIO $ do
+                      textBuf <- textViewGetBuffer sourceView
+                      textBuf `set` [textBufferModified := newState]
+                  return editor
+
+            , highlightSearchPreview = \editor text -> liftIO $ do
+                  ES.highlightSearchPreview sourceView text
+                  return editor
+
+            , resetSearchPreview = \editor -> liftIO $ do
+                  ES.resetSearchPreview sourceView
+                  return editor
+
+            , findFirstFromCursor = \editor text -> liftIO $ do
+                  ES.findFirstFromCursor sourceView text
+                  return editor
+
+            , findNext = \editor -> liftIO $ do
+                  ES.findNext sourceView
+                  return editor
+
+            , findPrevious = \editor -> liftIO $ do
+                  ES.findPrevious sourceView
+                  return editor
+
+            , resetSearch = \editor -> liftIO $ do
+                  ES.resetSearch sourceView
+                  return editor
+
+            , startReplace = \editor search replace -> liftIO $ do
+                  ES.startReplace sourceView search replace
+                  return editor
+
+            , replaceNext = \editor -> liftIO $ do
+                  ES.replaceNext sourceView
+                  return editor
+
+            , resetReplace = \editor -> liftIO $ do
+                  ES.resetReplace sourceView
+                  return editor
+
             }
+
+numberedJusts :: [Maybe a] -> [(Int, a)]
+numberedJusts a = mapMaybe liftTupledMaybe $ zip [0..] a
+
+liftTupledMaybe :: (a, Maybe b) -> Maybe (a, b)
+liftTupledMaybe (x, Just y) = Just (x, y)
+liftTupledMaybe (_, Nothing) = Nothing
+
 
 newEditorForText :: Notebook -> Maybe FilePath -> Text -> App ()
 newEditorForText targetNotebook filePath text = do
@@ -97,7 +168,7 @@ newEditorForText targetNotebook filePath text = do
             sourceViewSetTabWidth editor 4
             sourceViewSetInsertSpacesInsteadOfTabs editor True
             sourceViewSetHighlightCurrentLine editor True
-            sourceViewSetDrawSpaces editor SourceDrawSpacesTrailing
+            sourceViewSetDrawSpaces editor [SourceDrawSpacesTrailing]
 
             scrolledWindow <- scrolledWindowNew Nothing Nothing
             scrolledWindow `containerAdd` editor
@@ -111,7 +182,7 @@ newEditorForText targetNotebook filePath text = do
 
             _ <- buffer `on` modifiedChanged $ notebookSetTabLabelText targetNotebook scrolledWindow =<< tabTitleForEditor editor
 
-            setEditorFilePath editor filePath
+            setSourceViewFilePath editor filePath
             return editor
 
 
@@ -159,18 +230,18 @@ tabTitleForFile Nothing = "(new file)"
 
 tabTitleForEditor :: SourceView -> IO String
 tabTitleForEditor editor = do
-    filePath <- getEditorFilePath editor
+    filePath <- getSourceViewFilePath editor
     buffer <- textViewGetBuffer editor
     modified <- buffer `get` textBufferModified
     return $ if modified then tabTitleForFile filePath ++ "*" else tabTitleForFile filePath
 
-setEditorFilePath :: SourceView -> Maybe FilePath -> IO ()
-setEditorFilePath editor filePath = do
+setSourceViewFilePath :: SourceView -> Maybe FilePath -> IO ()
+setSourceViewFilePath editor filePath = do
     quark <- fileNameQuark
     objectSetAttribute quark editor filePath
 
-getEditorFilePath :: SourceView -> IO (Maybe FilePath)
-getEditorFilePath editor = do
+getSourceViewFilePath :: SourceView -> IO (Maybe FilePath)
+getSourceViewFilePath editor = do
     quark <- fileNameQuark
     objectGetAttributeUnsafe quark editor
 

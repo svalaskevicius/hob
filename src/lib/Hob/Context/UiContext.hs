@@ -2,7 +2,7 @@ module Hob.Context.UiContext (
     UiContext(..)
 ) where
 
-import Graphics.UI.Gtk (Entry, Label, Notebook, TreeView, Window)
+import           Graphics.UI.Gtk (Entry, Label, Notebook, TreeView, Window)
 
 data UiContext = UiContext {
     mainWindow        :: Window,

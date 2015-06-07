@@ -1,18 +1,23 @@
 module Hob.Context.Editor (
     initEditors,
     runOnEditor,
+    updateEditor,
     enterMode,
     exitLastMode,
     activeModes,
     getActiveCommands,
+    currentEditor,
+    editorById,
+    updateActiveEditor
     ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Reader
-import Data.Monoid
+import           Control.Concurrent.MVar
+import           Control.Monad.Reader
+import           Data.Monoid
 
-import Hob.Context.Events
-import Hob.Context.Types
+import           Hob.Context.Events
+import           Hob.Context.Types
+import           Hob.Control
 
 
 runOnEditor :: (Editor -> Editor -> a) -> Editor -> a
@@ -37,12 +42,20 @@ currentEditor = do
         if null active then Nothing
         else Just $ head active
 
+editorById :: Int -> App (Maybe Editor)
+editorById eid = do
+    editorList <- fromContext editors
+    matches <- filterM (\e -> (editorId e e) >>= (return . ((==)eid))) =<< liftIO (getEditors editorList)
+    return $
+        if null matches then Nothing
+        else Just $ head matches
+
 enterMode :: Mode -> App()
 enterMode mode = do
     updateActiveEditor $ \editor -> do
         editor' <- clearEditorModes editor
         runOnEditor enterEditorMode editor' mode
-    emitEvent $ Event "core.mode.change"
+    emitNamedEvent "core.mode.change"
     where clearEditorModes editor = do
               modes <- runOnEditor modeStack editor
               if not . null $ modes then do
@@ -58,27 +71,32 @@ activeModes = do
 exitLastMode :: App()
 exitLastMode = do
     updateActiveEditor $ \editor -> runOnEditor exitLastEditorMode editor
-    emitEvent $ Event "core.mode.change"
+    emitNamedEvent "core.mode.change"
 
 updateActiveEditor :: (Editor -> App Editor) -> App()
 updateActiveEditor actions = do
+    current <- currentEditor
+    maybeDo (\e -> updateEditor e actions) current
+
+updateEditor :: Editor -> (Editor -> App Editor) -> App()
+updateEditor editor actions = do
     ctx <- ask
     editorList <- fromContext editors
-    liftIO $ updateEditors editorList $ \oldEditors -> runReaderT (updateActiveEditorHandler oldEditors) ctx
+    liftIO $ updateEditors editorList $ \oldEditors -> runReaderT (updateEditorHandler oldEditors) ctx
     where
-        updateActiveEditorHandler oldEditors = do
-            (e1, e2) <- splitBeforeFirstActive oldEditors
+        updateEditorHandler oldEditors = do
+            eid <- editorId editor editor
+            (e1, e2) <- splitBeforeEditorId eid oldEditors
             if null e2 then return oldEditors
             else do
-                let active = head e2
-                active' <- actions active
-                return $ e1 ++ [active'] ++ tail e2
-        splitBeforeFirstActive [] = return ([], [])
-        splitBeforeFirstActive (x:xs) = do
-            active <- runOnEditor isCurrentlyActive x
-            if active then return ([], x:xs)
+                editor' <- actions editor
+                return $ e1 ++ [editor'] ++ drop 1 e2
+        splitBeforeEditorId _ [] = return ([], [])
+        splitBeforeEditorId eid (x:xs) = do
+            eid' <- editorId x x
+            if eid == eid' then return ([], x:xs)
             else do
-                (n, ns) <- splitBeforeFirstActive xs
+                (n, ns) <- splitBeforeEditorId eid xs
                 return (x:n, ns)
 
 getActiveCommands :: App CommandMatcher

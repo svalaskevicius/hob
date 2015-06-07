@@ -9,16 +9,23 @@ module Hob.Context (
     TextCommandMatcher,
     Mode(..),
     Event(..),
+    EventName(..),
+    EventHandler(..),
     Editor(..),
     EditorList(..),
     initContext,
     runOnEditor,
+    editorById,
     enterMode,
     exitLastMode,
     activeModes,
     deferredRunner,
+    defer,
     registerEventHandler,
+    registerParametrisedEventHandler,
     emitEvent,
+    emitNamedEvent,
+    emitParametrisedEvent,
     createMatcherForPrefix,
     createMatcherForCommand,
     createMatcherForKeyBinding,
@@ -27,19 +34,19 @@ module Hob.Context (
     getActiveCommands,
 ) where
 
-import Control.Concurrent.MVar
-import Control.Monad.Reader
-import Graphics.UI.Gtk          (postGUIAsync)
-import GtkExtras.LargeTreeStore as LTS (TreeStore)
+import           Control.Concurrent.MVar
+import           Control.Monad.Reader
+import           Graphics.UI.Gtk            (postGUIAsync)
+import           GtkExtras.LargeTreeStore   as LTS (TreeStore)
 
-import Hob.Context.CommandMatcher
-import Hob.Context.Editor
-import Hob.Context.Events
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.Types
-import Hob.Context.UiContext
-import Hob.DirectoryTree
+import           Hob.Context.CommandMatcher
+import           Hob.Context.Editor
+import           Hob.Context.Events
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.Types
+import           Hob.Context.UiContext
+import           Hob.DirectoryTree
 
 
 
@@ -72,6 +79,11 @@ runMessage  ctx (AppAction action) = runApp ctx action >> return ctx
 
 deferredRunner :: Context -> App() -> IO()
 deferredRunner ctx actions = postGUIAsync $ messageLoop ctx ctx $ AppAction actions
+
+defer :: App() -> App()
+defer actions = do
+    ctx <- ask
+    liftIO $ deferredRunner ctx actions
 
 initIdGenerator :: IO (IO Int)
 initIdGenerator = do

@@ -15,25 +15,26 @@ import           Graphics.UI.Gtk.General.CssProvider
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 import           GtkExtras.LargeTreeStore             as LTS
 
-import Hob.Command.CloseCurrentTab
-import Hob.Command.FindText
-import Hob.Command.FocusCommandEntry
-import Hob.Command.FocusNextTab
-import Hob.Command.FocusNumberedTab
-import Hob.Command.FocusPreviousTab
-import Hob.Command.FocusSidebar
-import Hob.Command.NewTab
-import Hob.Command.ReloadSidebarTree
-import Hob.Command.ReplaceText
-import Hob.Command.SaveCurrentTab
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.StyleContext
-import Hob.Context.UiContext
-import Hob.Ui.CommandEntry
-import Hob.Ui.Editor
-import Hob.Ui.Sidebar
-import Hob.Ui.SidebarSearch
+import           Hob.Command.CloseCurrentTab
+import           Hob.Command.FindText
+import           Hob.Command.FocusCommandEntry
+import           Hob.Command.FocusNextTab
+import           Hob.Command.FocusNumberedTab
+import           Hob.Command.FocusPreviousTab
+import           Hob.Command.FocusSidebar
+import           Hob.Command.NewTab
+import           Hob.Command.ReloadSidebarTree
+import           Hob.Command.ReplaceText
+import           Hob.Command.SaveCurrentTab
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.StyleContext
+import           Hob.Context.UiContext
+import           Hob.Ui.CommandEntry
+import           Hob.Ui.Editor
+import qualified Hob.Ui.Editor.Fancy                  as FancyEditor (initModule)
+import           Hob.Ui.Sidebar
+import           Hob.Ui.SidebarSearch
 
 loadGui :: FileContext -> StyleContext -> IO Context
 loadGui fileCtx styleCtx = do
@@ -48,6 +49,7 @@ loadGui fileCtx styleCtx = do
         initSidebar ctx
         initCommandEntry ctx
         initActiveModesMonitor ctx
+        runApp ctx FancyEditor.initModule
         return ctx
     where
         initCtx builder initCommands = do
@@ -102,7 +104,7 @@ loadGui fileCtx styleCtx = do
 
         initEditingArea ctx = do
             let mainEditNotebook = mainNotebook . uiContext $ ctx
-            _ <- mainEditNotebook `on` switchPage $ const $ deferredRunner ctx (emitEvent $ Event "core.editor.focused")
+            _ <- mainEditNotebook `on` switchPage $ const $ deferredRunner ctx (emitNamedEvent "core.editor.focused")
             return ()
 
         invokeKeyCommand ctx command = liftIO . runApp ctx $ do
@@ -112,8 +114,8 @@ loadGui fileCtx styleCtx = do
                                            matchKeyBinding activeCommands command
 
         initActiveModesMonitor ctx = deferredRunner ctx $ do
-            registerEventHandler (Event "core.editor.focused") refreshModesLabel
-            registerEventHandler (Event "core.mode.change") refreshModesLabel
+            registerEventHandler (EventName "core.editor.focused") $ EventHandler . const $ refreshModesLabel
+            registerEventHandler (EventName "core.mode.change") $ EventHandler . const $ refreshModesLabel
 
         refreshModesLabel = do
             activeCtx <- ask

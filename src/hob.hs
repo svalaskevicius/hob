@@ -1,22 +1,22 @@
 module Main (main) where
 
-import           Control.Monad.Trans (liftIO)
-import qualified Data.ByteString     as BS
-import qualified Data.Text.Encoding  as E
+import           Control.Monad.Trans      (liftIO)
+import qualified Data.ByteString          as BS
+import qualified Data.Text.Encoding       as E
 import           Graphics.UI.Gtk
 import           System.Directory
-import           System.Environment  (getArgs)
-import           System.IO           (hPutStr, stderr)
+import           System.Environment       (getArgs)
+import           System.IO                (hPutStr, stderr)
 
-import Hob.Context
-import Hob.Context.FileContext  (FileLoader, FileTreeLoader, FileWriter,
-                                 defaultFileContext)
-import Hob.Context.StyleContext (defaultStyleContext)
-import Hob.Context.UiContext
-import Hob.DirectoryTree
-import Hob.Ui
+import           Hob.Context
+import           Hob.Context.FileContext  (FileLoader, FileTreeLoader,
+                                           FileWriter, defaultFileContext)
+import           Hob.Context.StyleContext (defaultStyleContext)
+import           Hob.Context.UiContext
+import           Hob.DirectoryTree
+import           Hob.Ui
 
-import Paths_hob
+import           Paths_hob
 
 main :: IO ()
 main = do

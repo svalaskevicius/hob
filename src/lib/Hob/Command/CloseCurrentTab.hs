@@ -1,11 +1,11 @@
 module Hob.Command.CloseCurrentTab (closeCurrentEditorTab) where
 
 
-import Control.Monad.Trans (liftIO)
-import Graphics.UI.Gtk
+import           Control.Monad.Trans   (liftIO)
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Context.UiContext
+import           Hob.Context
+import           Hob.Context.UiContext
 
 closeCurrentEditorTab :: CommandHandler
 closeCurrentEditorTab = CommandHandler Nothing closeCurrentEditorTabHandler

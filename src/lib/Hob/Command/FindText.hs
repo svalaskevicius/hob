@@ -7,12 +7,12 @@ module Hob.Command.FindText (
         searchMode,
     ) where
 
-import Data.Monoid     (mconcat)
-import Graphics.UI.Gtk
+import           Data.Monoid           (mconcat)
+import           Graphics.UI.Gtk
 
-import Hob.Context
-import Hob.Ui.Editor
-import Hob.Ui.Editor.Search
+import           Hob.Context
+import           Hob.Context.Editor
+import           Hob.Context.UiContext
 
 searchCommandHandler :: String -> CommandHandler
 searchCommandHandler searchText = CommandHandler (Just $ PreviewCommandHandler (searchPreview searchText) searchResetPreview) (searchStart searchText)
@@ -24,26 +24,30 @@ searchBackwardsCommandHandler :: CommandHandler
 searchBackwardsCommandHandler = CommandHandler Nothing searchPrevious
 
 searchPreview :: String -> App()
-searchPreview text = invokeOnActiveEditor (`highlightSearchPreview` text)
+searchPreview "" = searchResetPreview
+searchPreview text = updateActiveEditor (flip (runOnEditor highlightSearchPreview) text)
 
 searchReset :: App()
-searchReset = invokeOnActiveEditor resetSearch
+searchReset = updateActiveEditor $ runOnEditor resetSearch
 
 searchResetPreview :: App()
-searchResetPreview = invokeOnActiveEditor resetSearchPreview
+searchResetPreview = updateActiveEditor $ runOnEditor resetSearchPreview
 
 searchNext :: App()
-searchNext = invokeOnActiveEditor findNext
+searchNext = updateActiveEditor $ runOnEditor findNext
 
 searchPrevious :: App()
-searchPrevious = invokeOnActiveEditor findPrevious
+searchPrevious = updateActiveEditor $ runOnEditor findPrevious
 
 searchStart :: String -> App()
 searchStart text = do
+    ui <- fromContext uiContext
+    let notebook = mainNotebook ui
     enterMode searchMode
-    invokeOnActiveEditor $ \editor -> do
-        findFirstFromCursor editor text
-        widgetGrabFocus editor
+    updateActiveEditor $ \editor -> do
+        editor' <- runOnEditor findFirstFromCursor editor text
+        (runOnEditor activateEditor editor') notebook
+        return editor'
 
 searchMode :: Mode
 searchMode = Mode "search" matcher searchReset

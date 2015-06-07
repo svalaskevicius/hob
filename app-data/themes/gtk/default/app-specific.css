@@ -8,3 +8,10 @@
   color: #FFEE99;
   background-color: mix(@theme_bg_color, yellow, 0.2);
 }
+
+GtkLabel.error {
+  padding: 3px;
+  color: #FF7777;
+  background-color: mix(@theme_bg_color, red, 0.1);
+  border: 1px solid #FF7777;
+}

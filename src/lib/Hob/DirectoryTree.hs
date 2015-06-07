@@ -7,10 +7,10 @@ module Hob.DirectoryTree (
     fileTreeGenerator
 ) where
 
-import Control.Monad   (forM)
-import Data.List       (sortBy)
-import Data.Tree
-import System.FilePath
+import           Control.Monad   (forM)
+import           Data.List       (sortBy)
+import           Data.Tree
+import           System.FilePath
 
 type IsDirectory = Bool
 

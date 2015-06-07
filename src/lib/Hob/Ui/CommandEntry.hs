@@ -6,8 +6,8 @@ import           Data.Text                            (unpack)
 import           Graphics.UI.Gtk
 import qualified Graphics.UI.Gtk.General.StyleContext as GtkSc
 
-import Hob.Context
-import Hob.Control
+import           Hob.Context
+import           Hob.Control
 
 type PreviewResetState = (PreviewCommandHandler -> App(), App())
 

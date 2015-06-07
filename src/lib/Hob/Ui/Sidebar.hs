@@ -7,18 +7,18 @@ module Hob.Ui.Sidebar (
     pathColumn
     ) where
 
-import Control.Monad.Reader
-import Data.List                 (isPrefixOf)
-import Graphics.UI.Gtk
-import Graphics.UI.Gtk.ModelView as Mv
-import GtkExtras.LargeTreeStore  as LTS
+import           Control.Monad.Reader
+import           Data.List                 (isPrefixOf)
+import           Graphics.UI.Gtk
+import           Graphics.UI.Gtk.ModelView as Mv
+import           GtkExtras.LargeTreeStore  as LTS
 
-import Hob.Command.NewTab
-import Hob.Context
-import Hob.Context.FileContext
-import Hob.Context.UiContext
-import Hob.Control
-import Hob.DirectoryTree
+import           Hob.Command.NewTab
+import           Hob.Context
+import           Hob.Context.FileContext
+import           Hob.Context.UiContext
+import           Hob.Control
+import           Hob.DirectoryTree
 
 newSideBarFileTree :: Context -> TreeView -> NewFileEditorLauncher -> IO ()
 newSideBarFileTree ctx treeView launchFile = do
@@ -68,7 +68,7 @@ reloadSidebarTree = do
     let fileTreeLoader = contextFileTreeLoader fileCtx
     liftIO $ LTS.treeStoreClear treeStore
     liftIO $ LTS.treeStoreInsertForest treeStore [] 0 =<< fileTreeLoader
-    emitEvent $ Event "core.sidebar.reload"
+    emitNamedEvent "core.sidebar.reload"
 
 
 activateSidebarPath :: TreeViewClass tv => tv -> TreePath -> IO ()

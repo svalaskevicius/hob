@@ -4,13 +4,13 @@ module Hob.Command.ReplaceText (
         replaceNextCommandHandler,
     ) where
 
-import Data.Monoid     (mconcat)
-import Graphics.UI.Gtk
+import           Data.Monoid           (mconcat)
+import           Graphics.UI.Gtk
 
-import Hob.Command.FindText
-import Hob.Context
-import Hob.Ui.Editor
-import Hob.Ui.Editor.Search
+import           Hob.Command.FindText
+import           Hob.Context
+import           Hob.Context.Editor
+import           Hob.Context.UiContext
 
 createMatcherForReplace :: Char -> (String -> String -> CommandHandler) -> CommandMatcher
 createMatcherForReplace prefix handler = CommandMatcher (const Nothing) match
@@ -48,16 +48,19 @@ replaceNextCommandHandler = CommandHandler Nothing invokeReplaceNext
 
 replaceStart :: String -> String -> App()
 replaceStart searchText replaceText = do
+    ui <- fromContext uiContext
+    let notebook = mainNotebook ui
     enterMode replaceMode
-    invokeOnActiveEditor $ \editor -> do
-        startReplace editor searchText replaceText
-        widgetGrabFocus editor
+    updateActiveEditor $ \editor -> do
+        editor' <- runOnEditor startReplace editor searchText replaceText
+        runOnEditor activateEditor editor' notebook
+        return editor'
 
 invokeReplaceNext :: App()
-invokeReplaceNext = invokeOnActiveEditor replaceNext
+invokeReplaceNext = updateActiveEditor $ runOnEditor replaceNext
 
 replaceReset :: App()
-replaceReset = invokeOnActiveEditor resetReplace
+replaceReset = updateActiveEditor $ runOnEditor resetReplace
 
 replaceMode :: Mode
 replaceMode = Mode "replace" matcher replaceReset
